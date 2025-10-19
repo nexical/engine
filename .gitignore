@@ -1,0 +1,24 @@
+# Build output
+dist/
+.astro/
+.output/
+.wrangler/
+
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.production
+
+# Logs
+npm-debug.log*
+
+# MacOS specific files
+.DS_Store
+
+# AI development
+.aider*
+
+# VSCode IDE
+*.code-workspace
