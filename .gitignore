@@ -1,18 +1,11 @@
-# Build output
-dist/
-.astro/
-.output/
-.wrangler/
+# Python files
+__pycache__
 
-# Dependencies
-node_modules/
-
-# Environment variables
+# Environment files
 .env
-.env.production
 
-# Logs
-npm-debug.log*
+# Test project
+website
 
 # MacOS specific files
 .DS_Store
