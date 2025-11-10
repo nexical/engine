@@ -1,12 +1,11 @@
-================================== AI Architect: Python CLI Specification
-
-.. contents:: Table of Contents
+==================================
+AI Architect: Python CLI Specification
 
 Overview
 
-This document defines the technical specification for the "AI Architect," a Python-based Command Line Interface (CLI) application. This tool functions as a multi-agent system designed to automate the end-to-end creation, modification, and deployment of static websites.
+This document defines the technical specification for the "AI Architect," a Python-based Command Line Interface (CLI) application. The tool is designed to be run within a project directory, which contains the website's configuration and content. It functions as a multi-agent system to automate the end-to-end creation, modification, and deployment of static websites.
 
-The system's core is a "Planner-Executor" agent architecture. It translates high-level, "fuzzy" user commands (e.g., "add a new blog page") into a series of "deterministic" tasks. These tasks are then executed by a workflow engine that calls a set of specialized "specialist agents" and hard-coded services.
+The system's core is a "Planner-Executor" agent architecture. It translates high-level, "fuzzy" user commands (e.g., "add a new blog page") into a series of "deterministic" tasks that operate on files within the project directory. These tasks are then executed by a workflow engine that calls a set of specialized "specialist agents."
 
 The primary goal is to provide a "hands-off" experience where the AI handles complex reasoning and generation, while the application provides a robust, extensible, and auditable framework for execution.
 
@@ -18,262 +17,248 @@ The system is built on three fundamental principles.
 
 The system's "brain" is not a single, monolithic AI. It is a two-part system:
 
-The Planner (AI-driven): This is a specialized AI agent (the PlannerAgent). Its only job is to receive a "fuzzy" user request and convert it into a "deterministic," step-by-step plan, which is saved as a task.yml file.
+The Planner (AI-driven): This is a specialized AI agent, implemented as a ``PlannerAgent`` class. Its only job is to receive a "fuzzy" user request and convert it into a "deterministic," step-by-step ``Plan`` object. This plan can be serialized to a ``task.yml`` file for auditing and debugging.
 
-The Executor (Code-driven): This is a "dumb" (non-AI) Python script (executor.py). Its only job is to read the task.yml file and execute each task in sequence, like a build script.
+The Executor (Code-driven): This is a non-AI ``Executor`` class. Its only job is to take a ``Plan`` object and execute each ``Task`` in sequence, like a build script.
 
-This separation allows for flexibility (the AI can create novel plans) and reliability (the execution of the plan is hard-coded and predictable).
+This separation allows for flexibility (the AI can create novel plans) and reliability (the execution of the plan is handled by predictable, testable Python classes).
 
 2.2. Agents-as-Configuration
 
-Specialist agents (e.g., ContentManager, Illustrator) are not defined as Python classes. They are defined as .yml configuration files in the /agents directory.
+Specialist agents (e.g., ``ContentAgent``, ``DesignerAgent``) are not defined as individual Python classes. Instead, they are defined as ``.yml`` configuration files (profiles) within an ``agents/`` directory. These profiles specify the agent's capabilities, prompts, and the tools it uses.
 
-This principle allows the system to be highly extensible. To add a new tool or capability, a developer simply adds a new .agent.yml file and describes its function in capabilities.yml. The Planner AI will automatically learn how to incorporate this new tool into its plans without requiring any changes to the core application logic.
+A generic ``AgentRunner`` class in Python is responsible for parsing these YAML profiles and executing the tasks. This principle allows the system to be highly extensible. To add a new tool or capability, a developer simply adds a new ``.agent.yml`` file and describes its function in ``capabilities.yml``. The Planner AI will automatically learn how to incorporate this new tool into its plans without requiring any changes to the core application logic.
 
 2.3. Deterministic-by-Default
 
 The AI (Planner) is only used for tasks that require complex reasoning and generation (i.e., "fuzzy" requests).
 
-Any task that is fixed, repeatable, and deterministic (e.g., "deploy the site," "compile the project") is implemented as a hard-coded Python function. The Orchestrator will route user commands (like --publish) directly to these hard-coded services, bypassing the AI Planner entirely. This saves costs, increases speed, and eliminates the risk of AI-generated errors for simple tasks.
+Any task that is fixed, repeatable, and deterministic (e.g., "deploy the site," "compile the project") is implemented as a method within a dedicated Service class (e.g., ``DeploymentService``). The ``Orchestrator`` class will route user commands (like ``--publish``) directly to these service methods, bypassing the AI Planner entirely. This saves costs, increases speed, and eliminates the risk of AI-generated errors for simple tasks.
 
 System Components
 
-3.1. The Orchestrator (orchestrator.py)
+3.1. The Orchestrator (Orchestrator Class)
 
-The main application router, implemented in Python. It is not an AI agent. Its responsibilities are:
+The main application router, implemented as an ``Orchestrator`` class. It is not an AI agent. Its responsibilities are:
 
-Parsing user input from the CLI (e.g., argparse).
+Parsing user input from the CLI (e.g., using ``argparse``).
 
-Routing the user's intent to the correct workflow.
+Routing the user's intent to the correct workflow by instantiating and calling other classes.
 
-Path 1 (AI-Driven): If the user provides a "fuzzy" prompt (e.g., --prompt "..."), the Orchestrator calls the Planner Agent to generate a task.yml, and then passes that plan to the Executor.
+Path 1 (AI-Driven): If the user provides a "fuzzy" prompt (e.g., ``--prompt "..."``), the Orchestrator instantiates the ``PlannerAgent`` to generate a ``Plan`` object, and then passes that plan to an ``Executor`` instance.
 
-Path 2 (Human-Driven): If the user provides a "deterministic" command (e.g., --publish), the Orchestrator bypasses the Planner and calls the Deployment Service directly.
+Path 2 (Human-Driven): If the user provides a "deterministic" command (e.g., ``--publish``), the Orchestrator bypasses the Planner and directly calls methods on the appropriate Service class (e.g., ``DeploymentService``).
 
-3.2. The Planner (AI Agent)
+Path 3 (Interactive Mode): If the application is launched with no arguments, the Orchestrator enters an interactive "chat" mode. It will repeatedly prompt the user for input, treating each line as a "fuzzy" prompt and executing the AI-Driven workflow.
 
-The "master agent" responsible for creating a plan. It is a process, not a file. It is invoked by the Orchestrator.
+3.2. The Planner (PlannerAgent Class)
 
-Input: The user's prompt (e.g., "Add a team page"), the content of capabilities.yml (the "tool menu"), and the current project.yml (the "state").
+The "master agent" responsible for creating a plan, implemented as a ``PlannerAgent`` class inheriting from ``BaseAgent``. It is instantiated and invoked by the ``Orchestrator``.
 
-Action: Calls the Gemini CLI via the GeminiService with a master prompt (defined in planner.agent.yml) instructing it to generate a plan.
+Input: The user's prompt (e.g., "Add a team page"), a list of available agents from ``capabilities.yml`` (the "tool menu"), and a summary of the project's file structure.
 
-Output: A fully-formed task.yml file, which is saved to the project's history.
+Action: Constructs a master prompt and calls an external AI model (e.g., Gemini) via a ``LanguageModelService`` to generate a plan.
 
-3.3. The Executor (executor.py)
+Output: A ``Plan`` object containing a list of ``Task`` objects. These tasks will contain instructions for agents to create, modify, or delete specific files in the project directory. This plan can be serialized to a ``task.yml`` file for auditing.
 
-A non-AI Python script that functions as a workflow engine.
+3.3. The Executor (Executor Class)
 
-Input: A file path to a task.yml file.
+A non-AI Python class that functions as a workflow engine.
+
+Input: A ``Plan`` object and the project path.
 
 Action:
 
-Parses the task.yml.
+Loops through the ``Task`` objects in the ``Plan``.
 
-Loops through the tasks: list in sequence.
+For each task, it prints a notice to the console.
 
-For each task, it prints the notice: field to the console.
+It identifies the required agent profile for the task (e.g., ``ContentAgent``).
 
-It reads the agent: field (e.g., "ContentManager") and calls the corresponding service (e.g., GeminiService) with the parameters defined in the .agent.yml file and the task.
+It uses a generic ``AgentRunner`` to execute the task according to the agent's YAML profile, passing the task's parameters. This may involve calling a language model, running a script, or interacting with the file system.
 
 Output: A "Success" or "Failed" status.
 
-3.4. Agent Definitions (/agents/*.yml)
+3.4. Agent Profiles (agents/)
 
-YAML configuration files that define the "tools" the Planner can use. Each file defines one specialist agent.
+A collection of YAML files that define the "tools" the Planner can use. Each file is a "profile" for a specialist agent.
 
-3.5. Service Abstractions (/services/*.py)
+A specialist agent is responsible for a specific domain. For example:
+- ``ResearcherAgent``: Performs research that provides information to guide content, designs, and development tasks
+- ``ContentAgent``: Writes and edits content files (e.g., Markdown).
+- ``DesignerAgent``: Creates and modifies theme files, CSS, and generates background images.
+- ``DeveloperAgent``: Creates new layouts, components, or other code-based project files.
 
-A layer of hard-coded Python modules that provide all external functionality. This isolates the core logic from implementation details.
+3.5. Service Classes (services/)
 
-gemini_service.py: A wrapper around the Gemini CLI (subprocess.run()).
+A layer of hard-coded Python classes that provide abstractions for all external functionality. This isolates the core application logic from implementation details and facilitates mocking for tests.
 
-github_service.py: A wrapper for GitPython or git CLI commands.
+``LanguageModelService``: A wrapper around an AI model API (e.g., Gemini).
 
-cloudflare_service.py: A wrapper for the Cloudflare API (using requests).
+``GitService``: A wrapper for Git commands (e.g., using GitPython).
 
-deployment_service.py: The hard-coded logic for the --publish and --preview commands.
+``CloudflareService``: A wrapper for the Cloudflare API.
 
-compiler.py: The hard-coded "Developer Agent" logic.
+``DeploymentService``: Contains the hard-coded logic for the ``--publish`` and ``--preview`` commands. It utilizes other services like ``GitService`` and ``CloudflareService``.
 
-fs_service.py: A helper module for all file system I/O (reading/writing project.yml, etc.).
+``FileSystemService``: A helper class for all file system I/O.
 
 Data Models
 
-The system's state is managed through a series of YAML files.
+The system's state is the project directory itself. There is no single state file. Agents interact directly with the file system.
 
-4.1. project.yml (The Website State)
+4.1. Project Directory (The Website State)
 
-The Single Source of Truth (SSOT) for the generated website. This file is the primary artifact that is read and mutated by the agents.
-
-.. code-block:: yaml
-
-# This is the SSOT for the website
-site:
-  title: "Piedmont Capital"
-theme:
-  styleGroups:
-    button-primary: "bg-blue-600 text-white..."
-pages:
-  index:
-    title: "Home"
-    sections:
-      - component: "layout:Hero"
-        content:
-          heading: "Welcome"
-          image_prompt: "A minimalist icon of a mountain peak."
+The file system is the Single Source of Truth (SSOT) for the generated website. Agents read, write, and delete files within the project directory to build and modify the site. This allows for a more flexible and extensible system where different agents can manage different types of files (content, themes, layouts, etc.).
 
 
 4.2. capabilities.yml (The Agent "Menu")
 
-The "menu" of available tools that is provided to the Planner Agent.
+A file that provides a descriptive "menu" of available agent classes for the Planner Agent.
 
 .. note::
-This file is the key to the system's extensibility. Adding a new tool here makes it available to the AI Planner.
+This file, in conjunction with the agent classes themselves, is the key to the system's extensibility. Registering a new agent class and describing it here makes it available to the AI Planner.
 
 .. code-block:: yaml
 
-- name: "ContentManager"
-  description: "Writes, updates, or refactors YAML content in the project.yml. Use for any content changes, adding pages, or modifying site structure."
-- name: "IllustratorAgent"
-  description: "Generates new images from a text prompt. Use when the user asks for a new picture, logo, or icon."
-- name: "Compiler"
-  description: "A hard-coded script that compiles the project.yml into the final /src directory. Call this after any file changes."
+- name: "ResearcherAgent"
+  description: "Performs research and answers questions to help guide content creation, theme design, and component or section layout development.  Use before any requests to create content, updating site styling, or develop site components"
+- name: "ContentAgent"
+  description: "Writes, creates, or edits text-based content files, such as blog posts or page content in Markdown format. Use for any requests related to website text."
+- name: "DesignerAgent"
+  description: "Creates or modifies theme files, CSS stylesheets, and generates images or icons. Use for requests related to visual appearance, styling, logos, and color schemes."
+- name: "DeveloperAgent"
+  description: "Creates or modifies layout templates, page components, or other structural code files. Use for requests to add new page types or complex interactive widgets."
 
 
-4.3. [agent_name].agent.yml (The Tool Definition)
+4.3. Agent Profile Definition (The Tool Implementation)
 
-Defines a single specialist agent's configuration.
+Defines a single specialist agent's configuration and prompt template in a YAML file.
 
 .. code-block:: yaml
 
-# /agents/content-manager.agent.yml
-name: "ContentManager"
-description: "Writes and updates YAML content."
-executable: "gemini" # Tells the executor which service to use
+# agents/content.agent.yml
+name: "ContentAgent"
+description: "Writes and edits Markdown content files."
+# Tells the AgentRunner which execution engine to use.
+# 'llm' for language model, 'script' for a shell command.
+engine: "llm"
 
-# Defines how to build the CLI command
-cli_options:
-  command: "--prompt"
-
-# The prompt template. The Executor will inject variables.
+# The prompt template. The AgentRunner will inject variables.
 prompt_template: |
-  You are an expert YAML content manager.
+  You are an expert content writer.
   The user's request is: "{user_request}"
   The specific task is: "{task_prompt}"
-
-  Please read the following project.yml file, perform the task,
-  and output ONLY the new, complete project.yml file.
+  The current file content of "{file_path}" is:
   ---
-  {project_yml_content}
+  {file_content}
   ---
 
+  Based on the task, please generate the new, complete content for the file "{file_path}".
+  Output ONLY the new file content.
 
-4.4. task.yml (The Dynamic Plan)
 
-The output of the Planner and the input for the Executor. This is a dynamically-generated "script" for the AI.
+4.4. Plan and Task Objects (The Dynamic Plan)
+
+The output of the ``PlannerAgent`` and the input for the ``Executor``. A ``Plan`` is a container for a list of ``Task`` objects. These are dynamically-generated "scripts" for the AI, which can be serialized to a ``task.yml`` file for storage in the project's ``.dev/history/`` directory.
 
 .. code-block:: yaml
 
+# Example task.yml (serialized Plan object)
 plan_name: "Add new team page"
 tasks:
-  - name: "Generate Team Page Content"
-    agent: "ContentManager"
+  - name: "Perform Research on Popular Company Team Pages"
+    agent: "ResearcherAgent"
+    notice: "First, I'm going to research other successful company team pages to gather ideas for layout and content."
+    params:
+      task_prompt: "Perform a search of popular team pages to gather ideas pertaining to structuring team content"
+      file_path: "research/team.md"
+
+  - name: "Create Team Page Content"
+    agent: "ContentAgent"
     notice: "Okay, I'm writing the content for the new 'Team' page."
     params:
-      task_prompt: "Generate a new 'pages.team' YAML block with 3 placeholder team members."
+      task_prompt: "Create a new page about the team with 3 placeholder members. Include a title and a short bio for each."
+      file_path: "content/pages/team.md"
 
   - name: "Generate Team Headshots"
-    agent: "IllustratorAgent"
+    agent: "DesignerAgent"
     notice: "Generating placeholder headshots for the new team..."
     params:
       # This shows how an agent can create multiple sub-tasks
       loop:
-        - user_prompt: "A professional headshot of a male CEO."
-          output_file: "/public/images/team-01.png"
-        - user_prompt: "A professional headshot of a female COO."
-          output_file: "/public/images/team-02.png"
-
-  - name: "Compile Site"
-    agent: "Compiler"
-    notice: "Compiling the new page..."
-    params: {}
+        - image_prompt: "A professional headshot of a male CEO, minimalist style."
+          output_file: "public/_images/team-01.png"
+        - image_prompt: "A professional headshot of a female COO, minimalist style."
+          output_file: "public/_images/team-02.png"
 
 
 Core Workflows
 
 5.1. AI-Driven (Fuzzy) Workflow
 
-This is the flow for a complex, natural language request (e.S., ai-architect --prompt "...").
+This is the flow for a complex, natural language request (e.g., ``ai-architect --prompt "..."``).
 
-Input: The Orchestrator receives the user's prompt string.
+Input: The ``Orchestrator`` receives the user's prompt string.
 
-Planning: The Orchestrator calls the Planner Agent (via GeminiService) with the prompt, capabilities.yml, and current project.yml.
+Planning: The ``Orchestrator`` instantiates the ``PlannerAgent`` and calls its ``generate_plan()`` method, passing the prompt and a summary of the project's file structure.
 
-Plan: The Planner Agent generates a new task.yml file.
+Plan: The ``PlannerAgent`` returns a ``Plan`` object.
 
-Execution: The Orchestrator passes the task.yml file path to the Executor.
+Execution: The ``Orchestrator`` instantiates the ``Executor`` with the ``Plan`` object and project path, then calls its ``execute_plan()`` method.
 
-Task Loop: The Executor reads the task.yml and executes each task sequentially by calling the appropriate Service (e.g., GeminiService, CompilerService).
+Task Loop: The ``Executor`` iterates through the ``Task`` objects in the plan. For each task, it uses the ``AgentRunner`` service to execute the task based on the specified agent's YAML profile.
 
-State Mutation: During execution, services like GeminiService (via the ContentManager agent) overwrite the project.yml with new content.
+State Mutation: During execution, the ``AgentRunner``, guided by the agent profile, uses services like ``LanguageModelService`` and ``FileSystemService`` to create, delete, or overwrite files within the project directory.
 
-Completion: The Executor finishes and reports success to the Orchestrator.
+Completion: The ``Executor`` finishes and reports success to the ``Orchestrator``.
 
 5.2. Human-Driven (Deterministic) Workflow
 
-This is the flow for a fixed, hard-coded command (e.g., ai-architect --publish).
+This is the flow for a fixed, hard-coded command (e.g., ``ai-architect --publish``).
 
-Input: The Orchestrator detects the --publish argument.
+Input: The ``Orchestrator`` detects the ``--publish`` argument.
 
-Routing: The Orchestrator bypasses the Planner and Executor.
+Routing: The ``Orchestrator`` bypasses the ``PlannerAgent`` and ``Executor``.
 
-Execution: It directly calls the DeploymentService.run_production_deployment() function.
+Execution: It directly instantiates and calls the relevant service class, e.g., ``DeploymentService.run_production_deployment()``.
 
-Fixed Sequence: This hard-coded function runs its own steps:
+Fixed Sequence: The service method runs its own steps, potentially using other services:
 
-Call CompilerService.run().
+Instantiate and call the ``CompilerAgent`` via the ``AgentRunner``.
 
-Call GithubService.commit_and_push("main").
+Instantiate and call ``GitService.commit_and_push("main")``.
 
-Call CloudflareService.wait_for_build("production").
+Instantiate and call ``CloudflareService.wait_for_build("production")``.
 
-Completion: The service reports success to the Orchestrator.
+Completion: The service method returns a success status to the ``Orchestrator``.
 
-Proposed Directory Structure
+Project Directory Structure
+
+The `ai-architect` command operates on a project directory. The CLI itself is installed globally, but it uses the files within the current working directory to manage the website. This allows for managing multiple projects in different terminal sessions.
+
+The CLI application itself will contain the core logic (Orchestrator, Planner, Executor, Services). The user's project directory, where the ``ai-architect`` command is run, contains the website source files and agent configurations.
 
 .. code-block:: bash
 
-/ai-architect-cli/
+/my-website-project/
 │
-├── /agents/                      # YAML-based agent definitions
-│   ├── capabilities.yml
-│   ├── planner.agent.yml
-│   ├── researcher.agent.yml
-│   ├── content-manager.agent.yml
-│   └── illustrator.agent.yml
+├── .dev/                         # Internal state files for the AI Architect CLI
+│   ├── research/                 # Agent research output (.yml files)
+│   └── history/                  # Stores past task.yml plans
 │
-├── /app/                         # Core application logic
-│   ├── __init__.py
-│   ├── orchestrator.py         # Main router logic
-│   ├── executor.py             # The task.yml runner
-│   └── compiler.py             # The hard-coded "Compiler" agent/service
+├── agents/                       # Agent profiles (.yml files)
+│   ├── content.agent.yml
+│   ├── designer.agent.yml
+│   └── capabilities.yml          # "Menu" of available agents for the Planner
 │
-├── /services/                    # Hard-coded wrappers for external tools
-│   ├── __init__.py
-│   ├── gemini_service.py         # Wraps subprocess.run("gemini ...")
-│   ├── github_service.py         # Wraps GitPython or git commands
-│   ├── cloudflare_service.py     # Wraps the Cloudflare API (requests)
-│   ├── fs_service.py             # File I/O helpers
-│   └── deployment_service.py     # Hard-coded deploy/preview logic
+├── build/                        # Output directory for the compiled static site
 │
-├── /common/                      # Shared data models
-│   ├── __init__.py
-│   └── models.py               # Pydantic or Dataclass models (Project, Task, etc.)
+├── content/                      # Content files (e.g., YAML content)
 │
-├── main.py                       # Entry point (handles argparse, calls orchestrator)
-├── requirements.txt
-└── .env
+├── src/                          # Astro JS source (e.g., HTML templates and components)
+│
+└── public/                       # User-managed assets (images, CSS, JS, etc.)
 
 
 CLI Interface (API)
@@ -287,3 +272,6 @@ ai-architect --new "Piedmont Capital"
 
 # Run a "fuzzy" AI-driven prompt
 ai-architect --prompt "Add a new page for 'Our Team' with 3 members."
+
+# Enter interactive chat mode (if no arguments are provided)
+ai-architect
