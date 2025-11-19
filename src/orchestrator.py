@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from typing import List
 
@@ -19,9 +20,43 @@ class Orchestrator:
     """
 
     def __init__(self, argv: List[str]):
-        """Initializes the orchestrator with command-line arguments."""
+        """Initializes the orchestrator with command-line arguments and services."""
         self.argv = argv
-        self.project_path = "."  # Assuming current directory is the project
+        self.project_path = os.getcwd()  # Use current working directory
+
+        # Load configuration from environment variables
+        self.cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN")
+        self.cloudflare_account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+        self.project_name = os.getenv("PROJECT_NAME", "my-website-project")
+
+        # Initialize services once
+        self.lm_service = LanguageModelService()
+        self.fs_service = FileSystemService()
+        self.agent_runner = AgentRunner(
+            project_path=self.project_path,
+            lm_service=self.lm_service,
+            fs_service=self.fs_service
+        )
+        self.git_service = GitService(repo_path=self.project_path)
+        
+        self.cloudflare_service = None
+        if self.cloudflare_api_token and self.cloudflare_account_id:
+            self.cloudflare_service = CloudflareService(
+                api_token=self.cloudflare_api_token,
+                account_id=self.cloudflare_account_id
+            )
+
+        self.deployment_service = DeploymentService(
+            agent_runner=self.agent_runner,
+            git_service=self.git_service,
+            cloudflare_service=self.cloudflare_service,
+            project_path=self.project_path,
+            project_name=self.project_name
+        )
+        
+        self.planner = Planner(lm_service=self.lm_service, fs_service=self.fs_service)
+        self.executor = Executor(project_path=self.project_path, agent_runner=self.agent_runner)
+
 
     def run(self) -> None:
         """
@@ -52,49 +87,21 @@ class Orchestrator:
     def run_ai_workflow(self, prompt: str):
         """Handles the AI-driven workflow."""
         print("Starting AI-driven workflow...")
-        # Initialize services
-        # Using mock LM service for now. Phase 6 includes replacing this.
-        lm_service = LanguageModelService()
-        fs_service = FileSystemService()
-        agent_runner = AgentRunner(
-            project_path=self.project_path,
-            lm_service=lm_service,
-            fs_service=fs_service
-        )
-
-        # 1. Planner generates the plan
-        planner = Planner(lm_service=lm_service, fs_service=fs_service)
-        plan = planner.generate_plan(prompt, self.project_path)
-
-        # 2. Executor executes the plan
-        executor = Executor(project_path=self.project_path, agent_runner=agent_runner)
-        executor.execute_plan(plan, user_prompt=prompt)
+        plan = self.planner.generate_plan(prompt, self.project_path)
+        self.executor.execute_plan(plan, user_prompt=prompt)
 
     def run_deterministic_workflow(self, command: str):
         """Handles fixed, deterministic commands."""
         print(f"Starting deterministic workflow: {command}")
-        # Initialize services
-        lm_service = LanguageModelService()
-        fs_service = FileSystemService()
-        agent_runner = AgentRunner(
-            project_path=self.project_path,
-            lm_service=lm_service,
-            fs_service=fs_service
-        )
-        git_service = GitService(repo_path=self.project_path)
-        cloudflare_service = CloudflareService(api_token="FAKE_TOKEN")
-
-        deployment_service = DeploymentService(
-            agent_runner=agent_runner,
-            git_service=git_service,
-            cloudflare_service=cloudflare_service,
-            project_path=self.project_path
-        )
+        
+        if not self.deployment_service or not self.cloudflare_service:
+            print("Error: Cloudflare API token and Account ID must be set as environment variables for deployment.")
+            return
 
         if command == "publish":
-            deployment_service.run_production_deployment()
+            self.deployment_service.run_production_deployment()
         elif command == "preview":
-            deployment_service.run_preview_deployment()
+            self.deployment_service.run_preview_deployment()
         else:
             print(f"Unknown deterministic command: {command}")
 

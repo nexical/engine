@@ -40,7 +40,7 @@ class AgentRunner:
         return {
             "CompilerAgent": CompilerAgent(),
             "ContentManagerAgent": ContentManagerAgent(self.lm_service, self.fs_service),
-            "IllustratorAgent": IllustratorAgent(self.image_generation_service),
+            "IllustratorAgent": IllustratorAgent(self.lm_service, self.fs_service),
         }
 
     def _load_yaml_profiles(self) -> Dict[str, Dict]:

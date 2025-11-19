@@ -14,84 +14,68 @@ class DeploymentService:
         git_service: GitService,
         cloudflare_service: CloudflareService,
         project_path: str,
+        project_name: str,
     ):
         """Initializes the service with its dependencies."""
         self.agent_runner = agent_runner
         self.git_service = git_service
         self.cloudflare_service = cloudflare_service
         self.project_path = project_path
+        self.project_name = project_name
         print("DeploymentService initialized.")
 
-    def run_production_deployment(self) -> None:
-        """
-        Executes the sequence for a production deployment:
-        run compile task, commit, push, and wait for build.
-        """
-        print("--- Starting Production Deployment ---")
-        
+    def _run_deployment(self, environment: str, branch: str, commit_message: str, build_command: str):
+        """Generic deployment workflow."""
+        print(f"--- Starting {environment.capitalize()} Deployment ---")
+
         # 1. Run compile task
         print("Step 1: Compiling project...")
         compile_task = Task(
-            name="Compile Project",
+            name=f"Compile Project for {environment}",
             agent="CompilerAgent",
-            notice="Compiling the website for production.",
-            params={}
+            notice=f"Compiling the website for {environment}.",
+            params={"command": build_command}
         )
         project = Project(project_path=self.project_path)
-        # The mock agent runner will just print a message
         self.agent_runner.run_agent(compile_task, project)
         print("Compilation step complete.")
 
         # 2. Commit and push
         print("\nStep 2: Committing and pushing changes...")
         self.git_service.commit_and_push(
-            branch="main",
-            message="Deploy: Build and deploy production website"
+            branch=branch,
+            message=commit_message
         )
         print("Git step complete.")
 
         # 3. Wait for Cloudflare build
-        print("\nStep 3: Waiting for Cloudflare deployment...")
+        print(f"\nStep 3: Waiting for Cloudflare deployment to '{environment}'...")
         self.cloudflare_service.wait_for_build(
-            project_name="my-website-project", # This would be dynamic
-            environment="production"
+            project_name=self.project_name,
+            environment=environment
         )
         print("Cloudflare step complete.")
         
-        print("\n--- Production Deployment Finished ---")
+        print(f"\n--- {environment.capitalize()} Deployment Finished ---")
 
-    def run_preview_deployment(self) -> None:
+    def run_production_deployment(self, build_command: str = "npm run build") -> None:
+        """
+        Executes the sequence for a production deployment.
+        """
+        self._run_deployment(
+            environment="production",
+            branch="main",
+            commit_message="Deploy: Build and deploy production website",
+            build_command=build_command
+        )
+
+    def run_preview_deployment(self, build_command: str = "npm run build") -> None:
         """
         Executes the sequence for a preview deployment.
         """
-        print("--- Starting Preview Deployment ---")
-        
-        # 1. Run compile task
-        print("Step 1: Compiling project...")
-        compile_task = Task(
-            name="Compile Project",
-            agent="CompilerAgent",
-            notice="Compiling the website for preview.",
-            params={}
-        )
-        project = Project(project_path=self.project_path)
-        self.agent_runner.run_agent(compile_task, project)
-        print("Compilation step complete.")
-
-        # 2. Commit and push to a preview branch
-        print("\nStep 2: Committing and pushing changes...")
-        self.git_service.commit_and_push(
+        self._run_deployment(
+            environment="preview",
             branch="preview",
-            message="Deploy: Build and deploy preview website"
+            commit_message="Deploy: Build and deploy preview website",
+            build_command=build_command
         )
-        print("Git step complete.")
-
-        # 3. Wait for Cloudflare build
-        print("\nStep 3: Waiting for Cloudflare deployment...")
-        self.cloudflare_service.wait_for_build(
-            project_name="my-website-project",
-            environment="preview"
-        )
-        print("Cloudflare step complete.")
-        
-        print("\n--- Preview Deployment Finished ---")
