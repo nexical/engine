@@ -18,7 +18,7 @@ class Planner:
 
     def _get_agent_capabilities(self, project_path: str) -> str:
         """Reads the capabilities.yml file and returns it as a string."""
-        capabilities_path = os.path.join(project_path, "agents", "capabilities.yml")
+        capabilities_path = os.path.join(project_path, ".builder", "agents", "capabilities.yml")
         if os.path.exists(capabilities_path):
             return self.fs_service.read_file(capabilities_path)
         return "No agent capabilities file found."

@@ -46,7 +46,7 @@ class AgentRunner:
     def _load_yaml_profiles(self) -> Dict[str, Dict]:
         """Loads agent profiles from the agents/ directory."""
         profiles = {}
-        agents_dir = os.path.join(self.project_path, "agents")
+        agents_dir = os.path.join(self.project_path, ".builder", "agents")
         if not os.path.isdir(agents_dir):
             return profiles
 
