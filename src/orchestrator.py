@@ -22,7 +22,17 @@ class Orchestrator:
     def __init__(self, argv: List[str]):
         """Initializes the orchestrator with command-line arguments and services."""
         self.argv = argv
-        self.project_path = os.getcwd()  # Use current working directory
+        self.argv = argv
+        
+        # Determine project path: check for 'website' subdirectory first
+        cwd = os.getcwd()
+        website_path = os.path.join(cwd, "website")
+        if os.path.isdir(website_path):
+            self.project_path = website_path
+            print(f"Detected 'website' subdirectory. Using project path: {self.project_path}")
+        else:
+            self.project_path = cwd
+            print(f"Using current directory as project path: {self.project_path}")
 
         # Load configuration from environment variables
         self.cloudflare_api_token = os.getenv("CLOUDFLARE_API_TOKEN")
