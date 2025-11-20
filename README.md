@@ -15,7 +15,7 @@ This separation provides both flexibility and reliability. The AI can create nov
 
 ### Agents-as-Configuration
 
-Specialist agents (e.g., for content, design, or development) are defined as `.yml` configuration files (profiles) within an `agents/` directory in your website project. A generic `AgentRunner` class in the application is responsible for parsing these YAML profiles and executing the tasks. This allows the system to be highly extensible—adding a new tool or capability is as simple as adding a new `.agent.yml` file.
+Specialist agents (e.g., for content, design, or development) are defined as `.yml` configuration files (profiles) within an `agents/` directory in your website project. A generic `AgentRunner` class in the application is responsible for parsing these YAML profiles and executing the tasks by calling external CLI tools (like `gemini`). This allows the system to be highly extensible—adding a new tool or capability is as simple as adding a new `.agent.yml` file that maps to a CLI command.
 
 ## Getting Started
 
@@ -23,7 +23,7 @@ Specialist agents (e.g., for content, design, or development) are defined as `.y
 
 *   Python 3.8+
 *   Git
-*   An LLM API key from a provider supported by [LiteLLM](https://litellm.ai/) (e.g., OpenAI, Anthropic, Google).
+*   `gemini` CLI tool (or other CLI tools defined in your agents) installed and in your PATH.
 *   (Optional) A Cloudflare account for deployments.
 
 ### Installation
@@ -49,15 +49,6 @@ Specialist agents (e.g., for content, design, or development) are defined as `.y
 2.  Edit the `.env` file with your credentials:
 
     ```env
-    # LLM Configuration (choose your provider)
-    OPENAI_API_KEY="sk-..."
-    # ANTHROPIC_API_KEY="sk-..."
-    # GOOGLE_API_KEY="..."
-
-    # LiteLLM model names
-    LITELLM_MODEL="gpt-4"
-    LITELLM_IMAGE_MODEL="dall-e-3"
-
     # Cloudflare Configuration (for --publish and --preview)
     CLOUDFLARE_API_TOKEN="your-cloudflare-api-token"
     CLOUDFLARE_ACCOUNT_ID="your-cloudflare-account-id"
@@ -79,9 +70,10 @@ Your website project should have the following structure:
 ├── .dev/                         # Internal state files for the AI Architect CLI
 │   ├── research/                 # Agent research output (.md files)
 │   └── history/                  # Stores past task.yml plans
-├── agents/                       # Agent profiles (.yml files)
+├── website/.builder/agents/      # Agent profiles (.yml files)
 │   ├── content.agent.yml
 │   ├── designer.agent.yml
+│   ├── compiler.agent.yml
 │   └── capabilities.yml          # "Menu" of available agents for the Planner
 ├── build/                        # Output directory for the compiled static site
 ├── content/                      # Content files (e.g., YAML content)
@@ -129,13 +121,17 @@ This application is designed to be extensible. You can add new capabilities by c
 
 ### Agent Profiles
 
-An agent profile is a YAML file in the `agents/` directory of your website project. It defines the agent's name, description, and how it operates.
+An agent profile is a YAML file in the `website/.builder/agents/` directory of your website project. It defines the agent's name, description, and the CLI command it executes.
 
 **Example `content.agent.yml`:**
 ```yaml
 name: "ContentAgent"
 description: "Writes and edits Markdown content files."
-engine: "llm"
+command: "gemini"
+args:
+  - "run"
+  - "{prompt}"
+
 prompt_template: |
   You are an expert content writer.
   The user's request is: "{user_request}"
@@ -150,7 +146,7 @@ prompt_template: |
 
 ### Capabilities Menu
 
-The `agents/capabilities.yml` file provides a "menu" of available agents for the Planner AI, telling it what tools it can use to fulfill a user's request.
+The `website/.builder/agents/capabilities.yml` file provides a "menu" of available agents for the Planner AI, telling it what tools it can use to fulfill a user's request.
 
 **Example `capabilities.yml`:**
 ```yaml
