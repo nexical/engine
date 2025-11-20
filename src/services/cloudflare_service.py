@@ -59,9 +59,46 @@ class CloudflareService:
                 # If still building, wait and poll again
                 time.sleep(30)
 
-            except requests.exceptions.RequestException as e:
-                print(f"Error communicating with Cloudflare API: {e}")
-                raise
             except Exception as e:
                 print(f"An error occurred: {e}")
                 raise
+
+    def get_project(self, project_name: str):
+        """Checks if a project exists."""
+        url = f"{self.BASE_URL}/accounts/{self.account_id}/pages/projects/{project_name}"
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                return response.json()["result"]
+            return None
+        except requests.exceptions.RequestException:
+            return None
+
+    def create_project(self, project_name: str):
+        """Creates a new Pages project."""
+        url = f"{self.BASE_URL}/accounts/{self.account_id}/pages/projects"
+        payload = {
+            "name": project_name,
+            "production_branch": "main",
+            # Add other defaults as needed
+        }
+        print(f"Creating Cloudflare Pages project: {project_name}")
+        response = requests.post(url, headers=self.headers, json=payload)
+        response.raise_for_status()
+        return response.json()["result"]
+
+    def add_domain(self, project_name: str, domain: str):
+        """Links a custom domain to the project."""
+        url = f"{self.BASE_URL}/accounts/{self.account_id}/pages/projects/{project_name}/domains"
+        payload = {"name": domain}
+        print(f"Linking domain '{domain}' to project '{project_name}'")
+        try:
+            response = requests.post(url, headers=self.headers, json=payload)
+            response.raise_for_status()
+            return response.json()["result"]
+        except requests.exceptions.HTTPError as e:
+            # If domain already exists, it might return 409 or similar, handle gracefully if needed
+            print(f"Failed to add domain: {e}")
+            # For now, we raise to be safe, but could ignore if "already exists"
+            raise
+
