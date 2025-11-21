@@ -20,6 +20,20 @@ The application follows a modular architecture centered around an **Orchestrator
 - **CloudflareService**: Handles deployments to Cloudflare Pages.
 - **DeploymentService**: Orchestrates the deployment process, combining Git and Cloudflare operations.
 
+### Task Execution Model
+
+The application supports a **Directed Acyclic Graph (DAG)** execution model for plans. This allows for:
+
+- **Parallel Execution**: Independent tasks are executed concurrently to speed up workflows.
+- **Sequential Execution**: Tasks with dependencies wait for their prerequisites to complete.
+
+**Plan Structure:**
+Each task in the generated YAML plan includes:
+- `id`: A unique identifier for the task.
+- `dependencies`: A list of task IDs that must complete before this task can start.
+
+The **Executor** builds a dependency graph and dynamically schedules tasks as their dependencies are met.
+
 ## Usage
 
 ### Prerequisites
