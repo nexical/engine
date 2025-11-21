@@ -25,12 +25,9 @@ export class AgentRunner {
     }
 
     private loadYamlProfiles(): void {
-        let agentsDir = path.join(this.projectPath, 'website', '.builder', 'agents');
+        let agentsDir = path.join(this.projectPath, '.builder', 'agents');
         if (!this.fsService.isDirectory(agentsDir)) {
-            agentsDir = path.join(this.projectPath, '.builder', 'agents');
-            if (!this.fsService.isDirectory(agentsDir)) {
-                return;
-            }
+            return;
         }
 
         const files = this.fsService.listFiles(agentsDir);
@@ -68,8 +65,9 @@ export class AgentRunner {
 
     private executeCliAgent(task: Task, profile: AgentProfile, project: Project, userPrompt: string): Project {
         const promptTemplate = profile.prompt_template || '';
+        const params = task.params || {};
 
-        const filePath = task.params.file_path;
+        const filePath = params.file_path;
         let fileContent = '';
         if (filePath) {
             const fullPath = path.join(project.project_path, filePath);
@@ -80,7 +78,7 @@ export class AgentRunner {
             user_request: userPrompt,
             file_path: filePath || '',
             file_content: fileContent || '',
-            ...task.params
+            ...params
         };
 
         // Interpolate prompt

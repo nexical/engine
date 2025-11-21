@@ -47,7 +47,9 @@ export class Planner {
                 throw new Error(`Planner CLI exited with code ${result.status}`);
             }
 
-            const planYaml = result.stdout;
+            let planYaml = result.stdout;
+            // Strip markdown code blocks if present
+            planYaml = planYaml.replace(/```yaml\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
             return PlanUtils.fromYaml(planYaml);
 
         } catch (e) {
