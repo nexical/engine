@@ -1,6 +1,6 @@
 # Website Editor CLI (TypeScript)
 
-This project is a TypeScript-based CLI application designed to orchestrate AI agents for website modification and deployment. It serves as a modern, strongly-typed replacement for the original Python implementation, leveraging CLI tools for LLM interactions and agent execution.
+This project is a TypeScript-based CLI application designed to orchestrate AI agents for website modification and deployment. It leverages CLI tools for LLM interactions and agent execution.
 
 ## Architecture
 
@@ -78,7 +78,7 @@ npm run builder
 
 ## Agent Definition Patterns
 
-Agents are defined as YAML files located in `.builder/agents/` (or `website/.builder/agents/`). This allows for flexible, data-driven agent configuration.
+Agents are defined as YAML files located in `.builder/agents/` (or `website/.builder/agents/` for CLI development). This allows for flexible, data-driven agent configuration.
 
 ### Agent Profile Format (`.agent.yml`)
 
@@ -109,10 +109,10 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
 ### Directory Structure
 
 - `src/`: Source code.
-    - `data_models/`: TypeScript interfaces and classes for core entities (Plan, Task, Project).
+    - `data_models/`: TypeScript interfaces and classes for core entities (Plan, Task, Project, DeploymentConfig).
     - `services/`: Service implementations.
+- `prompts`: Prompt templates for CLI use.
 - `dist/`: Compiled JavaScript output.
-- `python/`: Legacy Python implementation (deprecated).
 
 ### Building and Testing
 
@@ -122,14 +122,14 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
 ### Extending the Application
 
 1.  **Add a Service**: Create a new class in `src/services/` and inject it into the `Orchestrator`.
-2.  **Add an Agent**: Create a new `.agent.yml` file in the agents directory. No code changes are required for standard CLI agents.
+2.  **Add an Agent**: Create a new `.agent.yml` file in the project .builder/agents directory. No code changes are required for CLI agents.
 3.  **Modify Logic**: Update `src/planner.ts` or `src/executor.ts` to change how plans are generated or executed.
 
 ## Configuration
 
-The application uses a YAML configuration file located at `.builder/deployment.yml` to manage project settings and domain linking.
+The application uses a YAML configuration file located at `.builder/deploy.yml` to manage project settings and domain linking.
 
-### `deployment.yml` Format
+### `deploy.yml` Format
 
 ```yaml
 project_name: "my-website-project"
