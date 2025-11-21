@@ -1,3 +1,0 @@
-# Application Environment and Parsing
-python-dotenv==1.2.1
-PyYAML==6.0.3
