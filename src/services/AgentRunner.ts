@@ -1,6 +1,6 @@
 import path from 'path';
 import yaml from 'js-yaml';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import { Task } from '../data_models/Task.js';
 import { Project } from '../data_models/Project.js';
 import { FileSystemService } from './FileSystemService.js';
@@ -47,7 +47,7 @@ export class AgentRunner {
         }
     }
 
-    runAgent(task: Task, project: Project, userPrompt: string): Project {
+    async runAgent(task: Task, project: Project, userPrompt: string): Promise<Project> {
         console.log(task.notice);
 
         if (this.agents[task.agent]) {
@@ -58,70 +58,92 @@ export class AgentRunner {
         return project;
     }
 
-    private runYamlAgent(task: Task, project: Project, userPrompt: string): Project {
+    private async runYamlAgent(task: Task, project: Project, userPrompt: string): Promise<Project> {
         const profile = this.agents[task.agent];
         return this.executeCliAgent(task, profile, project, userPrompt);
     }
 
-    private executeCliAgent(task: Task, profile: AgentProfile, project: Project, userPrompt: string): Project {
-        const promptTemplate = profile.prompt_template || '';
-        const params = task.params || {};
+    private executeCliAgent(task: Task, profile: AgentProfile, project: Project, userPrompt: string): Promise<Project> {
+        return new Promise((resolve, reject) => {
+            const promptTemplate = profile.prompt_template || '';
+            const params = task.params || {};
 
-        const filePath = params.file_path;
-        let fileContent = '';
-        if (filePath) {
-            const fullPath = path.join(project.project_path, filePath);
-            fileContent = this.fsService.readFile(fullPath);
-        }
-
-        const formatArgs: Record<string, any> = {
-            user_request: userPrompt,
-            file_path: filePath || '',
-            file_content: fileContent || '',
-            ...params
-        };
-
-        // Interpolate prompt
-        let prompt = promptTemplate;
-        for (const [key, value] of Object.entries(formatArgs)) {
-            prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
-        }
-
-        const commandBin = profile.command || 'gemini';
-        const argsTemplate = profile.args || [];
-
-        formatArgs['prompt'] = prompt;
-
-        const finalArgs = argsTemplate.map(arg => {
-            let formattedArg = arg;
-            for (const [key, value] of Object.entries(formatArgs)) {
-                formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
+            const filePath = params.file_path;
+            let fileContent = '';
+            if (filePath) {
+                const fullPath = path.join(project.project_path, filePath);
+                fileContent = this.fsService.readFile(fullPath);
             }
-            return formattedArg;
-        });
 
-        console.log(`Running CLI agent: ${task.agent}`);
-        console.log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
+            const formatArgs: Record<string, any> = {
+                user_request: userPrompt,
+                file_path: filePath || '',
+                file_content: fileContent || '',
+                ...params
+            };
 
-        try {
-            const result = spawnSync(commandBin, finalArgs, {
-                cwd: project.project_path,
-                encoding: 'utf-8',
-                stdio: ['inherit', 'pipe', 'pipe'] // Inherit stdin, pipe stdout/stderr
+            // Interpolate prompt
+            let prompt = promptTemplate;
+            for (const [key, value] of Object.entries(formatArgs)) {
+                prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
+            }
+
+            const commandBin = profile.command || 'gemini';
+            const argsTemplate = profile.args || [];
+
+            formatArgs['prompt'] = prompt;
+
+            const finalArgs = argsTemplate.map(arg => {
+                let formattedArg = arg;
+                for (const [key, value] of Object.entries(formatArgs)) {
+                    formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
+                }
+                return formattedArg;
             });
 
-            console.log("--- stdout ---");
-            console.log(result.stdout);
-            console.log("--- stderr ---");
-            console.log(result.stderr);
+            console.log(`Running CLI agent: ${task.agent}`);
+            console.log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
 
-            if (result.status !== 0) {
-                console.warn(`Warning: Command exited with code ${result.status}`);
+            const child = spawn(commandBin, finalArgs, {
+                cwd: project.project_path,
+                stdio: ['inherit', 'pipe', 'pipe']
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            if (child.stdout) {
+                child.stdout.on('data', (data: Buffer) => {
+                    const chunk = data.toString();
+                    stdout += chunk;
+                    process.stdout.write(chunk);
+                });
             }
-        } catch (e) {
-            console.error(`An error occurred while executing the CLI agent: ${e}`);
-        }
 
-        return project;
+            if (child.stderr) {
+                child.stderr.on('data', (data: Buffer) => {
+                    const chunk = data.toString();
+                    stderr += chunk;
+                    process.stderr.write(chunk);
+                });
+            }
+
+            child.on('close', (code: number) => {
+                console.log("--- stdout ---");
+                console.log(stdout);
+                console.log("--- stderr ---");
+                console.log(stderr);
+
+                if (code !== 0) {
+                    console.warn(`Warning: Command exited with code ${code}`);
+                }
+                resolve(project);
+            });
+
+            child.on('error', (err: Error) => {
+                console.error(`An error occurred while executing the CLI agent: ${err}`);
+                reject(err);
+            });
+        });
     }
 }
