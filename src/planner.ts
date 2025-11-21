@@ -17,19 +17,15 @@ export class Planner {
     generatePlan(prompt: string, projectPath: string): Plan {
         const agentCapabilities = this.getAgentCapabilities(projectPath);
 
-        const fullPrompt = `
-You are an AI Architect. Your job is to create a deterministic YAML plan to accomplish a user's goal.
-The user's prompt is: "${prompt}"
+        const promptPath = path.join(process.cwd(), 'prompts', 'planner.md');
+        let fullPrompt = this.fsService.readFile(promptPath);
 
-Here are the tools (agents) you have available:
----
-${agentCapabilities}
----
+        if (!fullPrompt) {
+            throw new Error(`Planner prompt not found at ${promptPath}`);
+        }
 
-Based on the user's prompt and the available agents, please generate a YAML plan.
-The plan should be a sequence of tasks. Each task must use one of the available agents.
-The output must be only the YAML plan, starting with 'plan_name:'.
-`;
+        fullPrompt = fullPrompt.replace('{user_prompt}', prompt)
+            .replace('{agent_capabilities}', agentCapabilities);
 
         console.log("Generating plan for prompt:", prompt);
 
