@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs-extra';
+import yaml from 'js-yaml';
 import { Planner } from './planner.js';
 import { Executor } from './executor.js';
 import { AgentRunner } from './services/AgentRunner.js';
@@ -7,12 +8,13 @@ import { DeploymentService } from './services/DeploymentService.js';
 import { GitService } from './services/GitService.js';
 import { CloudflareService } from './services/CloudflareService.js';
 import { FileSystemService } from './services/FileSystemService.js';
+import { DeploymentConfig } from './data_models/DeploymentConfig.js';
 
 export class Orchestrator {
     private projectPath: string;
     private cloudflareApiToken: string | undefined;
     private cloudflareAccountId: string | undefined;
-    private projectName: string;
+    private deploymentConfig: DeploymentConfig;
 
     private fsService: FileSystemService;
     private agentRunner: AgentRunner;
@@ -36,9 +38,10 @@ export class Orchestrator {
 
         this.cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN;
         this.cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-        this.projectName = process.env.PROJECT_NAME || 'my-website-project';
 
         this.fsService = new FileSystemService();
+        this.deploymentConfig = this.loadDeploymentConfig();
+
         this.agentRunner = new AgentRunner(this.projectPath, this.fsService);
         this.gitService = new GitService(this.projectPath);
 
@@ -55,11 +58,30 @@ export class Orchestrator {
             this.gitService,
             this.cloudflareService,
             this.projectPath,
-            this.projectName
+            this.deploymentConfig
         );
 
         this.planner = new Planner(this.fsService);
         this.executor = new Executor(this.projectPath, this.agentRunner);
+    }
+
+    private loadDeploymentConfig(): DeploymentConfig {
+        const configPath = path.join(this.projectPath, '.builder', 'deployment.yml');
+        if (fs.existsSync(configPath)) {
+            try {
+                const content = fs.readFileSync(configPath, 'utf-8');
+                const config = yaml.load(content) as DeploymentConfig;
+                if (config && config.project_name) {
+                    return config;
+                }
+            } catch (e) {
+                console.error(`Error loading deployment config from ${configPath}:`, e);
+            }
+        }
+
+        // Fallback or error if config is missing
+        console.warn("Warning: .builder/deployment.yml not found or invalid. Using default project name.");
+        return { project_name: 'my-website-project' };
     }
 
     runAiWorkflow(prompt: string): void {
@@ -72,7 +94,7 @@ export class Orchestrator {
         }
     }
 
-    runDeterministicWorkflow(command: string): void {
+    async runDeterministicWorkflow(command: string): Promise<void> {
         console.log(`Starting deterministic workflow: ${command}`);
 
         if (!this.deploymentService || !this.cloudflareService) {
@@ -81,9 +103,9 @@ export class Orchestrator {
         }
 
         if (command === 'publish') {
-            this.deploymentService.runProductionDeployment();
+            await this.deploymentService.runProductionDeployment();
         } else if (command === 'preview') {
-            this.deploymentService.runPreviewDeployment();
+            await this.deploymentService.runPreviewDeployment();
         } else {
             console.error(`Unknown deterministic command: ${command}`);
         }

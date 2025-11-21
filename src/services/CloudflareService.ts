@@ -6,15 +6,13 @@ export class CloudflareService {
         private accountId: string
     ) { }
 
-    deploy(projectName: string, directory: string = '.', branch?: string): string {
+    async deploy(projectName: string, directory: string = '.', branch?: string): Promise<string> {
         const args = ['pages', 'deploy', directory, '--project-name', projectName];
 
         if (branch) {
             args.push('--branch', branch);
         }
 
-        // We assume wrangler is installed and available in the environment or via npx
-        // Using npx to ensure we use the local or installed version
         const command = 'npx';
         const commandArgs = ['wrangler', ...args];
 
@@ -34,4 +32,39 @@ export class CloudflareService {
 
         return "Deployment successful";
     }
+
+    async linkDomain(projectName: string, domain: string): Promise<void> {
+        console.log(`Linking domain ${domain} to project ${projectName}...`);
+
+        const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects/${projectName}/domains`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: domain
+                })
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`Failed to link domain: ${response.status} ${response.statusText} - ${errorBody}`);
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(`Cloudflare API error: ${JSON.stringify(data.errors)}`);
+            }
+
+            console.log(`Successfully linked domain ${domain}`);
+        } catch (error) {
+            console.error(`Error linking domain ${domain}:`, error);
+            throw error;
+        }
+    }
 }
+

@@ -3,6 +3,7 @@ import { AgentRunner } from './AgentRunner.js';
 import { GitService } from './GitService.js';
 import { CloudflareService } from './CloudflareService.js';
 import { Project } from '../data_models/Project.js';
+import { DeploymentConfig } from '../data_models/DeploymentConfig.js';
 
 export class DeploymentService {
     constructor(
@@ -10,10 +11,10 @@ export class DeploymentService {
         private gitService: GitService,
         private cloudflareService: CloudflareService | null,
         private projectPath: string,
-        private projectName: string
+        private config: DeploymentConfig
     ) { }
 
-    runProductionDeployment(): void {
+    async runProductionDeployment(): Promise<void> {
         console.log("Starting production deployment...");
 
         // 1. Verify clean git state
@@ -28,13 +29,15 @@ export class DeploymentService {
             return;
         }
 
-        // 2. Build (if necessary) - handled by Cloudflare usually, but we can add a build step here if needed
-
-        // 3. Deploy to Cloudflare
+        // 2. Deploy to Cloudflare
         if (this.cloudflareService) {
             try {
-                this.cloudflareService.deploy(this.projectName, '.', 'main');
+                await this.cloudflareService.deploy(this.config.project_name, '.', 'main');
                 console.log("Production deployment triggered.");
+
+                if (this.config.production_domain) {
+                    await this.cloudflareService.linkDomain(this.config.project_name, this.config.production_domain);
+                }
             } catch (e) {
                 console.error("Deployment failed:", e);
             }
@@ -43,14 +46,20 @@ export class DeploymentService {
         }
     }
 
-    runPreviewDeployment(): void {
+    async runPreviewDeployment(): Promise<void> {
         console.log("Starting preview deployment...");
 
         if (this.cloudflareService) {
             try {
                 const branch = this.gitService.getCurrentBranch();
-                this.cloudflareService.deploy(this.projectName, '.', branch);
+                await this.cloudflareService.deploy(this.config.project_name, '.', branch);
                 console.log(`Preview deployment triggered for branch ${branch}.`);
+
+                if (this.config.preview_domain) {
+                    // Note: Preview domains are usually per-branch, so linking a single static preview domain might not be desired 
+                    // unless it's a specific "staging" branch. For now, we'll link it if provided.
+                    await this.cloudflareService.linkDomain(this.config.project_name, this.config.preview_domain);
+                }
             } catch (e) {
                 console.error("Preview deployment failed:", e);
             }
