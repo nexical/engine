@@ -34,7 +34,7 @@ export class Orchestrator {
         this.config.builderPath = path.join(this.config.projectPath, '.builder');
         this.config.agentsPath = path.join(this.config.builderPath, 'agents')
         this.config.historyPath = path.join(this.config.builderPath, 'history')
-        this.config.deployConfigPath = path.join(this.config.builderPath, 'deployer.yml');
+        this.config.deployConfigPath = path.join(this.config.builderPath, 'deploy.yml');
 
         this.fsService = new FileSystemService();
 
@@ -65,7 +65,7 @@ export class Orchestrator {
         try {
             const plan = this.planner.generatePlan(prompt);
             this.savePlanToHistory(plan);
-            //this.executor.executePlan(plan, prompt);
+            // this.executor.executePlan(plan, prompt);
         } catch (e) {
             console.error("AI workflow failed:", e);
         }
