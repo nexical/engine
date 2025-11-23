@@ -1,17 +1,21 @@
 import { Plan } from './data_models/Plan.js';
 import { Task } from './data_models/Task.js';
-import { AgentRunner } from './services/AgentRunner.js';
+import { AppConfig } from './data_models/AppConfig.js';
 import { Project } from './data_models/Project.js';
+import { AgentRunner } from './services/AgentRunner.js';
 
 export class Executor {
+    private agentRunner: AgentRunner;
+
     constructor(
-        private projectPath: string,
-        private agentRunner: AgentRunner
-    ) { }
+        private config: AppConfig
+    ) {
+        this.agentRunner = new AgentRunner(this.config);
+    }
 
     async executePlan(plan: Plan, userPrompt: string): Promise<void> {
         console.log(`Executing plan: ${plan.plan_name}`);
-        let project: Project = { project_path: this.projectPath };
+        let project: Project = { project_path: this.config.projectPath };
 
         const tasksById = new Map<string, Task>();
         const completedTasks = new Set<string>();

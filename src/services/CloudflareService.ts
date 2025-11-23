@@ -1,10 +1,18 @@
 import { spawnSync } from 'child_process';
+import { AppConfig } from '../data_models/AppConfig.js';
 
 export class CloudflareService {
-    constructor(
-        private apiToken: string,
-        private accountId: string
-    ) { }
+    private apiToken: string | undefined;
+    private accountId: string | undefined;
+
+    constructor(private config: AppConfig) {
+        this.apiToken = process.env.CLOUDFLARE_API_TOKEN;
+        this.accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+
+        if (!this.apiToken || !this.accountId) {
+            throw new Error("Cloudflare API token and Account ID must be set as environment variables for deployment.");
+        }
+    }
 
     async createProject(projectName: string): Promise<void> {
         console.log(`Creating Cloudflare Pages project: ${projectName}...`);

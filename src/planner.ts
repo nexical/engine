@@ -1,36 +1,43 @@
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { AppConfig } from './data_models/AppConfig.js';
 import { Plan, PlanUtils } from './data_models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
 
 export class Planner {
-    constructor(private fsService: FileSystemService) { }
+    private plannerPrompt: string
+    private fsService: FileSystemService
 
-    private getAgentCapabilities(projectPath: string): string {
-        const capabilitiesPath = path.join(projectPath, '.builder', 'agents', 'capabilities.yml');
+    constructor(private config: AppConfig) {
+        const plannerPromptFile = 'planner.md';
+        const corePlannerPrompt = path.join(this.config.appPath, 'prompts', plannerPromptFile);
+        const projectPlannerPrompt = path.join(this.config.agentsPath, plannerPromptFile);
+
+        this.fsService = new FileSystemService();
+
+        if (this.fsService.exists(projectPlannerPrompt)) {
+            this.plannerPrompt = this.fsService.readFile(projectPlannerPrompt);
+        } else {
+            this.plannerPrompt = this.fsService.readFile(corePlannerPrompt);
+        }
+    }
+
+    private getAgentCapabilities(): string {
+        const capabilitiesPath = path.join(this.config.agentsPath, 'capabilities.yml');
         if (this.fsService.exists(capabilitiesPath)) {
             return this.fsService.readFile(capabilitiesPath);
         }
         return "No agent capabilities file found.";
     }
 
-    generatePlan(prompt: string, projectPath: string): Plan {
-        const agentCapabilities = this.getAgentCapabilities(projectPath);
+    generatePlan(prompt: string): Plan {
+        const agentCapabilities = this.getAgentCapabilities();
 
-        const promptPath = path.join(process.cwd(), 'prompts', 'planner.md');
-        let fullPrompt = this.fsService.readFile(promptPath);
-
-        if (!fullPrompt) {
-            throw new Error(`Planner prompt not found at ${promptPath}`);
-        }
-
-        fullPrompt = fullPrompt.replace('{user_prompt}', prompt)
+        const fullPrompt = this.plannerPrompt.replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities);
 
         console.log("Generating plan for prompt:", prompt);
 
-        // Execute gemini CLI directly
-        // Assuming 'gemini' is in the PATH or we use a specific command
         const command = 'gemini';
         const args = ['prompt', fullPrompt];
 

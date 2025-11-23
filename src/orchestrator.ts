@@ -1,104 +1,49 @@
 import path from 'path';
 import fs from 'fs-extra';
-import yaml from 'js-yaml';
-import { Planner } from './planner.js';
+import { fileURLToPath } from 'url';
 import { Plan, PlanUtils } from './data_models/Plan.js';
-import { Executor } from './executor.js';
-import { AgentRunner } from './services/AgentRunner.js';
-import { DeploymentService } from './services/DeploymentService.js';
-import { GitService } from './services/GitService.js';
-import { CloudflareService } from './services/CloudflareService.js';
+import { AppConfig } from './data_models/AppConfig.js';
 import { FileSystemService } from './services/FileSystemService.js';
-import { DeploymentConfig } from './data_models/DeploymentConfig.js';
+import { Planner } from './planner.js';
+import { Executor } from './executor.js';
+import { Deployer } from './deployer.js';
+
 
 export class Orchestrator {
-    private projectPath: string;
-    private cloudflareApiToken: string | undefined;
-    private cloudflareAccountId: string | undefined;
-    private deploymentConfig: DeploymentConfig;
-
+    private config: AppConfig;
     private fsService: FileSystemService;
-    private agentRunner: AgentRunner;
-    private gitService: GitService;
-    private cloudflareService: CloudflareService | null;
-    private deploymentService: DeploymentService;
     private planner: Planner;
     private executor: Executor;
+    private deployer: Deployer;
 
     constructor(argv: string[]) {
+        this.config = {} as AppConfig;
         const cwd = process.cwd();
         const websitePath = path.join(cwd, 'website');
 
         if (fs.existsSync(websitePath) && fs.statSync(websitePath).isDirectory()) {
-            this.projectPath = websitePath;
-            console.log(`Detected 'website' subdirectory. Using project path: ${this.projectPath}`);
+            this.config.projectPath = websitePath;
         } else {
-            this.projectPath = cwd;
-            console.log(`Using current directory as project path: ${this.projectPath}`);
+            this.config.projectPath = cwd;
         }
 
-        this.cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN;
-        this.cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+        console.debug(`Project path: ${this.config.projectPath}`);
+        console.debug('');
+
+        this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
+        this.config.builderPath = path.join(this.config.projectPath, '.builder');
+        this.config.agentsPath = path.join(this.config.builderPath, 'agents')
+        this.config.historyPath = path.join(this.config.builderPath, 'history')
+        this.config.deployConfigPath = path.join(this.config.builderPath, 'deployer.yml');
 
         this.fsService = new FileSystemService();
-        this.deploymentConfig = this.loadDeploymentConfig();
 
-        this.agentRunner = new AgentRunner(this.projectPath, this.fsService);
-        this.gitService = new GitService(this.projectPath);
-
-        this.cloudflareService = null;
-        if (this.cloudflareApiToken && this.cloudflareAccountId) {
-            this.cloudflareService = new CloudflareService(
-                this.cloudflareApiToken,
-                this.cloudflareAccountId
-            );
-        }
-
-        this.deploymentService = new DeploymentService(
-            this.agentRunner,
-            this.gitService,
-            this.cloudflareService,
-            this.projectPath,
-            this.deploymentConfig
-        );
-
-        this.planner = new Planner(this.fsService);
-        this.executor = new Executor(this.projectPath, this.agentRunner);
-    }
-
-    private loadDeploymentConfig(): DeploymentConfig {
-        const configPath = path.join(this.projectPath, '.builder', 'deployment.yml');
-        if (fs.existsSync(configPath)) {
-            try {
-                const content = fs.readFileSync(configPath, 'utf-8');
-                const config = yaml.load(content) as DeploymentConfig;
-                if (config && config.project_name) {
-                    return config;
-                }
-            } catch (e) {
-                console.error(`Error loading deployment config from ${configPath}:`, e);
-            }
-        }
-
-        // Fallback or error if config is missing
-        console.warn("Warning: .builder/deployment.yml not found or invalid. Using default project name.");
-        return { project_name: 'my-website-project' };
-    }
-
-    runAiWorkflow(prompt: string): void {
-        console.log("Starting AI-driven workflow...");
-        try {
-            const plan = this.planner.generatePlan(prompt, this.projectPath);
-            this.savePlanToHistory(plan);
-            this.executor.executePlan(plan, prompt);
-        } catch (e) {
-            console.error("AI workflow failed:", e);
-        }
+        this.planner = new Planner(this.config);
+        this.executor = new Executor(this.config);
+        this.deployer = new Deployer(this.config);
     }
 
     private savePlanToHistory(plan: Plan): void {
-        const historyDir = path.join(this.projectPath, '.builder', 'history');
-
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -107,29 +52,30 @@ export class Orchestrator {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
 
-        const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yaml`;
-        const filePath = path.join(historyDir, filename);
+        const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yml`;
+        const filePath = path.join(this.config.historyPath, filename);
 
         const yamlContent = PlanUtils.toYaml(plan);
         this.fsService.writeFile(filePath, yamlContent);
         console.log(`Saved plan history to: ${filePath}`);
     }
 
-
-    async runDeterministicWorkflow(command: string): Promise<void> {
-        console.log(`Starting deterministic workflow: ${command}`);
-
-        if (!this.deploymentService || !this.cloudflareService) {
-            console.error("Error: Cloudflare API token and Account ID must be set as environment variables for deployment.");
-            return;
+    async runAIWorkflow(prompt: string): Promise<void> {
+        console.log("Starting AI-driven workflow...");
+        try {
+            const plan = this.planner.generatePlan(prompt);
+            this.savePlanToHistory(plan);
+            //this.executor.executePlan(plan, prompt);
+        } catch (e) {
+            console.error("AI workflow failed:", e);
         }
+    }
 
-        if (command === 'publish') {
-            await this.deploymentService.runProductionDeployment();
-        } else if (command === 'preview') {
-            await this.deploymentService.runPreviewDeployment();
-        } else {
-            console.error(`Unknown deterministic command: ${command}`);
-        }
+    async runPreviewDeployment(): Promise<void> {
+        await this.deployer.runPreviewDeployment();
+    }
+
+    async runProductionDeployment(): Promise<void> {
+        await this.deployer.runProductionDeployment();
     }
 }

@@ -2,11 +2,8 @@
   "name": "website-editor",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
-    "builder": "node dist/cli.js"
+    "builder": "tsc && node dist/cli.js"
   },
   "keywords": [],
   "author": "",

@@ -1,6 +1,7 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import { spawn } from 'child_process';
+import { AppConfig } from '../data_models/AppConfig.js';
 import { Task } from '../data_models/Task.js';
 import { Project } from '../data_models/Project.js';
 import { FileSystemService } from './FileSystemService.js';
@@ -16,24 +17,24 @@ interface AgentProfile {
 
 export class AgentRunner {
     private agents: Record<string, AgentProfile> = {};
+    private fsService: FileSystemService
 
     constructor(
-        private projectPath: string,
-        private fsService: FileSystemService
+        private config: AppConfig
     ) {
+        this.fsService = new FileSystemService();
         this.loadYamlProfiles();
     }
 
     private loadYamlProfiles(): void {
-        let agentsDir = path.join(this.projectPath, '.builder', 'agents');
-        if (!this.fsService.isDirectory(agentsDir)) {
+        if (!this.fsService.isDirectory(this.config.agentsPath)) {
             return;
         }
 
-        const files = this.fsService.listFiles(agentsDir);
+        const files = this.fsService.listFiles(this.config.agentsPath);
         for (const filename of files) {
             if (filename.endsWith('.agent.yml') || filename.endsWith('.agent.yaml')) {
-                const filePath = path.join(agentsDir, filename);
+                const filePath = path.join(this.config.agentsPath, filename);
                 const content = this.fsService.readFile(filePath);
                 try {
                     const profile = yaml.load(content) as AgentProfile;
