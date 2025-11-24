@@ -73,6 +73,7 @@ export class AgentRunner {
             user_request: userPrompt,
             file_path: filePath || '',
             file_content: fileContent || '',
+            task_id: task.id,
             task_prompt: task.description,
             ...params
         };
