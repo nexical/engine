@@ -2,7 +2,6 @@ import debug from 'debug';
 import { Plan } from './data_models/Plan.js';
 import { Task } from './data_models/Task.js';
 import { AppConfig } from './data_models/AppConfig.js';
-import { Project } from './data_models/Project.js';
 import { AgentRunner } from './services/AgentRunner.js';
 
 const log = debug('executor');
@@ -18,7 +17,6 @@ export class Executor {
 
     async executePlan(plan: Plan, userPrompt: string): Promise<void> {
         log(`Executing plan: ${plan.plan_name}`);
-        let project: Project = { project_path: this.config.projectPath };
 
         const tasksById = new Map<string, Task>();
         const completedTasks = new Set<string>();
@@ -69,7 +67,7 @@ export class Executor {
             const promises = executableTasks.map(async (task) => {
                 runningTasks.add(task.id);
                 try {
-                    project = await this.agentRunner.runAgent(task, project, userPrompt);
+                    await this.agentRunner.runAgent(task, userPrompt);
                     completedTasks.add(task.id);
                 } catch (e) {
                     console.error(`Task '${task.message}' (ID: ${task.id}) failed:`, e);

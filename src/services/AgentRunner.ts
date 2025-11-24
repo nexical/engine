@@ -4,7 +4,6 @@ import debug from 'debug';
 import { spawn } from 'child_process';
 import { AppConfig } from '../data_models/AppConfig.js';
 import { Task } from '../data_models/Task.js';
-import { Project } from '../data_models/Project.js';
 import { FileSystemService } from './FileSystemService.js';
 
 const log = debug('agent-runner');
@@ -51,23 +50,22 @@ export class AgentRunner {
         }
     }
 
-    async runAgent(task: Task, project: Project, userPrompt: string): Promise<Project> {
+    async runAgent(task: Task, userPrompt: string): Promise<void> {
         console.log(task.message);
 
         if (this.agents[task.agent]) {
-            return this.runYamlAgent(task, project, userPrompt);
+            return this.runYamlAgent(task, userPrompt);
         }
 
         log(`Warning: Agent '${task.agent}' not found. Skipping task.`);
-        return project;
     }
 
-    private async runYamlAgent(task: Task, project: Project, userPrompt: string): Promise<Project> {
+    private async runYamlAgent(task: Task, userPrompt: string): Promise<void> {
         const profile = this.agents[task.agent];
-        return this.executeCliAgent(task, profile, project, userPrompt);
+        return this.executeCliAgent(task, profile, userPrompt);
     }
 
-    private executeCliAgent(task: Task, profile: AgentProfile, project: Project, userPrompt: string): Promise<Project> {
+    private executeCliAgent(task: Task, profile: AgentProfile, userPrompt: string): Promise<void> {
         return new Promise((resolve, reject) => {
             const promptTemplate = profile.prompt_template || '';
             const params = task.params || {};
@@ -75,7 +73,7 @@ export class AgentRunner {
             const filePath = params.file_path;
             let fileContent = '';
             if (filePath) {
-                const fullPath = path.join(project.project_path, filePath);
+                const fullPath = path.join(this.config.projectPath, filePath);
                 fileContent = this.fsService.readFile(fullPath);
             }
 
@@ -94,7 +92,7 @@ export class AgentRunner {
             }
 
             const commandBin = profile.command || 'gemini';
-            const argsTemplate = profile.args || [];
+            const argsTemplate = profile.args || ['prompt', '<prompt>'];
 
             formatArgs['prompt'] = prompt;
 
@@ -110,7 +108,7 @@ export class AgentRunner {
             log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
 
             const child = spawn(commandBin, finalArgs, {
-                cwd: project.project_path,
+                cwd: this.config.projectPath,
                 stdio: ['inherit', 'pipe', 'pipe']
             });
 
@@ -142,7 +140,7 @@ export class AgentRunner {
                 if (code !== 0) {
                     log(`Warning: Command exited with code ${code}`);
                 }
-                resolve(project);
+                resolve();
             });
 
             child.on('error', (err: Error) => {
