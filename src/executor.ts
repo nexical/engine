@@ -8,80 +8,95 @@ const log = debug('executor');
 
 export class Executor {
     private agentRunner: AgentRunner;
+    private taskPromises: Map<string, Promise<void>> = new Map();
 
     constructor(
-        private config: AppConfig
+        private config: AppConfig,
+        agentRunner?: AgentRunner
     ) {
-        this.agentRunner = new AgentRunner(this.config);
+        this.agentRunner = agentRunner || new AgentRunner(this.config);
     }
 
     async executePlan(plan: Plan, userPrompt: string): Promise<void> {
         log(`Executing plan: ${plan.plan_name}`);
+        this.taskPromises.clear();
 
         const tasksById = new Map<string, Task>();
-        const completedTasks = new Set<string>();
-        const runningTasks = new Set<string>();
-
-        // Index tasks by ID
         for (const task of plan.tasks) {
-            if (task.id) {
-                tasksById.set(task.id, task);
-            } else {
-                // Fallback for tasks without ID (shouldn't happen with new prompt, but safety first)
-                // We can generate a temporary ID or just treat them as sequential if we handle them differently.
-                // For now, let's assume IDs are present or we skip/fail.
-                log(`Task '${task.message}' is missing an ID. Assigning temporary ID.`);
+            if (!task.id) {
                 task.id = `temp-${Math.random().toString(36).substring(7)}`;
-                tasksById.set(task.id, task);
+                log(`Assigned temporary ID ${task.id} to task: ${task.message}`);
             }
+            tasksById.set(task.id, task);
         }
 
-        while (completedTasks.size < plan.tasks.length) {
-            const executableTasks: Task[] = [];
+        this.detectCycles(plan.tasks, tasksById);
 
-            for (const task of plan.tasks) {
-                if (completedTasks.has(task.id) || runningTasks.has(task.id)) {
-                    continue;
+        const executeTask = async (taskId: string): Promise<void> => {
+            if (this.taskPromises.has(taskId)) {
+                return this.taskPromises.get(taskId)!;
+            }
+
+            const task = tasksById.get(taskId);
+            if (!task) {
+                throw new Error(`Task ${taskId} not found in plan.`);
+            }
+
+            const promise = (async () => {
+                if (task.dependencies && task.dependencies.length > 0) {
+                    await Promise.all(task.dependencies.map(depId => executeTask(depId)));
                 }
 
-                const dependencies = task.dependencies || [];
-                const allDependenciesMet = dependencies.every(depId => completedTasks.has(depId));
-
-                if (allDependenciesMet) {
-                    executableTasks.push(task);
-                }
-            }
-
-            if (executableTasks.length === 0 && runningTasks.size === 0 && completedTasks.size < plan.tasks.length) {
-                console.error("Deadlock detected! Some tasks cannot be executed due to missing dependencies or cycles.");
-                break;
-            }
-
-            if (executableTasks.length === 0 && runningTasks.size > 0) {
-                // Wait for some running tasks to finish
-                await new Promise(resolve => setTimeout(resolve, 100)); // Simple polling for now
-                continue;
-            }
-
-            // Execute tasks in parallel
-            const promises = executableTasks.map(async (task) => {
-                runningTasks.add(task.id);
+                log(`Starting task: ${task.message} (${task.id})`);
                 try {
                     await this.agentRunner.runAgent(task, userPrompt);
-                    completedTasks.add(task.id);
+                    log(`Completed task: ${task.message} (${task.id})`);
                 } catch (e) {
-                    console.error(`Task '${task.message}' (ID: ${task.id}) failed:`, e);
-                    // Depending on policy, we might want to stop everything or continue independent paths.
-                    // For now, we'll treat it as completed (failed) to avoid infinite loops, but log heavily.
-                    completedTasks.add(task.id);
-                } finally {
-                    runningTasks.delete(task.id);
+                    log(`Failed task: ${task.message} (${task.id})`, e);
+                    throw e;
                 }
-            });
+            })();
 
-            await Promise.all(promises);
+            this.taskPromises.set(taskId, promise);
+            return promise;
+        };
+
+        try {
+            await Promise.all(plan.tasks.map(t => executeTask(t.id)));
+            log("Plan execution complete.");
+        } catch (e) {
+            console.error("Plan execution failed:", e);
+            throw e;
         }
+    }
 
-        log("Plan execution complete.");
+    private detectCycles(tasks: Task[], tasksById: Map<string, Task>): void {
+        const visited = new Set<string>();
+        const recursionStack = new Set<string>();
+
+        const visit = (taskId: string) => {
+            if (recursionStack.has(taskId)) {
+                throw new Error(`Cycle detected involving task ${taskId}`);
+            }
+            if (visited.has(taskId)) {
+                return;
+            }
+
+            visited.add(taskId);
+            recursionStack.add(taskId);
+
+            const task = tasksById.get(taskId);
+            if (task && task.dependencies) {
+                for (const depId of task.dependencies) {
+                    visit(depId);
+                }
+            }
+
+            recursionStack.delete(taskId);
+        };
+
+        for (const task of tasks) {
+            visit(task.id);
+        }
     }
 }

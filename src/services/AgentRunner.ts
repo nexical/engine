@@ -45,19 +45,16 @@ export class AgentRunner {
     async runAgent(task: Task, userPrompt: string): Promise<void> {
         console.log(task.message);
 
-        if (this.agents[task.agent]) {
-            return this.runYamlAgent(task, userPrompt);
+        const profile = this.agents[task.agent];
+        if (!profile) {
+            log(`Warning: Agent '${task.agent}' not found. Skipping task.`);
+            return;
         }
 
-        log(`Warning: Agent '${task.agent}' not found. Skipping task.`);
+        await this.executeAgent(task, profile, userPrompt);
     }
 
-    private async runYamlAgent(task: Task, userPrompt: string): Promise<void> {
-        const profile = this.agents[task.agent];
-        return this.executeCliAgent(task, profile, userPrompt);
-    }
-
-    private async executeCliAgent(task: Task, profile: Agent, userPrompt: string): Promise<void> {
+    private async executeAgent(task: Task, profile: Agent, userPrompt: string): Promise<void> {
         const promptTemplate = profile.prompt_template || '';
         const params = task.params || {};
 
@@ -65,7 +62,11 @@ export class AgentRunner {
         let fileContent = '';
         if (filePath) {
             const fullPath = path.join(this.config.projectPath, filePath);
-            fileContent = this.fsService.readFile(fullPath);
+            if (this.fsService.exists(fullPath)) {
+                fileContent = this.fsService.readFile(fullPath);
+            } else {
+                log(`Warning: File ${fullPath} not found.`);
+            }
         }
 
         const formatArgs: Record<string, any> = {
