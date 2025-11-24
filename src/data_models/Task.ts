@@ -1,8 +1,8 @@
 export interface Task {
     id: string;
-    name: string;
+    message: string;
+    description: string;
     agent: string;
-    notice: string;
-    params: Record<string, any>;
+    params?: Record<string, any>;
     dependencies?: string[];
 }

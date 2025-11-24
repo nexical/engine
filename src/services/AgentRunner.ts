@@ -49,7 +49,7 @@ export class AgentRunner {
     }
 
     async runAgent(task: Task, project: Project, userPrompt: string): Promise<Project> {
-        console.log(task.notice);
+        console.log(task.message);
 
         if (this.agents[task.agent]) {
             return this.runYamlAgent(task, project, userPrompt);
@@ -80,6 +80,7 @@ export class AgentRunner {
                 user_request: userPrompt,
                 file_path: filePath || '',
                 file_content: fileContent || '',
+                task_prompt: task.description,
                 ...params
             };
 

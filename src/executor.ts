@@ -29,7 +29,7 @@ export class Executor {
                 // Fallback for tasks without ID (shouldn't happen with new prompt, but safety first)
                 // We can generate a temporary ID or just treat them as sequential if we handle them differently.
                 // For now, let's assume IDs are present or we skip/fail.
-                console.warn(`Task '${task.name}' is missing an ID. Assigning temporary ID.`);
+                console.warn(`Task '${task.message}' is missing an ID. Assigning temporary ID.`);
                 task.id = `temp-${Math.random().toString(36).substring(7)}`;
                 tasksById.set(task.id, task);
             }
@@ -69,7 +69,7 @@ export class Executor {
                     project = await this.agentRunner.runAgent(task, project, userPrompt);
                     completedTasks.add(task.id);
                 } catch (e) {
-                    console.error(`Task '${task.name}' (ID: ${task.id}) failed:`, e);
+                    console.error(`Task '${task.message}' (ID: ${task.id}) failed:`, e);
                     // Depending on policy, we might want to stop everything or continue independent paths.
                     // For now, we'll treat it as completed (failed) to avoid infinite loops, but log heavily.
                     completedTasks.add(task.id);
