@@ -41,8 +41,6 @@ export class Planner {
         const command = 'gemini';
         const args = ['prompt', fullPrompt];
 
-        console.log(`Running CLI for planning: ${command} ...`);
-
         try {
             const result = spawnSync(command, args, {
                 encoding: 'utf-8',
