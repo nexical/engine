@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "builder": "tsc && node dist/cli.js"
+    "builder": "tsc && cp -fr src/prompts dist/ && node dist/cli.js"
   },
   "keywords": [],
   "author": "",
