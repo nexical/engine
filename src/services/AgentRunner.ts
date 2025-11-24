@@ -3,22 +3,14 @@ import yaml from 'js-yaml';
 import debug from 'debug';
 import { AppConfig } from '../data_models/AppConfig.js';
 import { Task } from '../data_models/Task.js';
+import { Agent } from '../data_models/Agent.js';
 import { FileSystemService } from './FileSystemService.js';
 import { ShellExecutor } from '../utils/ShellExecutor.js';
 
 const log = debug('agent-runner');
 
-interface AgentProfile {
-    name: string;
-    description?: string;
-    prompt_template?: string;
-    command?: string;
-    args?: string[];
-    [key: string]: any;
-}
-
 export class AgentRunner {
-    private agents: Record<string, AgentProfile> = {};
+    private agents: Record<string, Agent> = {};
     private fsService: FileSystemService
 
     constructor(
@@ -39,7 +31,7 @@ export class AgentRunner {
                 const filePath = path.join(this.config.agentsPath, filename);
                 const content = this.fsService.readFile(filePath);
                 try {
-                    const profile = yaml.load(content) as AgentProfile;
+                    const profile = yaml.load(content) as Agent;
                     if (profile && profile.name) {
                         this.agents[profile.name] = profile;
                     }
@@ -65,7 +57,7 @@ export class AgentRunner {
         return this.executeCliAgent(task, profile, userPrompt);
     }
 
-    private async executeCliAgent(task: Task, profile: AgentProfile, userPrompt: string): Promise<void> {
+    private async executeCliAgent(task: Task, profile: Agent, userPrompt: string): Promise<void> {
         const promptTemplate = profile.prompt_template || '';
         const params = task.params || {};
 
