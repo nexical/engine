@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs-extra';
+import debug from 'debug';
 import { fileURLToPath } from 'url';
 import { Plan, PlanUtils } from './data_models/Plan.js';
 import { AppConfig } from './data_models/AppConfig.js';
@@ -8,6 +9,7 @@ import { Planner } from './planner.js';
 import { Executor } from './executor.js';
 import { Deployer } from './deployer.js';
 
+const log = debug('orchestrator');
 
 export class Orchestrator {
     private config: AppConfig;
@@ -27,8 +29,7 @@ export class Orchestrator {
             this.config.projectPath = cwd;
         }
 
-        console.debug(`Project path: ${this.config.projectPath}`);
-        console.debug('');
+        log(`Project path: ${this.config.projectPath}`);
 
         this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
         this.config.builderPath = path.join(this.config.projectPath, '.builder');
@@ -57,15 +58,15 @@ export class Orchestrator {
 
         const yamlContent = PlanUtils.toYaml(plan);
         this.fsService.writeFile(filePath, yamlContent);
-        console.log(`Saved plan history to: ${filePath}`);
+        log(`Saved plan history to: ${filePath}`);
     }
 
     async runAIWorkflow(prompt: string): Promise<void> {
-        console.log("Starting AI-driven workflow...");
+        log("Starting AI-driven workflow...");
         try {
             const plan = this.planner.generatePlan(prompt);
             this.savePlanToHistory(plan);
-            // this.executor.executePlan(plan, prompt);
+            await this.executor.executePlan(plan, prompt);
         } catch (e) {
             console.error("AI workflow failed:", e);
         }

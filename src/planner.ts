@@ -1,8 +1,11 @@
 import path from 'path';
+import debug from 'debug';
 import { spawnSync } from 'child_process';
 import { AppConfig } from './data_models/AppConfig.js';
 import { Plan, PlanUtils } from './data_models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
+
+const log = debug('planner');
 
 export class Planner {
     private plannerPrompt: string
@@ -36,7 +39,7 @@ export class Planner {
         const fullPrompt = this.plannerPrompt.replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities);
 
-        console.log("Generating plan for prompt:", prompt);
+        log("Generating plan for prompt:", prompt);
 
         const command = 'gemini';
         const args = ['prompt', fullPrompt];

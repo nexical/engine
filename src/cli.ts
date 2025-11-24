@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import dotenv from 'dotenv';
+import debug from 'debug';
 import { Orchestrator } from './orchestrator.js';
 
 dotenv.config({ quiet: true });
 
+const log = debug('cli');
 const program = new Command();
 
 program
@@ -60,6 +62,6 @@ try {
         }
     }
 } catch (e) {
-    console.log(`Application error: ${e}`);
+    console.error(`Application error: ${e}`);
     process.exit(1);
 }

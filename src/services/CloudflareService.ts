@@ -1,5 +1,8 @@
+import debug from 'debug';
 import { spawnSync } from 'child_process';
 import { AppConfig } from '../data_models/AppConfig.js';
+
+const log = debug('cloudflare');
 
 export class CloudflareService {
     private apiToken: string | undefined;
@@ -15,7 +18,7 @@ export class CloudflareService {
     }
 
     async createProject(projectName: string): Promise<void> {
-        console.log(`Creating Cloudflare Pages project: ${projectName}...`);
+        log(`Creating Cloudflare Pages project: ${projectName}...`);
         const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects`;
 
         try {
@@ -35,7 +38,7 @@ export class CloudflareService {
                 const errorBody = await response.text();
                 // If conflict (already exists), we can ignore, but better to check first or handle 409
                 if (response.status === 409) {
-                    console.log(`Project ${projectName} already exists.`);
+                    log(`Project ${projectName} already exists.`);
                     return;
                 }
                 throw new Error(`Failed to create project: ${response.status} ${response.statusText} - ${errorBody}`);
@@ -46,7 +49,7 @@ export class CloudflareService {
                 throw new Error(`Cloudflare API error: ${JSON.stringify(data.errors)}`);
             }
 
-            console.log(`Successfully created project ${projectName}`);
+            log(`Successfully created project ${projectName}`);
         } catch (error) {
             console.error(`Error creating project ${projectName}:`, error);
             throw error;
@@ -71,7 +74,7 @@ export class CloudflareService {
         const command = 'npx';
         const commandArgs = ['wrangler', ...args];
 
-        console.log(`Running Cloudflare deployment: ${command} ${commandArgs.join(' ')}`);
+        log(`Running Cloudflare deployment: ${command} ${commandArgs.join(' ')}`);
 
         const env = { ...process.env, CLOUDFLARE_API_TOKEN: this.apiToken, CLOUDFLARE_ACCOUNT_ID: this.accountId };
 
@@ -89,7 +92,7 @@ export class CloudflareService {
     }
 
     async linkDomain(projectName: string, domain: string): Promise<void> {
-        console.log(`Linking domain ${domain} to project ${projectName}...`);
+        log(`Linking domain ${domain} to project ${projectName}...`);
 
         const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects/${projectName}/domains`;
 
@@ -115,7 +118,7 @@ export class CloudflareService {
                 throw new Error(`Cloudflare API error: ${JSON.stringify(data.errors)}`);
             }
 
-            console.log(`Successfully linked domain ${domain}`);
+            log(`Successfully linked domain ${domain}`);
         } catch (error) {
             console.error(`Error linking domain ${domain}:`, error);
             throw error;

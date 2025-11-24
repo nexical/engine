@@ -1,9 +1,12 @@
 import fs from 'fs-extra';
 import yaml from 'js-yaml';
+import debug from 'debug';
 import { DeploymentConfig } from './data_models/DeploymentConfig.js';
 import { AppConfig } from './data_models/AppConfig.js';
 import { GitService } from './services/GitService.js';
 import { CloudflareService } from './services/CloudflareService.js';
+
+const log = debug('deployer');
 
 export class Deployer {
     private deploymentConfig: DeploymentConfig;
@@ -30,13 +33,13 @@ export class Deployer {
     }
 
     async runProductionDeployment(): Promise<void> {
-        console.log("Starting production deployment...");
+        log("Starting production deployment...");
 
         // 1. Verify clean git state
         try {
             const status = this.gitService.runCommand(['status', '--porcelain']);
             if (status) {
-                console.log("Uncommitted changes detected. Committing...");
+                log("Uncommitted changes detected. Committing...");
                 this.gitService.commit("Auto-commit before deployment");
             }
         } catch (e) {
@@ -47,7 +50,7 @@ export class Deployer {
         // 2. Deploy to Cloudflare
         try {
             await this.cloudflareService.deploy(this.deploymentConfig.project_name, '.', 'main');
-            console.log("Production deployment triggered.");
+            log("Production deployment triggered.");
 
             if (this.deploymentConfig.production_domain) {
                 await this.cloudflareService.linkDomain(this.deploymentConfig.project_name, this.deploymentConfig.production_domain);
@@ -58,12 +61,12 @@ export class Deployer {
     }
 
     async runPreviewDeployment(): Promise<void> {
-        console.log("Starting preview deployment...");
+        log("Starting preview deployment...");
 
         try {
             const branch = this.gitService.getCurrentBranch();
             await this.cloudflareService.deploy(this.deploymentConfig.project_name, '.', branch);
-            console.log(`Preview deployment triggered for branch ${branch}.`);
+            log(`Preview deployment triggered for branch ${branch}.`);
 
             if (this.deploymentConfig.preview_domain) {
                 // Note: Preview domains are usually per-branch, so linking a single static preview domain might not be desired 

@@ -1,10 +1,13 @@
 import path from 'path';
 import yaml from 'js-yaml';
+import debug from 'debug';
 import { spawn } from 'child_process';
 import { AppConfig } from '../data_models/AppConfig.js';
 import { Task } from '../data_models/Task.js';
 import { Project } from '../data_models/Project.js';
 import { FileSystemService } from './FileSystemService.js';
+
+const log = debug('agent-runner');
 
 interface AgentProfile {
     name: string;
@@ -55,7 +58,7 @@ export class AgentRunner {
             return this.runYamlAgent(task, project, userPrompt);
         }
 
-        console.warn(`Warning: Agent '${task.agent}' not found. Skipping task.`);
+        log(`Warning: Agent '${task.agent}' not found. Skipping task.`);
         return project;
     }
 
@@ -103,8 +106,8 @@ export class AgentRunner {
                 return formattedArg;
             });
 
-            console.log(`Running CLI agent: ${task.agent}`);
-            console.log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
+            log(`Running CLI agent: ${task.agent}`);
+            log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
 
             const child = spawn(commandBin, finalArgs, {
                 cwd: project.project_path,
@@ -131,13 +134,13 @@ export class AgentRunner {
             }
 
             child.on('close', (code: number) => {
-                console.log("--- stdout ---");
-                console.log(stdout);
-                console.log("--- stderr ---");
-                console.log(stderr);
+                log("--- stdout ---");
+                log(stdout);
+                log("--- stderr ---");
+                log(stderr);
 
                 if (code !== 0) {
-                    console.warn(`Warning: Command exited with code ${code}`);
+                    log(`Warning: Command exited with code ${code}`);
                 }
                 resolve(project);
             });

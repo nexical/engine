@@ -1,8 +1,11 @@
+import debug from 'debug';
 import { Plan } from './data_models/Plan.js';
 import { Task } from './data_models/Task.js';
 import { AppConfig } from './data_models/AppConfig.js';
 import { Project } from './data_models/Project.js';
 import { AgentRunner } from './services/AgentRunner.js';
+
+const log = debug('executor');
 
 export class Executor {
     private agentRunner: AgentRunner;
@@ -14,7 +17,7 @@ export class Executor {
     }
 
     async executePlan(plan: Plan, userPrompt: string): Promise<void> {
-        console.log(`Executing plan: ${plan.plan_name}`);
+        log(`Executing plan: ${plan.plan_name}`);
         let project: Project = { project_path: this.config.projectPath };
 
         const tasksById = new Map<string, Task>();
@@ -29,7 +32,7 @@ export class Executor {
                 // Fallback for tasks without ID (shouldn't happen with new prompt, but safety first)
                 // We can generate a temporary ID or just treat them as sequential if we handle them differently.
                 // For now, let's assume IDs are present or we skip/fail.
-                console.warn(`Task '${task.message}' is missing an ID. Assigning temporary ID.`);
+                log(`Task '${task.message}' is missing an ID. Assigning temporary ID.`);
                 task.id = `temp-${Math.random().toString(36).substring(7)}`;
                 tasksById.set(task.id, task);
             }
@@ -81,6 +84,6 @@ export class Executor {
             await Promise.all(promises);
         }
 
-        console.log("Plan execution complete.");
+        log("Plan execution complete.");
     }
 }
