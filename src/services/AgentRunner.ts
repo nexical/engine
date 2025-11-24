@@ -1,10 +1,10 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import debug from 'debug';
-import { spawn } from 'child_process';
 import { AppConfig } from '../data_models/AppConfig.js';
 import { Task } from '../data_models/Task.js';
 import { FileSystemService } from './FileSystemService.js';
+import { ShellExecutor } from '../utils/ShellExecutor.js';
 
 const log = debug('agent-runner');
 
@@ -65,88 +65,63 @@ export class AgentRunner {
         return this.executeCliAgent(task, profile, userPrompt);
     }
 
-    private executeCliAgent(task: Task, profile: AgentProfile, userPrompt: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const promptTemplate = profile.prompt_template || '';
-            const params = task.params || {};
+    private async executeCliAgent(task: Task, profile: AgentProfile, userPrompt: string): Promise<void> {
+        const promptTemplate = profile.prompt_template || '';
+        const params = task.params || {};
 
-            const filePath = params.file_path;
-            let fileContent = '';
-            if (filePath) {
-                const fullPath = path.join(this.config.projectPath, filePath);
-                fileContent = this.fsService.readFile(fullPath);
-            }
+        const filePath = params.file_path;
+        let fileContent = '';
+        if (filePath) {
+            const fullPath = path.join(this.config.projectPath, filePath);
+            fileContent = this.fsService.readFile(fullPath);
+        }
 
-            const formatArgs: Record<string, any> = {
-                user_request: userPrompt,
-                file_path: filePath || '',
-                file_content: fileContent || '',
-                task_prompt: task.description,
-                ...params
-            };
+        const formatArgs: Record<string, any> = {
+            user_request: userPrompt,
+            file_path: filePath || '',
+            file_content: fileContent || '',
+            task_prompt: task.description,
+            ...params
+        };
 
-            // Interpolate prompt
-            let prompt = promptTemplate;
+        // Interpolate prompt
+        let prompt = promptTemplate;
+        for (const [key, value] of Object.entries(formatArgs)) {
+            prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
+        }
+
+        const commandBin = profile.command || 'gemini';
+        const argsTemplate = profile.args || ['prompt', '<prompt>'];
+
+        formatArgs['prompt'] = prompt;
+
+        const finalArgs = argsTemplate.map(arg => {
+            let formattedArg = arg;
             for (const [key, value] of Object.entries(formatArgs)) {
-                prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
+                formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
             }
-
-            const commandBin = profile.command || 'gemini';
-            const argsTemplate = profile.args || ['prompt', '<prompt>'];
-
-            formatArgs['prompt'] = prompt;
-
-            const finalArgs = argsTemplate.map(arg => {
-                let formattedArg = arg;
-                for (const [key, value] of Object.entries(formatArgs)) {
-                    formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
-                }
-                return formattedArg;
-            });
-
-            log(`Running CLI agent: ${task.agent}`);
-            log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
-
-            const child = spawn(commandBin, finalArgs, {
-                cwd: this.config.projectPath,
-                stdio: ['inherit', 'pipe', 'pipe']
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            if (child.stdout) {
-                child.stdout.on('data', (data: Buffer) => {
-                    const chunk = data.toString();
-                    stdout += chunk;
-                    process.stdout.write(chunk);
-                });
-            }
-
-            if (child.stderr) {
-                child.stderr.on('data', (data: Buffer) => {
-                    const chunk = data.toString();
-                    stderr += chunk;
-                    process.stderr.write(chunk);
-                });
-            }
-
-            child.on('close', (code: number) => {
-                log("--- stdout ---");
-                log(stdout);
-                log("--- stderr ---");
-                log(stderr);
-
-                if (code !== 0) {
-                    log(`Warning: Command exited with code ${code}`);
-                }
-                resolve();
-            });
-
-            child.on('error', (err: Error) => {
-                console.error(`An error occurred while executing the CLI agent: ${err}`);
-                reject(err);
-            });
+            return formattedArg;
         });
+
+        log(`Running CLI agent: ${task.agent}`);
+        log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
+
+        try {
+            const result = await ShellExecutor.execute(commandBin, finalArgs, {
+                cwd: this.config.projectPath
+            });
+
+            log("--- stdout ---");
+            log(result.stdout);
+            log("--- stderr ---");
+            log(result.stderr);
+
+            if (result.code !== 0) {
+                log(`Warning: Command exited with code ${result.code}`);
+            }
+        } catch (err) {
+            console.error(`An error occurred while executing the CLI agent: ${err}`);
+            throw err;
+        }
     }
 }

@@ -1,9 +1,9 @@
 import path from 'path';
 import debug from 'debug';
-import { spawnSync } from 'child_process';
 import { AppConfig } from './data_models/AppConfig.js';
 import { Plan, PlanUtils } from './data_models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
+import { ShellExecutor } from './utils/ShellExecutor.js';
 
 const log = debug('planner');
 
@@ -45,14 +45,13 @@ export class Planner {
         const args = ['prompt', fullPrompt];
 
         try {
-            const result = spawnSync(command, args, {
-                encoding: 'utf-8',
-                stdio: ['pipe', 'pipe', 'pipe']
+            const result = ShellExecutor.executeSync(command, args, {
+                cwd: this.config.projectPath
             });
 
-            if (result.status !== 0) {
+            if (result.code !== 0) {
                 console.error("Planner CLI failed:", result.stderr);
-                throw new Error(`Planner CLI exited with code ${result.status}`);
+                throw new Error(`Planner CLI exited with code ${result.code}`);
             }
 
             let planYaml = result.stdout;
