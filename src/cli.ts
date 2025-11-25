@@ -29,9 +29,9 @@ try {
     if (options.prompt) {
         await orchestrator.runAIWorkflow(options.prompt);
     } else if (options.publish) {
-        // await orchestrator.runProductionDeployment();
+        await orchestrator.runProductionDeployment();
     } else if (options.preview) {
-        // await orchestrator.runPreviewDeployment();
+        await orchestrator.runPreviewDeployment();
     } else {
         // Interactive mode or help
         if (process.argv.length <= 2) {
