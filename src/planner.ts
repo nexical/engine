@@ -2,7 +2,6 @@ import path from 'path';
 import debug from 'debug';
 import { Orchestrator } from './orchestrator.js';
 import { Plan, PlanUtils } from './models/Plan.js';
-import { FileSystemService } from './services/FileSystemService.js';
 import { Agent } from './models/Agent.js';
 
 const log = debug('planner');
