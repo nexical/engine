@@ -114,7 +114,7 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
 ### Directory Structure
 
 - `src/`: Source code.
-    - `models/`: TypeScript interfaces and classes for core entities (Plan, Task, Project, DeploymentConfig).
+    - `models/`: TypeScript interfaces and classes for core entities (Application, Plugins, Agent, Plan, Task, Deployment).
     - `plugins/`: Plugin implementations.
         - `agents/`: Agent execution plugins.
         - `commands/`: CLI command plugins.
