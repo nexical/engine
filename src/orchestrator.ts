@@ -38,10 +38,10 @@ export class Orchestrator {
         log(`Project path: ${this.config.projectPath}`);
 
         this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
-        this.config.builderPath = path.join(this.config.projectPath, '.builder');
-        this.config.agentsPath = path.join(this.config.builderPath, 'agents')
-        this.config.historyPath = path.join(this.config.builderPath, 'history')
-        this.config.deployConfigPath = path.join(this.config.builderPath, 'deploy.yml');
+        this.config.plotrisPath = path.join(this.config.projectPath, '.plotris');
+        this.config.agentsPath = path.join(this.config.plotrisPath, 'agents')
+        this.config.historyPath = path.join(this.config.plotrisPath, 'history')
+        this.config.deployConfigPath = path.join(this.config.plotrisPath, 'deploy.yml');
 
         // Initialize Registries
         this.commandRegistry = new CommandRegistry();

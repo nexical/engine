@@ -78,7 +78,7 @@ npm run builder
 
 ## Agent Definition Patterns
 
-Agents are defined as YAML files located in `.builder/agents/` (or `website/.builder/agents/` for CLI development). This allows for flexible, data-driven agent configuration.
+Agents are defined as YAML files located in `plotris/agents/` (or `website/.plotris/agents/` for CLI development). This allows for flexible, data-driven agent configuration.
 
 ### Agent Profile Format (`.agent.yml`)
 
@@ -86,6 +86,7 @@ Agents are defined as YAML files located in `.builder/agents/` (or `website/.bui
 name: "agent-name"
 description: "Description of what the agent does."
 prompt_template: "A template string with {variables}."
+provider: "cli"
 command: "cli-tool-name"
 args:
   - "arg1"
@@ -122,12 +123,12 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
 ### Extending the Application
 
 1.  **Add a Service**: Create a new class in `src/services/` and inject it into the `Orchestrator`.
-2.  **Add an Agent**: Create a new `.agent.yml` file in the project .builder/agents directory. No code changes are required for CLI agents.
+2.  **Add an Agent**: Create a new `.agent.yml` file in the project .plotris/agents directory. No code changes are required for CLI agents.
 3.  **Modify Logic**: Update `src/planner.ts` or `src/executor.ts` to change how plans are generated or executed.
 
 ## Configuration
 
-The application uses a YAML configuration file located at `.builder/deploy.yml` to manage project settings and domain linking.
+The application uses a YAML configuration file located at `.plotris/deploy.yml` to manage project settings and domain linking.
 
 ### `deploy.yml` Format
 
