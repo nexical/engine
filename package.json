@@ -19,6 +19,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.72",
+    "ai": "^5.0.101",
     "commander": "^14.0.2",
     "debug": "^4.4.3",
     "dotenv": "^17.2.3",

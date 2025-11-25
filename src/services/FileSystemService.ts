@@ -11,12 +11,24 @@ export class FileSystemService {
         }
     }
 
-    writeFile(filePath: string, content: string): void {
+    writeFile(filePath: string, content: string | Buffer): void {
         try {
             fs.ensureDirSync(path.dirname(filePath));
-            fs.writeFileSync(filePath, content, 'utf-8');
+            if (Buffer.isBuffer(content)) {
+                fs.writeFileSync(filePath, content);
+            } else {
+                fs.writeFileSync(filePath, content, 'utf-8');
+            }
         } catch (error) {
             console.error(`Error writing file ${filePath}:`, error);
+        }
+    }
+
+    ensureDir(dirPath: string): void {
+        try {
+            fs.ensureDirSync(dirPath);
+        } catch (error) {
+            console.error(`Error ensuring directory ${dirPath}:`, error);
         }
     }
 
