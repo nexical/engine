@@ -58,7 +58,7 @@ export class Planner {
 
         const plannerAgent: Agent = {
             name: 'planner',
-            command: 'gemini',
+            command: process.env.PLANNER_CLI_COMMAND || 'gemini',
             args: ['prompt', '{prompt}'],
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };

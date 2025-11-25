@@ -4,11 +4,11 @@ import { AgentPlugin, BasePlugin } from '../../models/Plugins.js';
 import { Agent } from '../../models/Agent.js';
 import { ShellExecutor } from '../../utils/ShellExecutor.js';
 
-const log = debug('agent:gemini-cli');
+const log = debug('agent:cli');
 
-export class GeminiCliAgentPlugin extends BasePlugin implements AgentPlugin {
-    name = 'gemini-cli';
-    description = 'Executes agents using the Gemini CLI.';
+export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
+    name = 'cli-agent';
+    description = 'Executes agents using a CLI command.';
 
     async execute(agent: Agent, taskPrompt: string, context: any = {}): Promise<string> {
         const promptTemplate = agent.prompt_template || '';

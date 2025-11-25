@@ -117,7 +117,7 @@ export class Orchestrator {
                             try {
                                 const instance = new ExportedClass(this);
                                 if (this.isAgentPlugin(instance)) {
-                                    const isDefault = instance.name === 'gemini-cli'; // Convention for default
+                                    const isDefault = instance.name === 'cli-agent';
                                     log(`Registering agent plugin: ${instance.name} (Default: ${isDefault})`);
                                     this.agentRegistry.register(instance, isDefault);
                                 }
