@@ -1,4 +1,4 @@
-# Website Editor CLI (TypeScript)
+# Plotris CLI (TypeScript)
 
 This project is a TypeScript-based CLI application designed to orchestrate AI agents for website modification and deployment. It leverages CLI tools for LLM interactions and agent execution.
 
