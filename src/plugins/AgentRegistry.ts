@@ -1,4 +1,4 @@
-import { AgentPlugin, PluginRegistry } from '../data_models/Plugins.js';
+import { AgentPlugin, PluginRegistry } from '../models/Plugins.js';
 
 export class AgentRegistry implements PluginRegistry<AgentPlugin> {
     private plugins: Map<string, AgentPlugin> = new Map();

@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import { Application } from '../data_models/Application.js';
+import { Application } from '../models/Application.js';
 
 export class GitService {
     constructor(private config: Application) { }

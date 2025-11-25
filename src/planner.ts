@@ -1,10 +1,10 @@
 import path from 'path';
 import debug from 'debug';
-import { Application } from './data_models/Application.js';
-import { Plan, PlanUtils } from './data_models/Plan.js';
+import { Application } from './models/Application.js';
+import { Plan, PlanUtils } from './models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
-import { Agent } from './data_models/Agent.js';
+import { Agent } from './models/Agent.js';
 
 const log = debug('planner');
 

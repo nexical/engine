@@ -1,6 +1,6 @@
 import debug from 'debug';
 import { spawnSync } from 'child_process';
-import { Application } from '../data_models/Application.js';
+import { Application } from '../models/Application.js';
 
 const log = debug('cloudflare');
 

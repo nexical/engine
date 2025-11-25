@@ -1,9 +1,9 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import debug from 'debug';
-import { Application } from '../data_models/Application.js';
-import { Task } from '../data_models/Task.js';
-import { Agent } from '../data_models/Agent.js';
+import { Application } from '../models/Application.js';
+import { Task } from '../models/Task.js';
+import { Agent } from '../models/Agent.js';
 import { FileSystemService } from './FileSystemService.js';
 import { AgentRegistry } from '../plugins/AgentRegistry.js';
 

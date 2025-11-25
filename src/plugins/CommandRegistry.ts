@@ -1,4 +1,4 @@
-import { CommandPlugin, PluginRegistry } from '../data_models/Plugins.js';
+import { CommandPlugin, PluginRegistry } from '../models/Plugins.js';
 
 export class CommandRegistry implements PluginRegistry<CommandPlugin> {
     private plugins: Map<string, CommandPlugin> = new Map();

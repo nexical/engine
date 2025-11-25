@@ -1,6 +1,6 @@
 import debug from 'debug';
-import { CommandPlugin, BasePlugin } from '../../data_models/Plugins.js';
-import { DeployUtils } from '../../data_models/Deployment.js';
+import { CommandPlugin, BasePlugin } from '../../models/Plugins.js';
+import { DeployUtils } from '../../models/Deployment.js';
 import { GitService } from '../../services/GitService.js';
 import { CloudflareService } from '../../services/CloudflareService.js';
 

@@ -1,7 +1,7 @@
 import path from 'path';
 import debug from 'debug';
-import { AgentPlugin, BasePlugin } from '../../data_models/Plugins.js';
-import { Agent } from '../../data_models/Agent.js';
+import { AgentPlugin, BasePlugin } from '../../models/Plugins.js';
+import { Agent } from '../../models/Agent.js';
 import { ShellExecutor } from '../../utils/ShellExecutor.js';
 import { FileSystemService } from '../../services/FileSystemService.js';
 

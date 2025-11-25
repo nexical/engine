@@ -1,7 +1,7 @@
 import debug from 'debug';
-import { Plan } from './data_models/Plan.js';
-import { Task } from './data_models/Task.js';
-import { Application } from './data_models/Application.js';
+import { Plan } from './models/Plan.js';
+import { Task } from './models/Task.js';
+import { Application } from './models/Application.js';
 import { AgentRunner } from './services/AgentRunner.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
 
