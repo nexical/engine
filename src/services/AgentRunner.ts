@@ -1,36 +1,31 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import debug from 'debug';
-import { Application } from '../models/Application.js';
 import { Task } from '../models/Task.js';
 import { Agent } from '../models/Agent.js';
-import { FileSystemService } from './FileSystemService.js';
-import { AgentRegistry } from '../plugins/AgentRegistry.js';
+import { Orchestrator } from '../orchestrator.js';
 
 const log = debug('agent-runner');
 
 export class AgentRunner {
     private agents: Record<string, Agent> = {};
-    private fsService: FileSystemService
 
     constructor(
-        private config: Application,
-        private agentRegistry: AgentRegistry
+        private core: Orchestrator
     ) {
-        this.fsService = new FileSystemService();
         this.loadYamlProfiles();
     }
 
     private loadYamlProfiles(): void {
-        if (!this.fsService.isDirectory(this.config.agentsPath)) {
+        if (!this.core.disk.isDirectory(this.core.config.agentsPath)) {
             return;
         }
 
-        const files = this.fsService.listFiles(this.config.agentsPath);
+        const files = this.core.disk.listFiles(this.core.config.agentsPath);
         for (const filename of files) {
             if (filename.endsWith('.agent.yml') || filename.endsWith('.agent.yaml')) {
-                const filePath = path.join(this.config.agentsPath, filename);
-                const content = this.fsService.readFile(filePath);
+                const filePath = path.join(this.core.config.agentsPath, filename);
+                const content = this.core.disk.readFile(filePath);
                 try {
                     const profile = yaml.load(content) as Agent;
                     if (profile && profile.name) {
@@ -60,7 +55,7 @@ export class AgentRunner {
         // For now, we default to the default plugin (Gemini CLI) unless the agent profile specifies otherwise.
         // Future: profile.plugin could specify the plugin name.
 
-        const plugin = this.agentRegistry.getDefault();
+        const plugin = this.core.agentRegistry.getDefault();
         if (!plugin) {
             throw new Error("No default agent plugin registered.");
         }

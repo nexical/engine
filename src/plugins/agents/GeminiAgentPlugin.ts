@@ -3,19 +3,12 @@ import debug from 'debug';
 import { AgentPlugin, BasePlugin } from '../../models/Plugins.js';
 import { Agent } from '../../models/Agent.js';
 import { ShellExecutor } from '../../utils/ShellExecutor.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
 
 const log = debug('agent:gemini-cli');
 
 export class GeminiCliAgentPlugin extends BasePlugin implements AgentPlugin {
     name = 'gemini-cli';
     description = 'Executes agents using the Gemini CLI.';
-
-    private fsService!: FileSystemService;
-
-    protected initialize() {
-        this.fsService = new FileSystemService();
-    }
 
     async execute(agent: Agent, taskPrompt: string, context: any = {}): Promise<string> {
         const promptTemplate = agent.prompt_template || '';
@@ -24,9 +17,9 @@ export class GeminiCliAgentPlugin extends BasePlugin implements AgentPlugin {
         const filePath = params.file_path;
         let fileContent = '';
         if (filePath) {
-            const fullPath = path.join(this.config.projectPath, filePath);
-            if (this.fsService.exists(fullPath)) {
-                fileContent = this.fsService.readFile(fullPath);
+            const fullPath = path.join(this.core.config.projectPath, filePath);
+            if (this.core.disk.exists(fullPath)) {
+                fileContent = this.core.disk.readFile(fullPath);
             } else {
                 log(`Warning: File ${fullPath} not found.`);
             }
@@ -65,7 +58,7 @@ export class GeminiCliAgentPlugin extends BasePlugin implements AgentPlugin {
 
         try {
             const result = await ShellExecutor.execute(commandBin, finalArgs, {
-                cwd: this.config.projectPath
+                cwd: this.core.config.projectPath
             });
 
             log("--- stdout ---");

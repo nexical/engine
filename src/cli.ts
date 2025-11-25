@@ -10,14 +10,12 @@ const log = debug('cli');
 const program = new Command();
 
 program
-    .name('ai-architect')
-    .description('AI Architect CLI')
-    .version('1.0.0');
+    .name('plotris')
+    .description('Extensible AI-driven multi-agent planner and orchstrator for local project development')
+    .version('0.1.0');
 
 program
-    .option('--prompt <prompt>', 'A "fuzzy" AI-driven prompt.')
-    .option('--publish', 'Run a production deployment.')
-    .option('--preview', 'Run a preview deployment.');
+    .option('--prompt <prompt>', 'A AI-driven prompt to drive orchestration engine or a /command.');
 
 program.parse(process.argv);
 
@@ -27,11 +25,7 @@ try {
     await orchestrator.init();
 
     if (options.prompt) {
-        await orchestrator.runAIWorkflow(options.prompt);
-    } else if (options.publish) {
-        await orchestrator.runProductionDeployment();
-    } else if (options.preview) {
-        await orchestrator.runPreviewDeployment();
+        await orchestrator.execute(options.prompt);
     } else {
         // Interactive mode or help
         if (process.argv.length <= 2) {
@@ -40,7 +34,7 @@ try {
             const rl = readline.createInterface({
                 input: process.stdin,
                 output: process.stdout,
-                prompt: 'builder> '
+                prompt: 'instruction> '
             });
 
             rl.prompt();
@@ -51,7 +45,7 @@ try {
                     return;
                 }
                 if (prompt) {
-                    await orchestrator.runAIWorkflow(prompt);
+                    await orchestrator.execute(prompt);
                 }
                 rl.prompt();
             }).on('close', () => {

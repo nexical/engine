@@ -1,6 +1,6 @@
 import debug from 'debug';
 import { spawnSync } from 'child_process';
-import { Application } from '../models/Application.js';
+import { Orchestrator } from '../orchestrator.js';
 
 const log = debug('cloudflare');
 
@@ -8,7 +8,7 @@ export class CloudflareService {
     private apiToken: string | undefined;
     private accountId: string | undefined;
 
-    constructor(private config: Application) {
+    constructor(private core: Orchestrator) {
         this.apiToken = process.env.CLOUDFLARE_API_TOKEN;
         this.accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 

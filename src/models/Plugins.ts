@@ -1,4 +1,4 @@
-import { Application } from './Application.js';
+import { Orchestrator } from '../orchestrator.js';
 import { Agent } from './Agent.js';
 
 export interface CommandPlugin {
@@ -20,7 +20,7 @@ export interface PluginRegistry<T> {
 }
 
 export class BasePlugin {
-    constructor(protected config: Application) {
+    constructor(protected core: Orchestrator) {
         this.initialize();
     }
 

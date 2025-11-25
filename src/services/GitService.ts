@@ -1,12 +1,12 @@
 import { spawnSync } from 'child_process';
-import { Application } from '../models/Application.js';
+import { Orchestrator } from '../orchestrator.js';
 
 export class GitService {
-    constructor(private config: Application) { }
+    constructor(private core: Orchestrator) { }
 
     runCommand(args: string[]): string {
         const result = spawnSync('git', args, {
-            cwd: this.config.projectPath,
+            cwd: this.core.config.projectPath,
             encoding: 'utf-8',
         });
 

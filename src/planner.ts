@@ -1,40 +1,52 @@
 import path from 'path';
 import debug from 'debug';
-import { Application } from './models/Application.js';
+import { Orchestrator } from './orchestrator.js';
 import { Plan, PlanUtils } from './models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
-import { AgentRegistry } from './plugins/AgentRegistry.js';
 import { Agent } from './models/Agent.js';
 
 const log = debug('planner');
 
 export class Planner {
     private plannerPrompt: string
-    private fsService: FileSystemService
 
     constructor(
-        private config: Application,
-        private agentRegistry: AgentRegistry
+        private core: Orchestrator
     ) {
         const plannerPromptFile = 'planner.md';
-        const corePlannerPrompt = path.join(this.config.appPath, 'prompts', plannerPromptFile);
-        const projectPlannerPrompt = path.join(this.config.agentsPath, plannerPromptFile);
+        const corePlannerPrompt = path.join(this.core.config.appPath, 'prompts', plannerPromptFile);
+        const projectPlannerPrompt = path.join(this.core.config.agentsPath, plannerPromptFile);
 
-        this.fsService = new FileSystemService();
-
-        if (this.fsService.exists(projectPlannerPrompt)) {
-            this.plannerPrompt = this.fsService.readFile(projectPlannerPrompt);
+        if (this.core.disk.exists(projectPlannerPrompt)) {
+            this.plannerPrompt = this.core.disk.readFile(projectPlannerPrompt);
         } else {
-            this.plannerPrompt = this.fsService.readFile(corePlannerPrompt);
+            this.plannerPrompt = this.core.disk.readFile(corePlannerPrompt);
         }
     }
 
     private getAgentCapabilities(): string {
-        const capabilitiesPath = path.join(this.config.agentsPath, 'capabilities.yml');
-        if (this.fsService.exists(capabilitiesPath)) {
-            return this.fsService.readFile(capabilitiesPath);
+        const capabilitiesPath = path.join(this.core.config.agentsPath, 'capabilities.yml');
+        if (this.core.disk.exists(capabilitiesPath)) {
+            return this.core.disk.readFile(capabilitiesPath);
         }
         return "No agent capabilities file found.";
+    }
+
+    private savePlanToHistory(plan: Plan): void {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+
+        const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yml`;
+        const filePath = path.join(this.core.config.historyPath, filename);
+
+        const yamlContent = PlanUtils.toYaml(plan);
+        this.core.disk.writeFile(filePath, yamlContent);
+        log(`Saved plan history to: ${filePath}`);
     }
 
     async generatePlan(prompt: string): Promise<Plan> {
@@ -52,7 +64,7 @@ export class Planner {
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
-        const plugin = this.agentRegistry.getDefault();
+        const plugin = this.core.agentRegistry.getDefault();
         if (!plugin) {
             throw new Error("No default agent plugin registered.");
         }
@@ -84,10 +96,11 @@ export class Planner {
                 }
             });
 
-            let planYaml = result;
-            // Strip markdown code blocks if present
-            planYaml = planYaml.replace(/```yaml\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
-            return PlanUtils.fromYaml(planYaml);
+            const planYaml = result.replace(/```yaml\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
+            const plan = PlanUtils.fromYaml(planYaml);
+
+            this.savePlanToHistory(plan);
+            return plan;
 
         } catch (e) {
             console.error("Error generating plan:", e);

@@ -1,7 +1,6 @@
 import debug from 'debug';
 import { CommandPlugin, BasePlugin } from '../../models/Plugins.js';
 import { DeployUtils } from '../../models/Deployment.js';
-import { GitService } from '../../services/GitService.js';
 import { CloudflareService } from '../../services/CloudflareService.js';
 
 const log = debug('command:preview');
@@ -11,14 +10,13 @@ export class PreviewCommandPlugin extends BasePlugin implements CommandPlugin {
     description = 'Deploy the website preview environment. Usage: /preview';
 
     async execute(args?: string[]): Promise<void> {
-        const deploymentConfig = DeployUtils.loadConfig(this.config);
-        const gitService = new GitService(this.config);
-        const cloudflareService = new CloudflareService(this.config);
+        const deploymentConfig = DeployUtils.loadConfig(this.core.config);
+        const cloudflareService = new CloudflareService(this.core);
 
         log("Starting preview deployment...");
 
         try {
-            const branch = gitService.getCurrentBranch();
+            const branch = this.core.git.getCurrentBranch();
             await cloudflareService.deploy(deploymentConfig.project_name, '.', branch);
             log(`Preview deployment triggered for branch ${branch}.`);
 

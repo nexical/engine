@@ -3,24 +3,26 @@ import fs from 'fs-extra';
 import { readdir } from 'fs/promises';
 import debug from 'debug';
 import { fileURLToPath } from 'url';
-import { Plan, PlanUtils } from './models/Plan.js';
 import { Application } from './models/Application.js';
-import { FileSystemService } from './services/FileSystemService.js';
+import { CommandPlugin, AgentPlugin } from './models/Plugins.js';
 import { Planner } from './planner.js';
 import { Executor } from './executor.js';
 import { CommandRegistry } from './plugins/CommandRegistry.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
-import { CommandPlugin, AgentPlugin } from './models/Plugins.js';
+import { GitService } from './services/GitService.js';
+import { FileSystemService } from './services/FileSystemService.js';
 
 const log = debug('orchestrator');
 
 export class Orchestrator {
-    private config: Application;
-    private fsService: FileSystemService;
+    public config: Application;
+    public disk: FileSystemService;
+    public git: GitService;
+    public commandRegistry: CommandRegistry;
+    public agentRegistry: AgentRegistry;
+
     private planner: Planner;
     private executor: Executor;
-    private commandRegistry: CommandRegistry;
-    private agentRegistry: AgentRegistry;
 
     constructor(argv: string[]) {
         this.config = {} as Application;
@@ -41,14 +43,17 @@ export class Orchestrator {
         this.config.historyPath = path.join(this.config.builderPath, 'history')
         this.config.deployConfigPath = path.join(this.config.builderPath, 'deploy.yml');
 
-        this.fsService = new FileSystemService();
-
         // Initialize Registries
         this.commandRegistry = new CommandRegistry();
         this.agentRegistry = new AgentRegistry();
 
-        this.planner = new Planner(this.config, this.agentRegistry);
-        this.executor = new Executor(this.config, this.agentRegistry);
+        // Initialize shared services
+        this.disk = new FileSystemService();
+        this.git = new GitService(this);
+
+        // Initialize orchestrator components
+        this.planner = new Planner(this);
+        this.executor = new Executor(this);
     }
 
     async init(): Promise<void> {
@@ -79,7 +84,7 @@ export class Orchestrator {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
                             try {
-                                const instance = new ExportedClass(this.config);
+                                const instance = new ExportedClass(this);
                                 if (this.isCommandPlugin(instance)) {
                                     log(`Registering command plugin: ${instance.name}`);
                                     this.commandRegistry.register(instance);
@@ -110,7 +115,7 @@ export class Orchestrator {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
                             try {
-                                const instance = new ExportedClass(this.config);
+                                const instance = new ExportedClass(this);
                                 if (this.isAgentPlugin(instance)) {
                                     const isDefault = instance.name === 'gemini-cli'; // Convention for default
                                     log(`Registering agent plugin: ${instance.name} (Default: ${isDefault})`);
@@ -136,49 +141,34 @@ export class Orchestrator {
         return obj && typeof obj.name === 'string' && typeof obj.execute === 'function';
     }
 
-    private savePlanToHistory(plan: Plan): void {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-
-        const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yml`;
-        const filePath = path.join(this.config.historyPath, filename);
-
-        const yamlContent = PlanUtils.toYaml(plan);
-        this.fsService.writeFile(filePath, yamlContent);
-        log(`Saved plan history to: ${filePath}`);
-    }
-
     async runAIWorkflow(prompt: string): Promise<void> {
         log("Starting AI-driven workflow...");
         try {
             const plan = await this.planner.generatePlan(prompt);
-            this.savePlanToHistory(plan);
             await this.executor.executePlan(plan, prompt);
         } catch (e) {
             console.error("AI workflow failed:", e);
         }
     }
 
-    async runPreviewDeployment(): Promise<void> {
-        const cmd = this.commandRegistry.get('preview');
-        if (cmd) {
-            await cmd.execute();
-        } else {
-            console.error("Preview command not found.");
-        }
-    }
+    async execute(input: string): Promise<void> {
+        input = input.trim();
+        if (input.startsWith('/')) {
+            // Command execution
+            const parts = input.slice(1).split(' ');
+            const commandName = parts[0];
+            const args = parts.slice(1);
 
-    async runProductionDeployment(): Promise<void> {
-        const cmd = this.commandRegistry.get('publish');
-        if (cmd) {
-            await cmd.execute();
+            const command = this.commandRegistry.get(commandName);
+            if (command) {
+                log(`Executing command: ${commandName}`);
+                await command.execute(args);
+            } else {
+                console.error(`Unknown command: /${commandName}`);
+            }
         } else {
-            console.error("Publish command not found.");
+            // AI Workflow
+            await this.runAIWorkflow(input);
         }
     }
 }
