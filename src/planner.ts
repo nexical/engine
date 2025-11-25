@@ -79,7 +79,6 @@ export class Planner {
             // Let's pass fullPrompt as 'prompt' in params.
 
             const result = await plugin.execute(plannerAgent, '', {
-                config: this.config,
                 params: {
                     prompt: fullPrompt
                 }

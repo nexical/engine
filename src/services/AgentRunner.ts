@@ -67,7 +67,6 @@ export class AgentRunner {
 
         try {
             await plugin.execute(profile, task.description, {
-                config: this.config,
                 userPrompt: userPrompt,
                 taskId: task.id,
                 params: task.params
