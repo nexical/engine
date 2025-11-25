@@ -61,17 +61,15 @@ The **Executor** builds a dependency graph and dynamically schedules tasks as th
 
 ### Running the CLI
 
-You can run the CLI using the `builder` script defined in `package.json`:
+You can run the CLI using the `cli` script defined in `package.json`:
 
 ```bash
-npm run builder -- [options]
+npm run cli -- [options]
 ```
 
 #### Options
 
-- `--prompt <text>`: Run an AI-driven workflow with the specified prompt.
-- `--publish`: Trigger a production deployment.
-- `--preview`: Trigger a preview deployment based on the current branch.
+- `--prompt <text>`: Run an AI-driven workflow with the specified prompt or /command.
 - `--help`: Show help information.
 
 #### Interactive Mode
@@ -79,12 +77,12 @@ npm run builder -- [options]
 If no arguments are provided, the CLI enters an interactive chat mode:
 
 ```bash
-npm run builder
+npm run cli
 ```
 
 ## Agent Definition Patterns
 
-Agents are defined as YAML files located in `plotris/agents/` (or `website/.plotris/agents/` for CLI development). This allows for flexible, data-driven agent configuration.
+Agents are defined as YAML files located in `plotris/agents/` (or `dev_project/.plotris/agents/` for CLI development). This allows for flexible, data-driven agent configuration.
 
 ### Agent Profile Format (`.agent.yml`)
 
@@ -121,13 +119,13 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
         - `agents/`: Agent execution plugins.
         - `commands/`: CLI command plugins.
     - `services/`: Service implementations.
-- `prompts`: Prompt templates for CLI use.
+    - `prompts`: Prompt templates for CLI use.
 - `dist/`: Compiled JavaScript output.
 
 ### Building and Testing
 
 - **Build**: `npm run build` (runs `tsc`).
-- **Run**: `npm run builder` (runs `node dist/cli.js`).
+- **Run**: `npm run cli` (runs `node dist/cli.js`).
 
 ### Extending the Application
 
