@@ -24,6 +24,7 @@ program.parse(process.argv);
 const options = program.opts();
 try {
     const orchestrator = new Orchestrator(process.argv);
+    await orchestrator.init();
 
     if (options.prompt) {
         await orchestrator.runAIWorkflow(options.prompt);

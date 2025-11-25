@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs-extra';
+import { readdir } from 'fs/promises';
 import debug from 'debug';
 import { fileURLToPath } from 'url';
 import { Plan, PlanUtils } from './models/Plan.js';
@@ -9,9 +10,7 @@ import { Planner } from './planner.js';
 import { Executor } from './executor.js';
 import { CommandRegistry } from './plugins/CommandRegistry.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
-import { PreviewCommandPlugin } from './plugins/commands/PreviewCommandPlugin.js';
-import { PublishCommandPlugin } from './plugins/commands/PublishCommandPlugin.js';
-import { GeminiCliAgentPlugin } from './plugins/agents/GeminiAgentPlugin.js';
+import { CommandPlugin, AgentPlugin } from './models/Plugins.js';
 
 const log = debug('orchestrator');
 
@@ -48,13 +47,93 @@ export class Orchestrator {
         this.commandRegistry = new CommandRegistry();
         this.agentRegistry = new AgentRegistry();
 
-        // Register Plugins
-        this.commandRegistry.register(new PreviewCommandPlugin(this.config));
-        this.commandRegistry.register(new PublishCommandPlugin(this.config));
-        this.agentRegistry.register(new GeminiCliAgentPlugin(this.config), true); // Default agent plugin
-
         this.planner = new Planner(this.config, this.agentRegistry);
         this.executor = new Executor(this.config, this.agentRegistry);
+    }
+
+    async init(): Promise<void> {
+        await this.loadPlugins();
+    }
+
+    private async loadPlugins(): Promise<void> {
+        const pluginsDir = path.join(this.config.appPath, 'plugins');
+        const commandsDir = path.join(pluginsDir, 'commands');
+        const agentsDir = path.join(pluginsDir, 'agents');
+
+        await this.loadCommandPlugins(commandsDir);
+        await this.loadAgentPlugins(agentsDir);
+    }
+
+    private async loadCommandPlugins(dir: string): Promise<void> {
+        if (!fs.existsSync(dir)) return;
+
+        const files = await readdir(dir);
+        for (const file of files) {
+            if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
+                try {
+                    const modulePath = path.join(dir, file);
+                    const module = await import(modulePath);
+
+                    // Iterate over exports to find classes implementing CommandPlugin
+                    for (const key in module) {
+                        const ExportedClass = module[key];
+                        if (typeof ExportedClass === 'function') {
+                            try {
+                                const instance = new ExportedClass(this.config);
+                                if (this.isCommandPlugin(instance)) {
+                                    log(`Registering command plugin: ${instance.name}`);
+                                    this.commandRegistry.register(instance);
+                                }
+                            } catch (e) {
+                                // Ignore if instantiation fails (e.g. not a class or needs args)
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to load command plugin from ${file}:`, e);
+                }
+            }
+        }
+    }
+
+    private async loadAgentPlugins(dir: string): Promise<void> {
+        if (!fs.existsSync(dir)) return;
+
+        const files = await readdir(dir);
+        for (const file of files) {
+            if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
+                try {
+                    const modulePath = path.join(dir, file);
+                    const module = await import(modulePath);
+
+                    for (const key in module) {
+                        const ExportedClass = module[key];
+                        if (typeof ExportedClass === 'function') {
+                            try {
+                                const instance = new ExportedClass(this.config);
+                                if (this.isAgentPlugin(instance)) {
+                                    const isDefault = instance.name === 'gemini-cli'; // Convention for default
+                                    log(`Registering agent plugin: ${instance.name} (Default: ${isDefault})`);
+                                    this.agentRegistry.register(instance, isDefault);
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to load agent plugin from ${file}:`, e);
+                }
+            }
+        }
+    }
+
+    private isCommandPlugin(obj: any): obj is CommandPlugin {
+        return obj && typeof obj.name === 'string' && typeof obj.execute === 'function';
+    }
+
+    private isAgentPlugin(obj: any): obj is AgentPlugin {
+        return obj && typeof obj.name === 'string' && typeof obj.execute === 'function';
     }
 
     private savePlanToHistory(plan: Plan): void {
@@ -86,18 +165,18 @@ export class Orchestrator {
     }
 
     async runPreviewDeployment(): Promise<void> {
-        const deployCmd = this.commandRegistry.get('preview');
-        if (deployCmd) {
-            await deployCmd.execute();
+        const cmd = this.commandRegistry.get('preview');
+        if (cmd) {
+            await cmd.execute();
         } else {
             console.error("Preview command not found.");
         }
     }
 
     async runProductionDeployment(): Promise<void> {
-        const deployCmd = this.commandRegistry.get('publish');
-        if (deployCmd) {
-            await deployCmd.execute();
+        const cmd = this.commandRegistry.get('publish');
+        if (cmd) {
+            await cmd.execute();
         } else {
             console.error("Publish command not found.");
         }
