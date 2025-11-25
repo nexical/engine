@@ -11,14 +11,20 @@ The application follows a modular architecture centered around an **Orchestrator
 - **Orchestrator** (`src/orchestrator.ts`): The main controller that initializes services and routes commands to the appropriate workflow (AI-driven or deterministic).
 - **Planner** (`src/planner.ts`): Responsible for generating execution plans from user prompts. It uses the `gemini` CLI to interface with an LLM, converting natural language requests into structured YAML plans.
 - **Executor** (`src/executor.ts`): Iterates through the tasks in a generated plan and delegates execution to the `AgentRunner`.
-- **AgentRunner** (`src/services/AgentRunner.ts`): Discovers and executes agents. It supports YAML-defined agents that map to CLI commands.
+- **AgentRunner** (`src/services/AgentRunner.ts`): Discovers and executes agents. It delegates execution to the appropriate `AgentPlugin` (defaulting to `CLIAgentPlugin`).
 
 ### Services
 
 - **FileSystemService**: Handles file I/O operations safely.
 - **GitService**: Manages version control operations (commit, push, branch detection).
 - **CloudflareService**: Handles deployments to Cloudflare Pages.
-- **DeploymentService**: Orchestrates the deployment process, combining Git and Cloudflare operations.
+
+### Plugins
+
+The application uses a plugin system to extend functionality:
+
+- **CommandPlugin**: Adds new CLI commands (e.g., `/publish`, `/preview`).
+- **AgentPlugin**: Defines how agents are executed (e.g., `CLIAgentPlugin` for CLI-based agents).
 
 ### Task Execution Model
 
@@ -110,7 +116,10 @@ The `AgentRunner` supports variable interpolation in `prompt_template` and `args
 ### Directory Structure
 
 - `src/`: Source code.
-    - `data_models/`: TypeScript interfaces and classes for core entities (Plan, Task, Project, DeploymentConfig).
+    - `models/`: TypeScript interfaces and classes for core entities (Plan, Task, Project, DeploymentConfig).
+    - `plugins/`: Plugin implementations.
+        - `agents/`: Agent execution plugins.
+        - `commands/`: CLI command plugins.
     - `services/`: Service implementations.
 - `prompts`: Prompt templates for CLI use.
 - `dist/`: Compiled JavaScript output.
