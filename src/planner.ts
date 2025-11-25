@@ -1,9 +1,10 @@
 import path from 'path';
 import debug from 'debug';
-import { AppConfig } from './data_models/AppConfig.js';
+import { Application } from './data_models/Application.js';
 import { Plan, PlanUtils } from './data_models/Plan.js';
 import { FileSystemService } from './services/FileSystemService.js';
-import { ShellExecutor } from './utils/ShellExecutor.js';
+import { AgentRegistry } from './plugins/AgentRegistry.js';
+import { Agent } from './data_models/Agent.js';
 
 const log = debug('planner');
 
@@ -11,7 +12,10 @@ export class Planner {
     private plannerPrompt: string
     private fsService: FileSystemService
 
-    constructor(private config: AppConfig) {
+    constructor(
+        private config: Application,
+        private agentRegistry: AgentRegistry
+    ) {
         const plannerPromptFile = 'planner.md';
         const corePlannerPrompt = path.join(this.config.appPath, 'prompts', plannerPromptFile);
         const projectPlannerPrompt = path.join(this.config.agentsPath, plannerPromptFile);
@@ -33,7 +37,7 @@ export class Planner {
         return "No agent capabilities file found.";
     }
 
-    generatePlan(prompt: string): Plan {
+    async generatePlan(prompt: string): Promise<Plan> {
         const agentCapabilities = this.getAgentCapabilities();
 
         const fullPrompt = this.plannerPrompt.replace('{user_prompt}', prompt)
@@ -41,20 +45,47 @@ export class Planner {
 
         log("Generating plan for prompt:", prompt);
 
-        const command = 'gemini';
-        const args = ['prompt', fullPrompt];
+        const plannerAgent: Agent = {
+            name: 'planner',
+            command: 'gemini',
+            args: ['prompt', '{prompt}'],
+            prompt_template: '{prompt}' // The fullPrompt is already constructed
+        };
+
+        const plugin = this.agentRegistry.getDefault();
+        if (!plugin) {
+            throw new Error("No default agent plugin registered.");
+        }
 
         try {
-            const result = ShellExecutor.executeSync(command, args, {
-                cwd: this.config.projectPath
+            // We pass fullPrompt as the "userPrompt" in context, but since we set prompt_template to {prompt},
+            // and we pass fullPrompt as 'prompt' in params (via context override if we want, or just rely on formatArgs).
+            // Wait, GeminiAgentPlugin uses 'task_prompt' as 'task_prompt' and 'user_request' as 'user_request'.
+            // And it interpolates {prompt} from formatArgs['prompt'].
+            // In GeminiAgentPlugin: formatArgs['prompt'] = prompt (which is interpolated promptTemplate).
+
+            // Let's look at GeminiAgentPlugin again.
+            // prompt = promptTemplate.replace(...)
+            // formatArgs['prompt'] = prompt
+
+            // So if promptTemplate is '{prompt}', then prompt becomes formatArgs['prompt'].
+            // But formatArgs['prompt'] is overwritten later by the interpolated prompt? No.
+            // formatArgs['prompt'] is assigned the result of interpolation.
+
+            // So we need to pass 'prompt' in formatArgs.
+            // GeminiAgentPlugin constructs formatArgs from context.params, user_request, etc.
+            // It doesn't seem to have a direct 'prompt' input from the caller except via params.
+
+            // Let's pass fullPrompt as 'prompt' in params.
+
+            const result = await plugin.execute(plannerAgent, '', {
+                config: this.config,
+                params: {
+                    prompt: fullPrompt
+                }
             });
 
-            if (result.code !== 0) {
-                console.error("Planner CLI failed:", result.stderr);
-                throw new Error(`Planner CLI exited with code ${result.code}`);
-            }
-
-            let planYaml = result.stdout;
+            let planYaml = result;
             // Strip markdown code blocks if present
             planYaml = planYaml.replace(/```yaml\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
             return PlanUtils.fromYaml(planYaml);

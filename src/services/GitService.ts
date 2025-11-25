@@ -1,8 +1,8 @@
 import { spawnSync } from 'child_process';
-import { AppConfig } from '../data_models/AppConfig.js';
+import { Application } from '../data_models/Application.js';
 
 export class GitService {
-    constructor(private config: AppConfig) { }
+    constructor(private config: Application) { }
 
     runCommand(args: string[]): string {
         const result = spawnSync('git', args, {

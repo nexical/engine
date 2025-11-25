@@ -1,11 +1,11 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import debug from 'debug';
-import { AppConfig } from '../data_models/AppConfig.js';
+import { Application } from '../data_models/Application.js';
 import { Task } from '../data_models/Task.js';
 import { Agent } from '../data_models/Agent.js';
 import { FileSystemService } from './FileSystemService.js';
-import { ShellExecutor } from '../utils/ShellExecutor.js';
+import { AgentRegistry } from '../plugins/AgentRegistry.js';
 
 const log = debug('agent-runner');
 
@@ -14,7 +14,8 @@ export class AgentRunner {
     private fsService: FileSystemService
 
     constructor(
-        private config: AppConfig
+        private config: Application,
+        private agentRegistry: AgentRegistry
     ) {
         this.fsService = new FileSystemService();
         this.loadYamlProfiles();
@@ -55,66 +56,24 @@ export class AgentRunner {
     }
 
     private async executeAgent(task: Task, profile: Agent, userPrompt: string): Promise<void> {
-        const promptTemplate = profile.prompt_template || '';
-        const params = task.params || {};
+        // Determine which plugin to use. 
+        // For now, we default to the default plugin (Gemini CLI) unless the agent profile specifies otherwise.
+        // Future: profile.plugin could specify the plugin name.
 
-        const filePath = params.file_path;
-        let fileContent = '';
-        if (filePath) {
-            const fullPath = path.join(this.config.projectPath, filePath);
-            if (this.fsService.exists(fullPath)) {
-                fileContent = this.fsService.readFile(fullPath);
-            } else {
-                log(`Warning: File ${fullPath} not found.`);
-            }
+        const plugin = this.agentRegistry.getDefault();
+        if (!plugin) {
+            throw new Error("No default agent plugin registered.");
         }
-
-        const formatArgs: Record<string, any> = {
-            user_request: userPrompt,
-            file_path: filePath || '',
-            file_content: fileContent || '',
-            task_id: task.id,
-            task_prompt: task.description,
-            ...params
-        };
-
-        // Interpolate prompt
-        let prompt = promptTemplate;
-        for (const [key, value] of Object.entries(formatArgs)) {
-            prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
-        }
-
-        const commandBin = profile.command || 'gemini';
-        const argsTemplate = profile.args || ['prompt', '<prompt>'];
-
-        formatArgs['prompt'] = prompt;
-
-        const finalArgs = argsTemplate.map(arg => {
-            let formattedArg = arg;
-            for (const [key, value] of Object.entries(formatArgs)) {
-                formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
-            }
-            return formattedArg;
-        });
-
-        log(`Running CLI agent: ${task.agent}`);
-        log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
 
         try {
-            const result = await ShellExecutor.execute(commandBin, finalArgs, {
-                cwd: this.config.projectPath
+            await plugin.execute(profile, task.description, {
+                config: this.config,
+                userPrompt: userPrompt,
+                taskId: task.id,
+                params: task.params
             });
-
-            log("--- stdout ---");
-            log(result.stdout);
-            log("--- stderr ---");
-            log(result.stderr);
-
-            if (result.code !== 0) {
-                log(`Warning: Command exited with code ${result.code}`);
-            }
         } catch (err) {
-            console.error(`An error occurred while executing the CLI agent: ${err}`);
+            console.error(`An error occurred while executing the agent ${task.agent}: ${err}`);
             throw err;
         }
     }

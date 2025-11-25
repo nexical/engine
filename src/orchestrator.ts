@@ -3,23 +3,28 @@ import fs from 'fs-extra';
 import debug from 'debug';
 import { fileURLToPath } from 'url';
 import { Plan, PlanUtils } from './data_models/Plan.js';
-import { AppConfig } from './data_models/AppConfig.js';
+import { Application } from './data_models/Application.js';
 import { FileSystemService } from './services/FileSystemService.js';
 import { Planner } from './planner.js';
 import { Executor } from './executor.js';
-import { Deployer } from './deployer.js';
+import { CommandRegistry } from './plugins/CommandRegistry.js';
+import { AgentRegistry } from './plugins/AgentRegistry.js';
+import { PreviewCommandPlugin } from './plugins/commands/PreviewCommandPlugin.js';
+import { PublishCommandPlugin } from './plugins/commands/PublishCommandPlugin.js';
+import { GeminiCliAgentPlugin } from './plugins/agents/GeminiAgentPlugin.js';
 
 const log = debug('orchestrator');
 
 export class Orchestrator {
-    private config: AppConfig;
+    private config: Application;
     private fsService: FileSystemService;
     private planner: Planner;
     private executor: Executor;
-    private deployer: Deployer;
+    private commandRegistry: CommandRegistry;
+    private agentRegistry: AgentRegistry;
 
     constructor(argv: string[]) {
-        this.config = {} as AppConfig;
+        this.config = {} as Application;
         const cwd = process.cwd();
         const websitePath = path.join(cwd, 'website');
 
@@ -39,9 +44,17 @@ export class Orchestrator {
 
         this.fsService = new FileSystemService();
 
-        this.planner = new Planner(this.config);
-        this.executor = new Executor(this.config);
-        this.deployer = new Deployer(this.config);
+        // Initialize Registries
+        this.commandRegistry = new CommandRegistry();
+        this.agentRegistry = new AgentRegistry();
+
+        // Register Plugins
+        this.commandRegistry.register(new PreviewCommandPlugin(this.config));
+        this.commandRegistry.register(new PublishCommandPlugin(this.config));
+        this.agentRegistry.register(new GeminiCliAgentPlugin(this.config), true); // Default agent plugin
+
+        this.planner = new Planner(this.config, this.agentRegistry);
+        this.executor = new Executor(this.config, this.agentRegistry);
     }
 
     private savePlanToHistory(plan: Plan): void {
@@ -64,7 +77,7 @@ export class Orchestrator {
     async runAIWorkflow(prompt: string): Promise<void> {
         log("Starting AI-driven workflow...");
         try {
-            const plan = this.planner.generatePlan(prompt);
+            const plan = await this.planner.generatePlan(prompt);
             this.savePlanToHistory(plan);
             await this.executor.executePlan(plan, prompt);
         } catch (e) {
@@ -73,10 +86,20 @@ export class Orchestrator {
     }
 
     async runPreviewDeployment(): Promise<void> {
-        await this.deployer.runPreviewDeployment();
+        const deployCmd = this.commandRegistry.get('preview');
+        if (deployCmd) {
+            await deployCmd.execute();
+        } else {
+            console.error("Preview command not found.");
+        }
     }
 
     async runProductionDeployment(): Promise<void> {
-        await this.deployer.runProductionDeployment();
+        const deployCmd = this.commandRegistry.get('publish');
+        if (deployCmd) {
+            await deployCmd.execute();
+        } else {
+            console.error("Publish command not found.");
+        }
     }
 }

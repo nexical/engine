@@ -1,8 +1,9 @@
 import debug from 'debug';
 import { Plan } from './data_models/Plan.js';
 import { Task } from './data_models/Task.js';
-import { AppConfig } from './data_models/AppConfig.js';
+import { Application } from './data_models/Application.js';
 import { AgentRunner } from './services/AgentRunner.js';
+import { AgentRegistry } from './plugins/AgentRegistry.js';
 
 const log = debug('executor');
 
@@ -11,10 +12,10 @@ export class Executor {
     private taskPromises: Map<string, Promise<void>> = new Map();
 
     constructor(
-        private config: AppConfig,
-        agentRunner?: AgentRunner
+        private config: Application,
+        private agentRegistry: AgentRegistry
     ) {
-        this.agentRunner = agentRunner || new AgentRunner(this.config);
+        this.agentRunner = new AgentRunner(this.config, this.agentRegistry);
     }
 
     async executePlan(plan: Plan, userPrompt: string): Promise<void> {
