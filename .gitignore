@@ -6,7 +6,7 @@ node_modules
 .env
 
 # Test project
-website
+dev_project
 
 # MacOS specific files
 .DS_Store
