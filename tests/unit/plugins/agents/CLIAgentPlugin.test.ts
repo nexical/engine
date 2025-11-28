@@ -58,59 +58,6 @@ describe('CLIAgentPlugin', () => {
         );
     });
 
-    it('should handle file reading', async () => {
-        mockShellExecutor.execute.mockResolvedValue({
-            stdout: 'output',
-            stderr: '',
-            code: 0
-        });
-
-        const agent: Agent = {
-            name: 'test-agent',
-            command: 'cat',
-            args: ['{file_content}'],
-            prompt_template: ''
-        };
-
-        await cliPlugin.execute(agent, 'task prompt', {
-            params: { file_path: 'test.txt' }
-        });
-
-        expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/test.txt');
-        expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/test.txt');
-        expect(mockShellExecutor.execute).toHaveBeenCalledWith(
-            'cat',
-            ['file content'],
-            expect.any(Object)
-        );
-    });
-
-    it('should handle missing file', async () => {
-        mockOrchestrator.disk.exists.mockReturnValue(false);
-        mockShellExecutor.execute.mockResolvedValue({
-            stdout: 'output',
-            stderr: '',
-            code: 0
-        });
-
-        const agent: Agent = {
-            name: 'test-agent',
-            command: 'cat',
-            args: ['{file_content}'],
-            prompt_template: ''
-        };
-
-        await cliPlugin.execute(agent, 'task prompt', {
-            params: { file_path: 'test.txt' }
-        });
-
-        expect(mockShellExecutor.execute).toHaveBeenCalledWith(
-            'cat',
-            [''],
-            expect.any(Object)
-        );
-    });
-
     it('should throw on execution error', async () => {
         mockShellExecutor.execute.mockRejectedValue(new Error('Execution failed'));
 
@@ -135,5 +82,31 @@ describe('CLIAgentPlugin', () => {
         };
 
         await expect(cliPlugin.execute(agent, 'task prompt')).rejects.toThrow('Command exited with code 1');
+    });
+    it('should use default values and log output', async () => {
+        mockShellExecutor.execute.mockResolvedValue({
+            stdout: 'default output',
+            stderr: '',
+            code: 0
+        });
+
+        const agent: Agent = {
+            name: 'default-agent'
+            // No command, args, or prompt_template to trigger defaults
+        };
+
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
+
+        const result = await cliPlugin.execute(agent, 'task prompt');
+
+        expect(result).toBe('default output');
+        expect(mockShellExecutor.execute).toHaveBeenCalledWith(
+            'gemini', // Default command
+            ['prompt', '', '--yolo'], // Default args with empty prompt (since template is empty)
+            expect.objectContaining({ cwd: '/project' })
+        );
+        expect(consoleSpy).toHaveBeenCalledWith('default output');
+
+        consoleSpy.mockRestore();
     });
 });

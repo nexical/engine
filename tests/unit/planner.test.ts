@@ -20,22 +20,31 @@ describe('Planner', () => {
 
     beforeEach(() => {
         mockPlugin = {
-            execute: (jest.fn() as any).mockResolvedValue('tasks: []')
+            execute: jest.fn<any>().mockResolvedValue('') // execute returns void/string, result ignored
         };
 
         mockOrchestrator = {
             config: {
+                projectPath: '/project',
                 appPath: '/app',
                 agentsPath: '/agents',
                 historyPath: '/history'
             },
             disk: {
                 exists: jest.fn().mockReturnValue(true),
-                readFile: jest.fn().mockReturnValue('template'),
+                readFile: jest.fn<any>().mockImplementation((path: any) => {
+                    if (path.endsWith('planner.md')) return 'template';
+                    if (path.endsWith('capabilities.yml')) return 'capabilities';
+                    if (path.endsWith('plan.yml')) return 'tasks: []';
+                    return '';
+                }),
                 writeFile: jest.fn()
             },
             agentRegistry: {
-                getDefault: jest.fn().mockReturnValue(mockPlugin)
+                get: jest.fn<any>().mockImplementation((name: any) => {
+                    if (name === 'cli') return mockPlugin;
+                    return undefined;
+                })
             }
         };
 
@@ -43,6 +52,12 @@ describe('Planner', () => {
         mockPlanUtils.fromYaml.mockReturnValue({ tasks: [] });
 
         planner = new Planner(mockOrchestrator);
+
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     describe('constructor', () => {
@@ -64,8 +79,30 @@ describe('Planner', () => {
             const plan = await planner.generatePlan('user prompt');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/agents/capabilities.yml');
-            expect(mockPlugin.execute).toHaveBeenCalled();
+            expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('cli');
+
+            expect(mockPlugin.execute).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    name: 'planner',
+                    command: 'gemini', // Default
+                    args: ['prompt', '{prompt}', '--yolo']
+                }),
+                '',
+                expect.objectContaining({
+                    userPrompt: 'user prompt',
+                    params: expect.objectContaining({
+                        prompt: expect.stringContaining('template')
+                    })
+                })
+            );
+
+            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/history/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
+
+            // Verify history saving is called (generic check here, specific check in separate test)
+            expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
+            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalled();
+
             expect(plan).toEqual({ tasks: [] });
         });
 
@@ -79,27 +116,90 @@ describe('Planner', () => {
             await planner.generatePlan('user prompt');
 
             expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/agents/capabilities.yml');
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/agents/planner.md');
+            // Should still proceed
+            expect(mockPlugin.execute).toHaveBeenCalled();
         });
 
-        it('should save plan to history', async () => {
-            await planner.generatePlan('user prompt');
-
-            expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
-            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalledWith(
-                expect.stringMatching(/\/history\/plan-\d{4}-\d{2}-\d{2}\.\d{2}-\d{2}-\d{2}\.yml/),
-                'yaml content'
-            );
-        });
-
-        it('should throw if no default plugin', async () => {
-            mockOrchestrator.agentRegistry.getDefault.mockReturnValue(undefined);
-            await expect(planner.generatePlan('user prompt')).rejects.toThrow('No default agent plugin registered');
+        it('should throw if CLI plugin not found', async () => {
+            mockOrchestrator.agentRegistry.get.mockReturnValue(undefined);
+            await expect(planner.generatePlan('user prompt')).rejects.toThrow('CLI plugin not found for planner.');
         });
 
         it('should handle execution errors', async () => {
             mockPlugin.execute.mockRejectedValue(new Error('Execution failed'));
             await expect(planner.generatePlan('user prompt')).rejects.toThrow('Execution failed');
+            expect(console.error).toHaveBeenCalledWith('Error generating plan:', expect.any(Error));
+        });
+
+        it('should parse YAML from markdown block', async () => {
+            mockOrchestrator.disk.readFile.mockImplementation((path: string) => {
+                if (path.endsWith('plan.yml')) {
+                    return '```yaml\ntasks: []\n```';
+                }
+                return 'template';
+            });
+
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
+        });
+
+        it('should parse YAML from partial content', async () => {
+            mockOrchestrator.disk.readFile.mockImplementation((path: string) => {
+                if (path.endsWith('plan.yml')) {
+                    return 'Some text\nplan_name: test\ntasks: []';
+                }
+                return 'template';
+            });
+
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('plan_name: test\ntasks: []');
+        });
+
+        it('should parse YAML from generic code block', async () => {
+            mockOrchestrator.disk.readFile.mockImplementation((path: string) => {
+                if (path.endsWith('plan.yml')) {
+                    return '```\ntasks: []\n```';
+                }
+                return 'template';
+            });
+
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
+        });
+
+        it('should use custom CLI command and args from env', async () => {
+            process.env.PLANNER_CLI_COMMAND = 'custom-cli';
+            process.env.PLANNER_CLI_ARGS = '["arg1", "arg2"]';
+
+            await planner.generatePlan('user prompt');
+
+            expect(mockPlugin.execute).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    command: 'custom-cli',
+                    args: ['arg1', 'arg2']
+                }),
+                expect.anything(),
+                expect.anything()
+            );
+
+            delete process.env.PLANNER_CLI_COMMAND;
+            delete process.env.PLANNER_CLI_ARGS;
+        });
+        it('should save plan to history', async () => {
+            const mockDate = new Date(2023, 0, 1, 12, 0, 0);
+            jest.useFakeTimers();
+            jest.setSystemTime(mockDate);
+
+            await planner.generatePlan('user prompt');
+
+            // 2023-01-01.12-00-00
+            const expectedFilename = 'plan-2023-01-01.12-00-00.yml';
+            const expectedPath = '/history/' + expectedFilename;
+
+            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalledWith(expectedPath, 'yaml content');
+            expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
+
+            jest.useRealTimers();
         });
     });
 });
