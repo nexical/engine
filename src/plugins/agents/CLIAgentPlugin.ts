@@ -15,21 +15,8 @@ export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
         const promptTemplate = agent.prompt_template || '';
         const params = context.params || {};
 
-        const filePath = params.file_path;
-        let fileContent = '';
-        if (filePath) {
-            const fullPath = path.join(this.core.config.projectPath, filePath);
-            if (this.core.disk.exists(fullPath)) {
-                fileContent = this.core.disk.readFile(fullPath);
-            } else {
-                log(`Warning: File ${fullPath} not found.`);
-            }
-        }
-
         const formatArgs: Record<string, any> = {
             user_request: context.userPrompt || '',
-            file_path: filePath || '',
-            file_content: fileContent || '',
             task_id: context.taskId || '',
             task_prompt: taskPrompt,
             ...params
@@ -39,7 +26,7 @@ export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
         const prompt = interpolate(promptTemplate, formatArgs);
 
         const commandBin = agent.command || 'gemini';
-        const argsTemplate = agent.args || ['prompt', '<prompt>', '--yolo'];
+        const argsTemplate = agent.args || ['prompt', '{prompt}', '--yolo'];
 
         formatArgs['prompt'] = prompt;
 

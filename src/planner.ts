@@ -60,10 +60,13 @@ export class Planner {
             plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const fullPrompt = this.plannerPrompt.replace('{user_prompt}', prompt)
-            .replace('{agent_capabilities}', agentCapabilities);
+        const planFile = '.plotris/history/plan.yml';
+        const planFileWithPrefix = `@${planFile}`;
 
-        log("Generating plan for prompt:", prompt);
+        const fullPrompt = this.plannerPrompt
+            .replace('{user_prompt}', prompt)
+            .replace('{agent_capabilities}', agentCapabilities)
+            .replace('{plan_file}', planFileWithPrefix);
 
         const plannerAgent: Agent = {
             name: 'planner',
@@ -72,41 +75,41 @@ export class Planner {
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
-        const plugin = this.core.agentRegistry.getDefault();
-        if (!plugin) {
-            throw new Error("No default agent plugin registered.");
-        }
-
         try {
-            // We pass fullPrompt as the "userPrompt" in context, but since we set prompt_template to {prompt},
-            // and we pass fullPrompt as 'prompt' in params (via context override if we want, or just rely on formatArgs).
-            // Wait, GeminiAgentPlugin uses 'task_prompt' as 'task_prompt' and 'user_request' as 'user_request'.
-            // And it interpolates {prompt} from formatArgs['prompt'].
-            // In GeminiAgentPlugin: formatArgs['prompt'] = prompt (which is interpolated promptTemplate).
-
-            // Let's look at GeminiAgentPlugin again.
-            // prompt = promptTemplate.replace(...)
-            // formatArgs['prompt'] = prompt
-
-            // So if promptTemplate is '{prompt}', then prompt becomes formatArgs['prompt'].
-            // But formatArgs['prompt'] is overwritten later by the interpolated prompt? No.
-            // formatArgs['prompt'] is assigned the result of interpolation.
-
-            // So we need to pass 'prompt' in formatArgs.
-            // GeminiAgentPlugin constructs formatArgs from context.params, user_request, etc.
-            // It doesn't seem to have a direct 'prompt' input from the caller except via params.
-
             // Let's pass fullPrompt as 'prompt' in params.
 
-            const result = await plugin.execute(plannerAgent, '', {
+            const plugin = this.core.agentRegistry.get('cli');
+            if (!plugin) {
+                throw new Error("CLI plugin not found for planner.");
+            }
+
+            // Execute the planner agent. It should write the plan to planFile.
+            await plugin.execute(plannerAgent, '', {
+                userPrompt: prompt,
                 params: {
                     prompt: fullPrompt
                 }
             });
 
-            const planYaml = result.replace(/```yaml\n/g, '').replace(/```\n/g, '').replace(/```/g, '');
-            const plan = PlanUtils.fromYaml(planYaml);
+            // Read the plan from the file
+            const planContent = this.core.disk.readFile(path.join(this.core.config.projectPath, planFile));
 
+            // Parse the YAML
+            // Extract YAML block if wrapped in markdown
+            let yamlContent = planContent;
+            const yamlBlockMatch = planContent.match(/```yaml\n([\s\S]*?)\n```/) || planContent.match(/```\n([\s\S]*?)\n```/);
+
+            if (yamlBlockMatch) {
+                yamlContent = yamlBlockMatch[1];
+            } else {
+                // Try to find the start of the YAML object (plan_name:)
+                const yamlStart = planContent.indexOf('plan_name:');
+                if (yamlStart !== -1) {
+                    yamlContent = planContent.substring(yamlStart);
+                }
+            }
+
+            const plan = PlanUtils.fromYaml(yamlContent);
             this.savePlanToHistory(plan);
             return plan;
 
