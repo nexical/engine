@@ -4,7 +4,7 @@
   "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
   "scripts": {
     "build": "tsc && cp -fr src/prompts dist/",
-    "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
     "test:integration": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
     "test": "npm run test:unit && npm run test:integration",
     "cli": "npm run build && node dist/cli.js"
