@@ -2,7 +2,7 @@ import path from 'path';
 import debug from 'debug';
 import { AgentPlugin, BasePlugin } from '../../models/Plugins.js';
 import { Agent } from '../../models/Agent.js';
-import { ShellExecutor } from '../../utils/ShellExecutor.js';
+import { ShellExecutor } from '../../utils/shell.js';
 import { interpolate } from '../../utils/interpolation.js';
 
 const log = debug('agent:cli');
