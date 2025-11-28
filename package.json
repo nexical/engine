@@ -4,6 +4,7 @@
   "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
   "scripts": {
     "build": "tsc && cp -fr src/prompts dist/",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "cli": "npm run build && node dist/cli.js"
   },
   "keywords": [],
@@ -13,8 +14,11 @@
   "devDependencies": {
     "@types/debug": "^4.1.12",
     "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.1",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

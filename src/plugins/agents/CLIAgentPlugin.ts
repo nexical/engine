@@ -3,6 +3,7 @@ import debug from 'debug';
 import { AgentPlugin, BasePlugin } from '../../models/Plugins.js';
 import { Agent } from '../../models/Agent.js';
 import { ShellExecutor } from '../../utils/ShellExecutor.js';
+import { interpolate } from '../../utils/interpolation.js';
 
 const log = debug('agent:cli');
 
@@ -35,23 +36,14 @@ export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
         };
 
         // Interpolate prompt
-        let prompt = promptTemplate;
-        for (const [key, value] of Object.entries(formatArgs)) {
-            prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
-        }
+        const prompt = interpolate(promptTemplate, formatArgs);
 
         const commandBin = agent.command || 'gemini';
         const argsTemplate = agent.args || ['prompt', '<prompt>'];
 
         formatArgs['prompt'] = prompt;
 
-        const finalArgs = argsTemplate.map(arg => {
-            let formattedArg = arg;
-            for (const [key, value] of Object.entries(formatArgs)) {
-                formattedArg = formattedArg.replace(new RegExp(`{${key}}`, 'g'), String(value));
-            }
-            return formattedArg;
-        });
+        const finalArgs = argsTemplate.map(arg => interpolate(arg, formatArgs));
 
         log(`Running CLI agent: ${agent.name}`);
         log(`Command: ${commandBin} ${finalArgs.join(' ')}`);
