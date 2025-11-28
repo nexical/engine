@@ -39,7 +39,7 @@ export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
         const prompt = interpolate(promptTemplate, formatArgs);
 
         const commandBin = agent.command || 'gemini';
-        const argsTemplate = agent.args || ['prompt', '<prompt>'];
+        const argsTemplate = agent.args || ['prompt', '<prompt>', '--yolo'];
 
         formatArgs['prompt'] = prompt;
 

@@ -1,5 +1,6 @@
 import path from 'path';
 import debug from 'debug';
+import yaml from 'js-yaml';
 import { Orchestrator } from './orchestrator.js';
 import { Plan, PlanUtils } from './models/Plan.js';
 import { Agent } from './models/Agent.js';
@@ -50,6 +51,14 @@ export class Planner {
 
     async generatePlan(prompt: string): Promise<Plan> {
         const agentCapabilities = this.getAgentCapabilities();
+        const plannerCliCommand = process.env.PLANNER_CLI_COMMAND || 'gemini';
+        let plannerCliArgs: string[];
+
+        if (process.env.PLANNER_CLI_ARGS) {
+            plannerCliArgs = yaml.load(process.env.PLANNER_CLI_ARGS) as string[];
+        } else {
+            plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
+        }
 
         const fullPrompt = this.plannerPrompt.replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities);
@@ -58,8 +67,8 @@ export class Planner {
 
         const plannerAgent: Agent = {
             name: 'planner',
-            command: process.env.PLANNER_CLI_COMMAND || 'gemini',
-            args: ['prompt', '{prompt}'],
+            command: plannerCliCommand,
+            args: plannerCliArgs,
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
