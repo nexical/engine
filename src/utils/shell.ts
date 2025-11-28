@@ -68,6 +68,10 @@ export class ShellExecutor {
             ...options
         });
 
+        if (result.error) {
+            throw result.error;
+        }
+
         return {
             stdout: result.stdout ? result.stdout.toString() : '',
             stderr: result.stderr ? result.stderr.toString() : '',

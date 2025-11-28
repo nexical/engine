@@ -43,8 +43,7 @@ export class AgentRunner {
 
         const profile = this.agents[task.agent];
         if (!profile) {
-            log(`Warning: Agent '${task.agent}' not found. Skipping task.`);
-            return;
+            throw new Error(`Agent '${task.agent}' not found.`);
         }
 
         await this.executeAgent(task, profile, userPrompt);
@@ -60,10 +59,7 @@ export class AgentRunner {
         if (profile.provider) {
             plugin = this.core.agentRegistry.get(profile.provider);
             if (!plugin) {
-                // Fallback to default if specific provider not found, or throw?
-                // For now, let's try to find it, if not, fallback to default but warn.
-                log(`Warning: Plugin '${profile.provider}' not found. Falling back to default.`);
-                plugin = this.core.agentRegistry.getDefault();
+                throw new Error(`Plugin '${profile.provider}' not found.`);
             }
         } else {
             plugin = this.core.agentRegistry.getDefault();

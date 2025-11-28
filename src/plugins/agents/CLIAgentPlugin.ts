@@ -59,7 +59,7 @@ export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
             log(result.stderr);
 
             if (result.code !== 0) {
-                log(`Warning: Command exited with code ${result.code}`);
+                throw new Error(`Command exited with code ${result.code}\nStderr: ${result.stderr}`);
             }
 
             return result.stdout;
