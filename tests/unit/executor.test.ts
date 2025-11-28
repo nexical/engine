@@ -1,27 +1,31 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import { Executor } from '../../src/executor.js';
-import { Orchestrator } from '../../src/orchestrator.js';
 import { Plan } from '../../src/models/Plan.js';
 
-// Mock Orchestrator and AgentRunner
-jest.mock('../../src/orchestrator.js');
-jest.mock('../../src/services/AgentRunner.js', () => {
-    return {
-        AgentRunner: jest.fn().mockImplementation(() => {
-            return {
-                runAgent: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-            };
-        }),
-    };
-});
+const mockAgentRunner = {
+    runAgent: jest.fn(),
+};
+
+const mockOrchestrator = {
+    agentRunner: mockAgentRunner,
+};
+
+jest.unstable_mockModule('../../src/orchestrator.js', () => ({
+    Orchestrator: jest.fn().mockImplementation(() => mockOrchestrator),
+}));
+
+jest.unstable_mockModule('../../src/services/AgentRunner.js', () => ({
+    AgentRunner: jest.fn().mockImplementation(() => mockAgentRunner),
+}));
+
+const { Executor } = await import('../../src/executor.js');
 
 describe('Executor', () => {
-    let executor: Executor;
-    let mockOrchestrator: Orchestrator;
+    let executor: any;
 
     beforeEach(() => {
-        mockOrchestrator = new Orchestrator({} as any);
-        executor = new Executor(mockOrchestrator);
+        (mockAgentRunner.runAgent as any).mockReset();
+        (mockAgentRunner.runAgent as any).mockResolvedValue(undefined);
+        executor = new Executor(mockOrchestrator as any);
     });
 
     it('should detect cycles in the plan', async () => {
@@ -76,9 +80,49 @@ describe('Executor', () => {
             ],
         };
 
-        // We can't easily verify the exact execution order with the current mock setup 
-        // without more complex spying, but we can ensure it doesn't throw and completes.
-        // The cycle detection logic implicitly validates the graph structure.
         await expect(executor.executePlan(plan, '')).resolves.not.toThrow();
+        expect(mockAgentRunner.runAgent).toHaveBeenCalledTimes(3);
+    });
+
+    it('should assign temporary IDs to tasks without IDs', async () => {
+        const plan = {
+            plan_name: 'Test Plan',
+            tasks: [
+                { description: 'Task 1', message: 'Doing task 1', agent: 'agent-1' }
+            ]
+        };
+
+        await executor.executePlan(plan as any, 'prompt');
+
+        expect(mockAgentRunner.runAgent).toHaveBeenCalled();
+        const taskArg = mockAgentRunner.runAgent.mock.calls[0][0] as any;
+        expect(taskArg.id).toBeDefined();
+        expect(taskArg.id).toMatch(/^temp-/);
+    });
+
+    it('should throw if dependency not found', async () => {
+        const plan = {
+            plan_name: 'Test Plan',
+            tasks: [
+                { id: 'task-1', description: 'Task 1', message: 'Doing task 1', agent: 'agent-1', dependencies: ['unknown-task'] }
+            ]
+        };
+
+        await expect(executor.executePlan(plan, 'prompt')).rejects.toThrow('Task unknown-task not found in plan.');
+    });
+
+    it('should handle agent execution failure', async () => {
+        const plan = {
+            plan_name: 'Test Plan',
+            tasks: [
+                { id: 'task-1', description: 'Task 1', message: 'Doing task 1', agent: 'agent-1' }
+            ]
+        };
+        (mockAgentRunner.runAgent as any).mockRejectedValue(new Error('Agent failed'));
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+        await expect(executor.executePlan(plan, 'prompt')).rejects.toThrow('Agent failed');
+        expect(consoleSpy).toHaveBeenCalledWith('Plan execution failed:', expect.any(Error));
+        consoleSpy.mockRestore();
     });
 });

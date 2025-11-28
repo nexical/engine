@@ -1,4 +1,4 @@
-import { interpolate } from '../../src/utils/interpolation.js';
+import { interpolate } from '../../../src/utils/interpolation.js';
 
 describe('Interpolation Utility', () => {
     it('should replace placeholders with values from context', () => {

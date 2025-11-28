@@ -15,4 +15,12 @@ module.exports = {
         ],
     },
     extensionsToTreatAsEsm: ['.ts'],
+    collectCoverage: true,
+    collectCoverageFrom: [
+        'src/**/*.{ts,js}',
+        '!src/**/*.d.ts',
+        '!src/cli.ts',
+    ],
+    coverageDirectory: 'coverage',
+    coverageReporters: ['text', 'lcov'],
 };

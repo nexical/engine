@@ -1,4 +1,4 @@
-import { AgentSchema, PlanSchema } from '../../src/utils/validation.js';
+import { AgentSchema, PlanSchema } from '../../../src/utils/validation.js';
 
 describe('Validation Schemas', () => {
     describe('AgentSchema', () => {
