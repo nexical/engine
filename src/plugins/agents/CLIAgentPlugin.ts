@@ -7,7 +7,7 @@ import { ShellExecutor } from '../../utils/ShellExecutor.js';
 const log = debug('agent:cli');
 
 export class CLIAgentPlugin extends BasePlugin implements AgentPlugin {
-    name = 'cli-agent';
+    name = 'cli';
     description = 'Executes agents using a CLI command.';
 
     async execute(agent: Agent, taskPrompt: string, context: any = {}): Promise<string> {

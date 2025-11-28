@@ -55,9 +55,22 @@ export class AgentRunner {
         // For now, we default to the default plugin (Gemini CLI) unless the agent profile specifies otherwise.
         // Future: profile.plugin could specify the plugin name.
 
-        const plugin = this.core.agentRegistry.getDefault();
+        // Determine which plugin to use. 
+        let plugin;
+        if (profile.provider) {
+            plugin = this.core.agentRegistry.get(profile.provider);
+            if (!plugin) {
+                // Fallback to default if specific provider not found, or throw?
+                // For now, let's try to find it, if not, fallback to default but warn.
+                log(`Warning: Plugin '${profile.provider}' not found. Falling back to default.`);
+                plugin = this.core.agentRegistry.getDefault();
+            }
+        } else {
+            plugin = this.core.agentRegistry.getDefault();
+        }
+
         if (!plugin) {
-            throw new Error("No default agent plugin registered.");
+            throw new Error("No agent plugin found for execution.");
         }
 
         try {

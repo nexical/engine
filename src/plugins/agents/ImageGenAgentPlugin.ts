@@ -8,7 +8,7 @@ import { Agent } from '../../models/Agent.js';
 const log = debug('agent:image-gen');
 
 export class ImageGenAgentPlugin extends BasePlugin implements AgentPlugin {
-    name = 'image-gen-agent';
+    name = 'image-gen';
     description = 'Generates images using AI SDK and saves them to a file.';
 
     async execute(agent: Agent, taskPrompt: string, context: any = {}): Promise<string> {
@@ -27,31 +27,20 @@ export class ImageGenAgentPlugin extends BasePlugin implements AgentPlugin {
             prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
         }
 
-        const provider = (agent.provider || 'openrouter').toLowerCase();
-        const modelName = agent.model || 'openai/dall-e-3'; // Default model
+        const modelName = agent.model || 'google/gemini-3-pro-image-preview'; // Default model
         const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
 
         if (!apiKey) {
             throw new Error('Missing API Key for image generation (OPENROUTER_API_KEY or OPENAI_API_KEY)');
         }
 
-        let model;
-        if (provider === 'openrouter') {
-            const openrouter = createOpenAI({
-                baseURL: 'https://openrouter.ai/api/v1',
-                apiKey: apiKey,
-            });
-            model = openrouter.image(modelName);
-        } else if (provider === 'openai') {
-            const openai = createOpenAI({
-                apiKey: apiKey,
-            });
-            model = openai.image(modelName);
-        } else {
-            throw new Error(`Unsupported image provider: ${provider}`);
-        }
+        const openrouter = createOpenAI({
+            baseURL: 'https://openrouter.ai/api/v1',
+            apiKey: apiKey,
+        });
+        const model = openrouter.image(modelName);
 
-        log(`Generating image with provider: ${provider}, model: ${modelName}`);
+        log(`Generating image with model: ${modelName}`);
         log(`Prompt: ${prompt}`);
 
         const size = params.size || agent.size;
