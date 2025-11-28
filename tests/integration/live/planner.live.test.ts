@@ -1,6 +1,8 @@
 import { jest, describe, it, beforeEach, afterEach, beforeAll, afterAll, expect } from '@jest/globals';
 import { Orchestrator } from '../../../src/orchestrator.js';
 import { setupTestProject, cleanupTestProject } from './setup.js';
+import path from 'path';
+import fs from 'fs-extra';
 
 describe('Planner Live Integration Tests', () => {
     let orchestrator: Orchestrator;
@@ -40,6 +42,10 @@ describe('Planner Live Integration Tests', () => {
 
         expect(plan).toBeDefined();
         expect(plan.tasks.length).toBeGreaterThan(0);
+
+        // Verify plan file creation
+        const planPath = path.join(testProjectRoot, '.plotris', 'history', 'plan.yml');
+        expect(await fs.pathExists(planPath)).toBe(true);
 
         const agentNames = plan.tasks.map((t: any) => t.agent);
         const knownAgents = ['ResearcherAgent', 'DesignerAgent', 'DeveloperAgent', 'ContentAgent', 'IllustratorAgent'];
