@@ -74,12 +74,10 @@ export class Orchestrator {
 
         const files = await readdir(dir);
         for (const file of files) {
-            if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
+            if (file.endsWith('.ts') || file.endsWith('.js')) {
+                const modulePath = path.join(dir, file);
                 try {
-                    const modulePath = path.join(dir, file);
                     const module = await import(modulePath);
-
-                    // Iterate over exports to find classes implementing CommandPlugin
                     for (const key in module) {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
@@ -106,11 +104,10 @@ export class Orchestrator {
 
         const files = await readdir(dir);
         for (const file of files) {
-            if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
+            if (file.endsWith('.ts') || file.endsWith('.js')) {
+                const modulePath = path.join(dir, file);
                 try {
-                    const modulePath = path.join(dir, file);
                     const module = await import(modulePath);
-
                     for (const key in module) {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {

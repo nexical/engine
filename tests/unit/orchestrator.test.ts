@@ -140,18 +140,30 @@ describe('Orchestrator', () => {
             const tempDir = realFs.mkdtempSync(path.join(os.tmpdir(), 'plotris-test-'));
             const commandsDir = path.join(tempDir, 'plugins', 'commands');
             realFs.mkdirSync(commandsDir, { recursive: true });
+            const agentsDir = path.join(tempDir, 'plugins', 'agents');
+            realFs.mkdirSync(agentsDir, { recursive: true });
 
             // 1. Not a function export (using CJS to avoid Jest parsing issues with ESM in VM)
-            realFs.writeFileSync(path.join(commandsDir, 'NotAFunction.js'), 'module.exports = { default: "bar" };');
+            realFs.writeFileSync(path.join(commandsDir, 'NotAFunction.js'), 'module.exports = "bar";');
+            realFs.writeFileSync(path.join(agentsDir, 'NotAFunction.js'), 'module.exports = "bar";');
 
-            // 2. Not a plugin instance
-            realFs.writeFileSync(path.join(commandsDir, 'NotAPlugin.js'), 'module.exports = { default: class Bar {} };');
+            // 2. Not a plugin instance (valid class but fails isCommandPlugin/isAgentPlugin check)
+            realFs.writeFileSync(path.join(commandsDir, 'NotAPlugin.js'), 'class Bar {}; module.exports = Bar;');
+            realFs.writeFileSync(path.join(agentsDir, 'NotAPlugin.js'), 'class Bar {}; module.exports = Bar;');
+
+            // 3. Valid class structure but missing required properties (to test isCommandPlugin returning false)
+            realFs.writeFileSync(path.join(commandsDir, 'InvalidCommand.js'), 'class InvalidCommand { constructor(o) {} }; module.exports = InvalidCommand;');
+            realFs.writeFileSync(path.join(agentsDir, 'InvalidAgent.js'), 'class InvalidAgent { constructor(o) {} }; module.exports = InvalidAgent;');
 
             orchestrator.config.appPath = tempDir;
 
             mockFs.existsSync.mockReturnValue(true);
             (mockFsPromises.readdir as any).mockImplementation((dir: string) => {
-                if (dir === commandsDir) return ['NotAFunction.js', 'NotAPlugin.js'];
+                console.log(`Mock readdir called with: ${dir}`);
+                console.log(`Expecting commandsDir: ${commandsDir}`);
+                console.log(`Expecting agentsDir: ${agentsDir}`);
+                if (dir === commandsDir) return ['NotAFunction.js', 'NotAPlugin.js', 'InvalidCommand.js'];
+                if (dir === agentsDir) return ['NotAFunction.js', 'NotAPlugin.js', 'InvalidAgent.js'];
                 return [];
             });
 

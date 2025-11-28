@@ -64,6 +64,16 @@ describe('CloudflareService', () => {
             );
         });
 
+        it('should throw error if API returns failure', async () => {
+            mockFetch.mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({ success: false, errors: ['API Error'] })
+            });
+
+            await expect(cloudflareService.createProject('test-project')).rejects.toThrow('Cloudflare API error: ["API Error"]');
+        });
+
         it('should handle conflict (409) gracefully', async () => {
             mockFetch.mockResolvedValue({
                 ok: false,
@@ -137,6 +147,16 @@ describe('CloudflareService', () => {
                 })
             );
         });
+        it('should throw error if API returns failure', async () => {
+            mockFetch.mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({ success: false, errors: ['API Error'] })
+            });
+
+            await expect(cloudflareService.linkDomain('test-project', 'example.com')).rejects.toThrow('Cloudflare API error: ["API Error"]');
+        });
+
         it('should throw if link domain fails', async () => {
             mockFetch.mockResolvedValue({
                 ok: false,
