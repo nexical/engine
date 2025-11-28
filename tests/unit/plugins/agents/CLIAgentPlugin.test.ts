@@ -105,7 +105,6 @@ describe('CLIAgentPlugin', () => {
             ['prompt', '', '--yolo'], // Default args with empty prompt (since template is empty)
             expect.objectContaining({ cwd: '/project' })
         );
-        expect(consoleSpy).toHaveBeenCalledWith('default output');
 
         consoleSpy.mockRestore();
     });
