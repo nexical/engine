@@ -10,4 +10,6 @@ prompt_template: |
 
   Please provide a detailed answer or research summary to address the user's needs.
   If the user asks for code examples, provide them in a clear, educational format.
-  Output ONLY the research results or answer.
+  CRITICAL: You must write the answer to the file specified in the task (prefixed with @).
+  You must use your file editing tools to perform the write operation.
+  Do not just output the answer.
