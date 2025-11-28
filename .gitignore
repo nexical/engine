@@ -10,6 +10,7 @@ coverage
 
 # Test project
 dev_project
+test_project
 
 # MacOS specific files
 .DS_Store
