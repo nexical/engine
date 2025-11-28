@@ -1,0 +1,17 @@
+# agents/content.agent.yml
+name: "ContentAgent"
+description: "Writes and edits Markdown content files."
+provider: "cli"
+
+# The prompt template. The AgentRunner will inject variables.
+prompt_template: |
+  You are an expert content writer.
+  The user's request is: "{user_request}"
+  The specific task is: "{task_prompt}"
+  The current file content of "{file_path}" is:
+  ---
+  {file_content}
+  ---
+
+  Based on the task, please generate the new, complete content for the file "{file_path}".
+  Output ONLY the new file content.

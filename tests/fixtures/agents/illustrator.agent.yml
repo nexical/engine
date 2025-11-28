@@ -1,0 +1,22 @@
+# agents/illustrator.agent.yml
+name: "IllustratorAgent"
+description: "Generates images and visual assets for the website."
+
+provider: "image-gen"
+model: "google/gemini-3-pro-image-preview"
+
+prompt_template: "{task_prompt}"
+
+args:
+  - name: "prompt"
+    description: "The image generation prompt"
+    required: true
+  - name: "size"
+    description: "Image size (e.g., '1024x1024')"
+    required: false
+  - name: "aspectRatio"
+    description: "Image aspect ratio (e.g., '1:1', '16:9')"
+    required: false
+  - name: "output_path"
+    description: "Path to save the generated image"
+    required: false
