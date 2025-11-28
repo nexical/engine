@@ -8,10 +8,8 @@ prompt_template: |
   You are an expert content writer.
   The user's request is: "{user_request}"
   The specific task is: "{task_prompt}"
-  The current file content of "{file_path}" is:
-  ---
-  {file_content}
-  ---
 
-  Based on the task, please generate the new, complete content for the file "{file_path}".
-  Output ONLY the new file content.
+  Based on the task, please create or modify the required content files.
+  CRITICAL: You must write the content to the file specified in the task (prefixed with @).
+  You must use your file editing tools to perform the write operation.
+  Do not just output the content.
