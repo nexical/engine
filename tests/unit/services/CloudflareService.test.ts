@@ -41,6 +41,35 @@ describe('CloudflareService', () => {
     });
 
     describe('createProject', () => {
+        it('should create a project with GitHub source', async () => {
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: async () => ({ success: true })
+            });
+
+            await cloudflareService.createProject('test-project', { type: 'github', owner: 'owner', repo: 'repo' });
+
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects');
+            expect(options.method).toBe('POST');
+            expect(options.headers['Authorization']).toBe('Bearer token');
+            const body = JSON.parse(options.body);
+            expect(body).toEqual({
+                name: 'test-project',
+                production_branch: 'main',
+                source: {
+                    type: 'github',
+                    config: {
+                        owner: 'owner',
+                        repo_name: 'repo',
+                        production_branch: 'main',
+                        pr_comments_enabled: true,
+                        deployments_enabled: true
+                    }
+                }
+            });
+        });
+
         it('should create a project successfully', async () => {
             mockFetch.mockResolvedValue({
                 ok: true,
@@ -49,19 +78,15 @@ describe('CloudflareService', () => {
 
             await cloudflareService.createProject('test-project');
 
-            expect(mockFetch).toHaveBeenCalledWith(
-                'https://api.cloudflare.com/client/v4/accounts/account/pages/projects',
-                expect.objectContaining({
-                    method: 'POST',
-                    headers: expect.objectContaining({
-                        'Authorization': 'Bearer token'
-                    }),
-                    body: JSON.stringify({
-                        name: 'test-project',
-                        production_branch: 'main'
-                    })
-                })
-            );
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects');
+            expect(options.method).toBe('POST');
+            expect(options.headers['Authorization']).toBe('Bearer token');
+            const body = JSON.parse(options.body);
+            expect(body).toEqual({
+                name: 'test-project',
+                production_branch: 'main'
+            });
         });
 
         it('should throw error if API returns failure', async () => {
@@ -137,15 +162,13 @@ describe('CloudflareService', () => {
 
             await cloudflareService.linkDomain('test-project', 'example.com');
 
-            expect(mockFetch).toHaveBeenCalledWith(
-                'https://api.cloudflare.com/client/v4/accounts/account/pages/projects/test-project/domains',
-                expect.objectContaining({
-                    method: 'POST',
-                    body: JSON.stringify({
-                        name: 'example.com'
-                    })
-                })
-            );
+            const [url, options] = mockFetch.mock.calls[0];
+            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects/test-project/domains');
+            expect(options.method).toBe('POST');
+            const body = JSON.parse(options.body);
+            expect(body).toEqual({
+                name: 'example.com'
+            });
         });
         it('should throw error if API returns failure', async () => {
             mockFetch.mockResolvedValue({

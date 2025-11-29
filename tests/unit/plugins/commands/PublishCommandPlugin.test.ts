@@ -42,6 +42,10 @@ describe('PublishCommandPlugin', () => {
         mockSavePlugin.execute.mockReset();
     });
 
+    it('should return correct name', () => {
+        expect(publishPlugin.getName()).toBe('publish');
+    });
+
     it('should publish from feature branch', async () => {
         mockGitService.getCurrentBranch.mockReturnValue('feature-branch');
         mockSavePlugin.execute.mockResolvedValue('Saved');
@@ -66,5 +70,40 @@ describe('PublishCommandPlugin', () => {
         expect(mockGitService.checkout).not.toHaveBeenCalled();
         expect(mockGitService.merge).not.toHaveBeenCalled();
         expect(result).toContain('Already on main');
+    });
+    it('should throw if checkout main fails', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('feature');
+        mockGitService.checkout.mockImplementation((branch) => {
+            if (branch === 'main') throw new Error('Checkout failed');
+        });
+
+        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to checkout main');
+    });
+
+    it('should throw if merge fails', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('feature');
+        mockGitService.merge.mockImplementation(() => {
+            throw new Error('Merge failed');
+        });
+
+        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to merge feature into main');
+    });
+
+    it('should throw if pull fails', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('feature');
+        mockGitService.pull.mockImplementation(() => {
+            throw new Error('Pull failed');
+        });
+
+        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to pull remote main');
+    });
+
+    it('should throw if push fails', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('feature');
+        mockGitService.push.mockImplementation(() => {
+            throw new Error('Push failed');
+        });
+
+        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to push main');
     });
 });
