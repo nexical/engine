@@ -1,5 +1,5 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { PublishCommandPlugin as PublishCommandPluginType } from '../../../../src/plugins/commands/PublishCommandPlugin.js';
+import { PublishCommandPlugin } from '../../../../src/plugins/commands/PublishCommandPlugin.js';
 
 const mockGitService = {
     getCurrentBranch: jest.fn(),
@@ -22,17 +22,18 @@ jest.unstable_mockModule('../../../../src/plugins/commands/SaveCommandPlugin.js'
     SaveCommandPlugin: jest.fn().mockImplementation(() => mockSavePlugin)
 }));
 
-const { PublishCommandPlugin } = await import('../../../../src/plugins/commands/PublishCommandPlugin.js');
+const { PublishCommandPlugin: PublishCommandPluginClass } = await import('../../../../src/plugins/commands/PublishCommandPlugin.js');
 
 describe('PublishCommandPlugin', () => {
-    let publishPlugin: PublishCommandPluginType;
+    let publishPlugin: InstanceType<typeof PublishCommandPluginClass>;
     let mockOrchestrator: any;
 
     beforeEach(() => {
         mockOrchestrator = {
             config: {},
+            git: mockGitService
         };
-        publishPlugin = new PublishCommandPlugin(mockOrchestrator);
+        publishPlugin = new PublishCommandPluginClass(mockOrchestrator);
 
         mockGitService.getCurrentBranch.mockReset();
         mockGitService.checkout.mockReset();
@@ -40,15 +41,19 @@ describe('PublishCommandPlugin', () => {
         mockGitService.pull.mockReset();
         mockGitService.push.mockReset();
         mockSavePlugin.execute.mockReset();
+
+        // Mock console.error/log
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(publishPlugin.getName()).toBe('publish');
+    it('should have correct name', () => {
+        expect(publishPlugin.name).toBe('publish');
     });
 
     it('should publish from feature branch', async () => {
         mockGitService.getCurrentBranch.mockReturnValue('feature-branch');
-        mockSavePlugin.execute.mockResolvedValue('Saved');
+        mockSavePlugin.execute.mockResolvedValue(undefined);
 
         await publishPlugin.execute(['commit message']);
 
@@ -58,26 +63,29 @@ describe('PublishCommandPlugin', () => {
         expect(mockGitService.pull).toHaveBeenCalledWith('origin', 'main');
         expect(mockGitService.push).toHaveBeenCalledWith('origin', 'main');
         expect(mockGitService.checkout).toHaveBeenCalledWith('feature-branch');
+        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Published feature-branch to production'));
     });
 
     it('should handle publishing from main', async () => {
         mockGitService.getCurrentBranch.mockReturnValue('main');
-        mockSavePlugin.execute.mockResolvedValue('Saved');
+        mockSavePlugin.execute.mockResolvedValue(undefined);
 
-        const result = await publishPlugin.execute([]);
+        await publishPlugin.execute([]);
 
         expect(mockSavePlugin.execute).toHaveBeenCalledWith(['Publishing changes']);
         expect(mockGitService.checkout).not.toHaveBeenCalled();
         expect(mockGitService.merge).not.toHaveBeenCalled();
-        expect(result).toContain('Already on main');
+        expect(console.log).toHaveBeenCalledWith('Already on main. Changes saved and pushed.');
     });
+
     it('should throw if checkout main fails', async () => {
         mockGitService.getCurrentBranch.mockReturnValue('feature');
-        mockGitService.checkout.mockImplementation((branch) => {
+        mockGitService.checkout.mockImplementation((branch: any) => {
             if (branch === 'main') throw new Error('Checkout failed');
         });
 
-        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to checkout main');
+        await expect(publishPlugin.execute([])).rejects.toThrow('Checkout failed');
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to checkout main'));
     });
 
     it('should throw if merge fails', async () => {
@@ -86,7 +94,8 @@ describe('PublishCommandPlugin', () => {
             throw new Error('Merge failed');
         });
 
-        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to merge feature into main');
+        await expect(publishPlugin.execute([])).rejects.toThrow('Merge failed');
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to merge feature into main'));
     });
 
     it('should throw if pull fails', async () => {
@@ -95,7 +104,8 @@ describe('PublishCommandPlugin', () => {
             throw new Error('Pull failed');
         });
 
-        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to pull remote main');
+        await expect(publishPlugin.execute([])).rejects.toThrow('Pull failed');
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to pull remote main'));
     });
 
     it('should throw if push fails', async () => {
@@ -104,6 +114,7 @@ describe('PublishCommandPlugin', () => {
             throw new Error('Push failed');
         });
 
-        await expect(publishPlugin.execute([])).rejects.toThrow('Failed to push main');
+        await expect(publishPlugin.execute([])).rejects.toThrow('Push failed');
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to push main'));
     });
 });

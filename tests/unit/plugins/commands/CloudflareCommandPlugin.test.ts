@@ -1,41 +1,38 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { CloudflareCommandPlugin as CloudflareCommandPluginType } from '../../../../src/plugins/commands/CloudflareCommandPlugin.js';
-
-const mockFileSystemService = {
-    exists: jest.fn<any>(),
-    readFile: jest.fn<any>(),
-    writeFile: jest.fn<any>()
-};
-
-jest.unstable_mockModule('../../../../src/services/FileSystemService.js', () => ({
-    FileSystemService: jest.fn().mockImplementation(() => mockFileSystemService)
-}));
-
-const { CloudflareCommandPlugin } = await import('../../../../src/plugins/commands/CloudflareCommandPlugin.js');
+import { CloudflareCommandPlugin } from '../../../../src/plugins/commands/CloudflareCommandPlugin.js';
 
 describe('CloudflareCommandPlugin', () => {
-    let plugin: CloudflareCommandPluginType;
+    let plugin: CloudflareCommandPlugin;
     let mockOrchestrator: any;
+    let mockFileSystemService: any;
 
     beforeEach(() => {
+        mockFileSystemService = {
+            exists: jest.fn<any>(),
+            readFile: jest.fn<any>(),
+            writeFile: jest.fn<any>()
+        };
+
         mockOrchestrator = {
             config: {
                 projectPath: '/test/project'
-            }
+            },
+            disk: mockFileSystemService
         };
         plugin = new CloudflareCommandPlugin(mockOrchestrator);
 
-        mockFileSystemService.exists.mockReset();
-        mockFileSystemService.readFile.mockReset();
-        mockFileSystemService.writeFile.mockReset();
+        // Mock console.error/log to keep output clean
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(plugin.getName()).toBe('cloudflare');
+    it('should have correct name', () => {
+        expect(plugin.name).toBe('cloudflare');
     });
 
-    it('should throw if args missing', async () => {
-        await expect(plugin.execute(['id'])).rejects.toThrow('Usage: /cloudflare');
+    it('should log error if args missing', async () => {
+        await plugin.execute(['id']);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Usage: /cloudflare'));
     });
 
     it('should update env vars', async () => {

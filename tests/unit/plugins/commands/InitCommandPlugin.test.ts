@@ -1,69 +1,58 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { InitCommandPlugin as InitCommandPluginType } from '../../../../src/plugins/commands/InitCommandPlugin.js';
-
-const mockGitHubService = {
-    getRepo: jest.fn<any>(),
-    createRepo: jest.fn<any>()
-};
-
-const mockGitService = {
-    init: jest.fn(),
-    addRemote: jest.fn(),
-    clone: jest.fn()
-};
-
-const mockFileSystemService = {
-    exists: jest.fn(),
-    ensureDir: jest.fn(),
-    writeFile: jest.fn()
-};
-
-jest.unstable_mockModule('../../../../src/services/GitHubService.js', () => ({
-    GitHubService: jest.fn().mockImplementation(() => mockGitHubService)
-}));
-
-jest.unstable_mockModule('../../../../src/services/GitService.js', () => ({
-    GitService: jest.fn().mockImplementation(() => mockGitService)
-}));
-
-jest.unstable_mockModule('../../../../src/services/FileSystemService.js', () => ({
-    FileSystemService: jest.fn().mockImplementation(() => mockFileSystemService)
-}));
-
-const { InitCommandPlugin } = await import('../../../../src/plugins/commands/InitCommandPlugin.js');
+import { InitCommandPlugin } from '../../../../src/plugins/commands/InitCommandPlugin.js';
 
 describe('InitCommandPlugin', () => {
-    let plugin: InitCommandPluginType;
+    let plugin: InitCommandPlugin;
     let mockOrchestrator: any;
+    let mockGitHubService: any;
+    let mockGitService: any;
+    let mockFileSystemService: any;
 
     beforeEach(() => {
+        mockGitHubService = {
+            getRepo: jest.fn<any>(),
+            createRepo: jest.fn<any>()
+        };
+
+        mockGitService = {
+            init: jest.fn(),
+            addRemote: jest.fn(),
+            clone: jest.fn()
+        };
+
+        mockFileSystemService = {
+            exists: jest.fn(),
+            ensureDir: jest.fn(),
+            writeFile: jest.fn()
+        };
+
         mockOrchestrator = {
             config: {
                 projectPath: '/test/project'
-            }
+            },
+            github: mockGitHubService,
+            git: mockGitService,
+            disk: mockFileSystemService
         };
         plugin = new InitCommandPlugin(mockOrchestrator);
 
-        mockGitHubService.getRepo.mockReset();
-        mockGitHubService.createRepo.mockReset();
-        mockGitService.init.mockReset();
-        mockGitService.addRemote.mockReset();
-        mockGitService.clone.mockReset();
-        mockFileSystemService.exists.mockReset();
-        mockFileSystemService.ensureDir.mockReset();
-        mockFileSystemService.writeFile.mockReset();
+        // Mock console.error/log
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(plugin.getName()).toBe('init');
+    it('should have correct name', () => {
+        expect(plugin.name).toBe('init');
     });
 
-    it('should throw if args are missing', async () => {
-        await expect(plugin.execute([])).rejects.toThrow('Usage: /init');
+    it('should log error if args are missing', async () => {
+        await plugin.execute([]);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Usage: /init'));
     });
 
-    it('should throw if repo format is invalid', async () => {
-        await expect(plugin.execute(['invalid'])).rejects.toThrow('Invalid GitHub repository format');
+    it('should log error if repo format is invalid', async () => {
+        await plugin.execute(['invalid']);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Invalid GitHub repository format'));
     });
 
     it('should init in current directory with existing repo', async () => {
@@ -95,9 +84,6 @@ describe('InitCommandPlugin', () => {
         await plugin.execute(['org/repo', 'dir']);
 
         expect(mockGitService.clone).toHaveBeenCalledWith('https://github.com/org/repo.git', 'dir');
-    });
-    it('should throw if repo format is invalid', async () => {
-        await expect(plugin.execute(['invalidrepo'])).rejects.toThrow('Invalid GitHub repository format');
     });
 
     it('should not overwrite existing config files', async () => {

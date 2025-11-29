@@ -1,52 +1,38 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { SaveCommandPlugin as SaveCommandPluginType } from '../../../../src/plugins/commands/SaveCommandPlugin.js';
-
-const mockGitService = {
-    add: jest.fn(),
-    commit: jest.fn(),
-    pull: jest.fn(),
-    push: jest.fn(),
-    getCurrentBranch: jest.fn()
-};
-
-const mockCloudflareService = {
-    // Cloudflare service is instantiated but not used in execute directly for deployment in the current impl
-    // but we should mock it anyway
-};
-
-jest.unstable_mockModule('../../../../src/services/GitService.js', () => ({
-    GitService: jest.fn().mockImplementation(() => mockGitService)
-}));
-
-jest.unstable_mockModule('../../../../src/services/CloudflareService.js', () => ({
-    CloudflareService: jest.fn().mockImplementation(() => mockCloudflareService)
-}));
-
-const { SaveCommandPlugin } = await import('../../../../src/plugins/commands/SaveCommandPlugin.js');
+import { SaveCommandPlugin } from '../../../../src/plugins/commands/SaveCommandPlugin.js';
 
 describe('SaveCommandPlugin', () => {
-    let plugin: SaveCommandPluginType;
+    let plugin: SaveCommandPlugin;
     let mockOrchestrator: any;
+    let mockGitService: any;
 
     beforeEach(() => {
+        mockGitService = {
+            add: jest.fn(),
+            commit: jest.fn(),
+            pull: jest.fn(),
+            push: jest.fn(),
+            getCurrentBranch: jest.fn()
+        };
+
         mockOrchestrator = {
-            config: {}
+            config: {},
+            git: mockGitService
         };
         plugin = new SaveCommandPlugin(mockOrchestrator);
 
-        mockGitService.add.mockReset();
-        mockGitService.commit.mockReset();
-        mockGitService.pull.mockReset();
-        mockGitService.push.mockReset();
-        mockGitService.getCurrentBranch.mockReset();
+        // Mock console.error/log
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(plugin.getName()).toBe('save');
+    it('should have correct name', () => {
+        expect(plugin.name).toBe('save');
     });
 
-    it('should throw if args missing', async () => {
-        await expect(plugin.execute([])).rejects.toThrow('Usage: /save');
+    it('should log error if args missing', async () => {
+        await plugin.execute([]);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Usage: /save'));
     });
 
     it('should save changes', async () => {
@@ -58,6 +44,7 @@ describe('SaveCommandPlugin', () => {
         expect(mockGitService.commit).toHaveBeenCalledWith('message');
         expect(mockGitService.pull).toHaveBeenCalledWith('origin', 'feature');
         expect(mockGitService.push).toHaveBeenCalledWith('origin', 'feature');
+        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Saved changes to feature'));
     });
 
     it('should ignore nothing to commit error', async () => {
@@ -77,6 +64,7 @@ describe('SaveCommandPlugin', () => {
     it('should throw on pull error', async () => {
         mockGitService.getCurrentBranch.mockReturnValue('feature');
         mockGitService.pull.mockImplementation(() => { throw new Error('pull error'); });
-        await expect(plugin.execute(['message'])).rejects.toThrow('Failed to pull remote changes');
+        await expect(plugin.execute(['message'])).rejects.toThrow('pull error');
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Failed to pull remote changes'));
     });
 });

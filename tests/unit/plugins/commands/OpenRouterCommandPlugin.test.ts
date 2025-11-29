@@ -1,41 +1,38 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { OpenRouterCommandPlugin as OpenRouterCommandPluginType } from '../../../../src/plugins/commands/OpenRouterCommandPlugin.js';
-
-const mockFileSystemService = {
-    exists: jest.fn<any>(),
-    readFile: jest.fn<any>(),
-    writeFile: jest.fn<any>()
-};
-
-jest.unstable_mockModule('../../../../src/services/FileSystemService.js', () => ({
-    FileSystemService: jest.fn().mockImplementation(() => mockFileSystemService)
-}));
-
-const { OpenRouterCommandPlugin } = await import('../../../../src/plugins/commands/OpenRouterCommandPlugin.js');
+import { OpenRouterCommandPlugin } from '../../../../src/plugins/commands/OpenRouterCommandPlugin.js';
 
 describe('OpenRouterCommandPlugin', () => {
-    let plugin: OpenRouterCommandPluginType;
+    let plugin: OpenRouterCommandPlugin;
     let mockOrchestrator: any;
+    let mockFileSystemService: any;
 
     beforeEach(() => {
+        mockFileSystemService = {
+            exists: jest.fn<any>(),
+            readFile: jest.fn<any>(),
+            writeFile: jest.fn<any>()
+        };
+
         mockOrchestrator = {
             config: {
                 projectPath: '/test/project'
-            }
+            },
+            disk: mockFileSystemService
         };
         plugin = new OpenRouterCommandPlugin(mockOrchestrator);
 
-        mockFileSystemService.exists.mockReset();
-        mockFileSystemService.readFile.mockReset();
-        mockFileSystemService.writeFile.mockReset();
+        // Mock console.error/log
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(plugin.getName()).toBe('openrouter');
+    it('should have correct name', () => {
+        expect(plugin.name).toBe('openrouter');
     });
 
-    it('should throw if args missing', async () => {
-        await expect(plugin.execute([])).rejects.toThrow('Usage: /openrouter');
+    it('should log error if args missing', async () => {
+        await plugin.execute([]);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Usage: /openrouter'));
     });
 
     it('should create new env file if not exists', async () => {

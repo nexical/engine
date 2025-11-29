@@ -1,74 +1,71 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { ConfigCommandPlugin as ConfigCommandPluginType } from '../../../../src/plugins/commands/ConfigCommandPlugin.js';
-
-const mockFileSystemService = {
-    exists: jest.fn<any>(),
-    readFile: jest.fn<any>(),
-    writeFile: jest.fn<any>()
-};
-
-jest.unstable_mockModule('../../../../src/services/FileSystemService.js', () => ({
-    FileSystemService: jest.fn().mockImplementation(() => mockFileSystemService)
-}));
-
-const { ConfigCommandPlugin } = await import('../../../../src/plugins/commands/ConfigCommandPlugin.js');
+import { ConfigCommandPlugin } from '../../../../src/plugins/commands/ConfigCommandPlugin.js';
 
 describe('ConfigCommandPlugin', () => {
-    let plugin: ConfigCommandPluginType;
+    let plugin: ConfigCommandPlugin;
     let mockOrchestrator: any;
+    let mockFileSystemService: any;
 
     beforeEach(() => {
+        mockFileSystemService = {
+            exists: jest.fn<any>(),
+            readFile: jest.fn<any>(),
+            writeFile: jest.fn<any>()
+        };
+
         mockOrchestrator = {
             config: {
                 projectPath: '/test/project'
-            }
+            },
+            disk: mockFileSystemService
         };
         plugin = new ConfigCommandPlugin(mockOrchestrator);
 
-        mockFileSystemService.exists.mockReset();
-        mockFileSystemService.readFile.mockReset();
-        mockFileSystemService.writeFile.mockReset();
+        // Mock console.error/log
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
-    it('should return correct name', () => {
-        expect(plugin.getName()).toBe('config');
+    it('should have correct name', () => {
+        expect(plugin.name).toBe('config');
     });
 
     it('should handle empty config file', async () => {
         mockFileSystemService.exists.mockReturnValue(true);
         mockFileSystemService.readFile.mockResolvedValue(''); // Empty file
 
-        const result = await plugin.execute([]);
-        expect(result).toBe('{}\n');
+        await plugin.execute([]);
+        expect(console.log).toHaveBeenCalledWith('{}\n');
     });
 
-    it('should throw if config file not found', async () => {
+    it('should log error if config file not found', async () => {
         mockFileSystemService.exists.mockReturnValue(false);
-        await expect(plugin.execute([])).rejects.toThrow('Configuration file not found');
+        await plugin.execute([]);
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Configuration file not found'));
     });
 
-    it('should return all config if no args', async () => {
+    it('should log all config if no args', async () => {
         mockFileSystemService.exists.mockReturnValue(true);
         mockFileSystemService.readFile.mockResolvedValue('key: value');
 
-        const result = await plugin.execute([]);
-        expect(result).toContain('key: value');
+        await plugin.execute([]);
+        expect(console.log).toHaveBeenCalledWith(expect.stringContaining('key: value'));
     });
 
-    it('should return specific config value', async () => {
+    it('should log specific config value', async () => {
         mockFileSystemService.exists.mockReturnValue(true);
         mockFileSystemService.readFile.mockResolvedValue('key: value');
 
-        const result = await plugin.execute(['key']);
-        expect(result).toBe('value');
+        await plugin.execute(['key']);
+        expect(console.log).toHaveBeenCalledWith('value');
     });
 
-    it('should return undefined for missing key', async () => {
+    it('should log undefined for missing key', async () => {
         mockFileSystemService.exists.mockReturnValue(true);
         mockFileSystemService.readFile.mockResolvedValue('key: value');
 
-        const result = await plugin.execute(['other']);
-        expect(result).toBe('undefined');
+        await plugin.execute(['other']);
+        expect(console.log).toHaveBeenCalledWith('undefined');
     });
 
     it('should set config value', async () => {
