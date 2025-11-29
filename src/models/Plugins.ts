@@ -20,9 +20,5 @@ export interface PluginRegistry<T> {
 }
 
 export class BasePlugin {
-    constructor(protected core: Orchestrator) {
-        this.initialize();
-    }
-
-    protected initialize() { }
+    constructor(protected core: Orchestrator) { }
 }

@@ -1,14 +1,16 @@
 import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import { SaveCommandPlugin } from './SaveCommandPlugin.js';
+import { Orchestrator } from '../../orchestrator.js';
 
 export class PublishCommandPlugin extends BasePlugin implements CommandPlugin {
     name = 'publish';
     description = 'Publish changes to production. Usage: /publish [message]';
 
-    private savePlugin!: SaveCommandPlugin;
+    private savePlugin: SaveCommandPlugin;
 
-    protected initialize() {
-        this.savePlugin = new SaveCommandPlugin(this.core);
+    constructor(protected core: Orchestrator) {
+        super(core);
+        this.savePlugin = new SaveCommandPlugin(core);
     }
 
     async execute(args: string[]): Promise<void> {
