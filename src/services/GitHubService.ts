@@ -1,5 +1,5 @@
 import debug from 'debug';
-import { Orchestrator } from '../orchestrator.js';
+import type { Orchestrator } from '../orchestrator.js';
 
 const log = debug('github');
 
@@ -57,8 +57,8 @@ export class GitHubService {
 
     async createRepo(name: string, org?: string): Promise<any> {
         log(`Creating repo ${name} in ${org || 'user account'}...`);
-        
-        const url = org 
+
+        const url = org
             ? `https://api.github.com/orgs/${org}/repos`
             : 'https://api.github.com/user/repos';
 

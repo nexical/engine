@@ -1,23 +1,14 @@
-import { BasePlugin } from '../../models/Plugins.js';
-import { Orchestrator } from '../../orchestrator.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
+import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import path from 'path';
 
-export class GitHubCommandPlugin extends BasePlugin {
-    private fs: FileSystemService;
+export class GitHubCommandPlugin extends BasePlugin implements CommandPlugin {
+    name = 'github';
+    description = 'Configure GitHub credentials. Usage: /github <organization> <api key>';
 
-    constructor(protected core: Orchestrator) {
-        super(core);
-        this.fs = new FileSystemService();
-    }
-
-    getName(): string {
-        return 'github';
-    }
-
-    async execute(args: string[]): Promise<string> {
-        if (args.length < 2) {
-            throw new Error('Usage: /github <organization> <api key>');
+    async execute(args: string[]): Promise<void> {
+        if (!args || args.length < 2) {
+            console.error('Usage: /github <organization> <api key>');
+            return;
         }
 
         const org = args[0];
@@ -25,8 +16,8 @@ export class GitHubCommandPlugin extends BasePlugin {
         const envPath = path.join(this.core.config.projectPath, '.plotris', '.env');
 
         let envContent = '';
-        if (this.fs.exists(envPath)) {
-            envContent = await this.fs.readFile(envPath);
+        if (this.core.disk.exists(envPath)) {
+            envContent = await this.core.disk.readFile(envPath);
         }
 
         const envLines = envContent.split('\n');
@@ -56,8 +47,8 @@ export class GitHubCommandPlugin extends BasePlugin {
             }
         }
 
-        await this.fs.writeFile(envPath, newEnvLines.join('\n'));
+        await this.core.disk.writeFile(envPath, newEnvLines.join('\n'));
 
-        return 'GitHub configuration updated.';
+        console.log('GitHub configuration updated.');
     }
 }

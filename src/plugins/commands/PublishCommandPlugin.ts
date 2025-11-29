@@ -1,71 +1,64 @@
-import { BasePlugin } from '../../models/Plugins.js';
-import { Orchestrator } from '../../orchestrator.js';
-import { GitService } from '../../services/GitService.js';
+import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import { SaveCommandPlugin } from './SaveCommandPlugin.js';
 
-export class PublishCommandPlugin extends BasePlugin {
-    private git: GitService;
-    private savePlugin: SaveCommandPlugin;
+export class PublishCommandPlugin extends BasePlugin implements CommandPlugin {
+    name = 'publish';
+    description = 'Publish changes to production. Usage: /publish [message]';
 
-    constructor(protected core: Orchestrator) {
-        super(core);
-        this.git = new GitService(core);
-        this.savePlugin = new SaveCommandPlugin(core);
+    private savePlugin!: SaveCommandPlugin;
+
+    protected initialize() {
+        this.savePlugin = new SaveCommandPlugin(this.core);
     }
 
-    getName(): string {
-        return 'publish';
-    }
-
-    async execute(args: string[]): Promise<string> {
+    async execute(args: string[]): Promise<void> {
         const message = args.length > 0 ? args.join(' ') : 'Publishing changes';
 
         // 1. Run save on current branch
         await this.savePlugin.execute([message]);
 
-        const currentBranch = this.git.getCurrentBranch();
+        const currentBranch = this.core.git.getCurrentBranch();
 
         if (currentBranch === 'main') {
-            return 'Already on main. Changes saved and pushed.';
+            console.log('Already on main. Changes saved and pushed.');
+            return;
         }
 
         // 2. Checkout main
         try {
-            this.git.checkout('main');
+            this.core.git.checkout('main');
         } catch (e) {
-            throw new Error(`Failed to checkout main: ${e}`);
+            console.error(`Failed to checkout main: ${e}`);
+            throw e;
         }
 
         // 3. Merge current branch into main
         try {
-            this.git.merge(currentBranch);
+            this.core.git.merge(currentBranch);
         } catch (e) {
-            throw new Error(`Failed to merge ${currentBranch} into main: ${e}`);
+            console.error(`Failed to merge ${currentBranch} into main: ${e}`);
+            throw e;
         }
 
         // 4. Pull updates from remote main (to avoid push conflicts)
         try {
-            this.git.pull('origin', 'main');
+            this.core.git.pull('origin', 'main');
         } catch (e) {
-            throw new Error(`Failed to pull remote main: ${e}`);
+            console.error(`Failed to pull remote main: ${e}`);
+            throw e;
         }
 
         // 5. Push main
         try {
-            this.git.push('origin', 'main');
+            this.core.git.push('origin', 'main');
         } catch (e) {
-            throw new Error(`Failed to push main: ${e}`);
+            console.error(`Failed to push main: ${e}`);
+            throw e;
         }
 
-        // 6. Switch back to feature branch? 
-        // The prompt doesn't explicitly say to switch back, but it's usually good practice.
-        // However, "The purpose of this command is to make a production deployment."
-        // Usually after publishing, you might be done with the feature branch.
-        // Let's stay on main or maybe switch back.
-        // Given the workflow, staying on main might be safer to avoid confusion, or the user might want to continue working.
-        // Let's switch back to be nice.
-        this.git.checkout(currentBranch);
+        // 6. Switch back to feature branch
+        this.core.git.checkout(currentBranch);
 
-        return `Published ${currentBranch} to production (merged to main and pushed).`;
+        console.log(`Published ${currentBranch} to production (merged to main and pushed).`);
     }
 }

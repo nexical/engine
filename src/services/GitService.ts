@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import { Orchestrator } from '../orchestrator.js';
+import type { Orchestrator } from '../orchestrator.js';
 
 export class GitService {
     constructor(private core: Orchestrator) { }

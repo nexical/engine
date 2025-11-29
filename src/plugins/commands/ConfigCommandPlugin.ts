@@ -1,34 +1,26 @@
-import { BasePlugin } from '../../models/Plugins.js';
-import { Orchestrator } from '../../orchestrator.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
+import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import path from 'path';
 import yaml from 'js-yaml';
 
-export class ConfigCommandPlugin extends BasePlugin {
-    private fs: FileSystemService;
+export class ConfigCommandPlugin extends BasePlugin implements CommandPlugin {
+    name = 'config';
+    description = 'Get or set configuration values. Usage: /config [key] [value]';
 
-    constructor(protected core: Orchestrator) {
-        super(core);
-        this.fs = new FileSystemService();
-    }
-
-    getName(): string {
-        return 'config';
-    }
-
-    async execute(args: string[]): Promise<string> {
+    async execute(args: string[]): Promise<void> {
         const configPath = path.join(this.core.config.projectPath, '.plotris', 'config.yml');
 
-        if (!this.fs.exists(configPath)) {
-            throw new Error('Configuration file not found. Run /init first.');
+        if (!this.core.disk.exists(configPath)) {
+            console.error('Configuration file not found. Run /init first.');
+            return;
         }
 
-        const configContent = await this.fs.readFile(configPath);
+        const configContent = await this.core.disk.readFile(configPath);
         const config: any = yaml.load(configContent) || {};
 
-        if (args.length === 0) {
+        if (!args || args.length === 0) {
             // Return all config
-            return yaml.dump(config);
+            console.log(yaml.dump(config));
+            return;
         }
 
         const key = args[0];
@@ -36,12 +28,13 @@ export class ConfigCommandPlugin extends BasePlugin {
 
         if (args.length === 1) {
             // Get value
-            return config[key] !== undefined ? String(config[key]) : 'undefined';
+            console.log(config[key] !== undefined ? String(config[key]) : 'undefined');
+            return;
         }
 
         // Set value
         config[key] = value;
-        await this.fs.writeFile(configPath, yaml.dump(config));
-        return `Set ${key} to ${value}`;
+        await this.core.disk.writeFile(configPath, yaml.dump(config));
+        console.log(`Set ${key} to ${value}`);
     }
 }

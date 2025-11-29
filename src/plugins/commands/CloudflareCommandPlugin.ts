@@ -1,23 +1,14 @@
-import { BasePlugin } from '../../models/Plugins.js';
-import { Orchestrator } from '../../orchestrator.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
+import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import path from 'path';
 
-export class CloudflareCommandPlugin extends BasePlugin {
-    private fs: FileSystemService;
+export class CloudflareCommandPlugin extends BasePlugin implements CommandPlugin {
+    name = 'cloudflare';
+    description = 'Configure Cloudflare credentials. Usage: /cloudflare <account id> <api key>';
 
-    constructor(protected core: Orchestrator) {
-        super(core);
-        this.fs = new FileSystemService();
-    }
-
-    getName(): string {
-        return 'cloudflare';
-    }
-
-    async execute(args: string[]): Promise<string> {
-        if (args.length < 2) {
-            throw new Error('Usage: /cloudflare <account id> <api key>');
+    async execute(args: string[]): Promise<void> {
+        if (!args || args.length < 2) {
+            console.error('Usage: /cloudflare <account id> <api key>');
+            return;
         }
 
         const accountId = args[0];
@@ -25,8 +16,8 @@ export class CloudflareCommandPlugin extends BasePlugin {
         const envPath = path.join(this.core.config.projectPath, '.plotris', '.env');
 
         let envContent = '';
-        if (this.fs.exists(envPath)) {
-            envContent = await this.fs.readFile(envPath);
+        if (this.core.disk.exists(envPath)) {
+            envContent = await this.core.disk.readFile(envPath);
         }
 
         const envLines = envContent.split('\n');
@@ -56,8 +47,8 @@ export class CloudflareCommandPlugin extends BasePlugin {
             }
         }
 
-        await this.fs.writeFile(envPath, newEnvLines.join('\n'));
+        await this.core.disk.writeFile(envPath, newEnvLines.join('\n'));
 
-        return 'Cloudflare configuration updated.';
+        console.log('Cloudflare configuration updated.');
     }
 }

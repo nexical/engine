@@ -11,6 +11,7 @@ import { Executor } from './executor.js';
 import { CommandRegistry } from './plugins/CommandRegistry.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
 import { GitService } from './services/GitService.js';
+import { GitHubService } from './services/GitHubService.js';
 import { FileSystemService } from './services/FileSystemService.js';
 
 const log = debug('orchestrator');
@@ -19,6 +20,7 @@ export class Orchestrator {
     public config: Application;
     public disk: FileSystemService;
     public git: GitService;
+    public github: GitHubService;
     public commandRegistry: CommandRegistry;
     public agentRegistry: AgentRegistry;
 
@@ -61,6 +63,7 @@ export class Orchestrator {
         // Initialize shared services
         this.disk = new FileSystemService();
         this.git = new GitService(this);
+        this.github = new GitHubService(this);
 
         // Initialize orchestrator components
         this.planner = new Planner(this);

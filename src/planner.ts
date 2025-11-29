@@ -1,7 +1,7 @@
 import path from 'path';
 import debug from 'debug';
 import yaml from 'js-yaml';
-import { Orchestrator } from './orchestrator.js';
+import type { Orchestrator } from './orchestrator.js';
 import { Plan, PlanUtils } from './models/Plan.js';
 import { Agent } from './models/Agent.js';
 

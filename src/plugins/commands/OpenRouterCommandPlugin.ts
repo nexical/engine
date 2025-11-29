@@ -1,31 +1,22 @@
-import { BasePlugin } from '../../models/Plugins.js';
-import { Orchestrator } from '../../orchestrator.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
+import { BasePlugin, CommandPlugin } from '../../models/Plugins.js';
 import path from 'path';
 
-export class OpenRouterCommandPlugin extends BasePlugin {
-    private fs: FileSystemService;
+export class OpenRouterCommandPlugin extends BasePlugin implements CommandPlugin {
+    name = 'openrouter';
+    description = 'Configure OpenRouter API key. Usage: /openrouter <api key>';
 
-    constructor(protected core: Orchestrator) {
-        super(core);
-        this.fs = new FileSystemService();
-    }
-
-    getName(): string {
-        return 'openrouter';
-    }
-
-    async execute(args: string[]): Promise<string> {
-        if (args.length < 1) {
-            throw new Error('Usage: /openrouter <api key>');
+    async execute(args: string[]): Promise<void> {
+        if (!args || args.length < 1) {
+            console.error('Usage: /openrouter <api key>');
+            return;
         }
 
         const apiKey = args[0];
         const envPath = path.join(this.core.config.projectPath, '.plotris', '.env');
 
         let envContent = '';
-        if (this.fs.exists(envPath)) {
-            envContent = await this.fs.readFile(envPath);
+        if (this.core.disk.exists(envPath)) {
+            envContent = await this.core.disk.readFile(envPath);
         }
 
         // Parse existing env vars
@@ -46,8 +37,8 @@ export class OpenRouterCommandPlugin extends BasePlugin {
             newEnvLines.push(`OPENROUTER_API_KEY=${apiKey}`);
         }
 
-        await this.fs.writeFile(envPath, newEnvLines.join('\n'));
+        await this.core.disk.writeFile(envPath, newEnvLines.join('\n'));
 
-        return 'OpenRouter API key configured.';
+        console.log('OpenRouter API key configured.');
     }
 }

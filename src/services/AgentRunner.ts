@@ -3,7 +3,7 @@ import yaml from 'js-yaml';
 import debug from 'debug';
 import { Task } from '../models/Task.js';
 import { Agent } from '../models/Agent.js';
-import { Orchestrator } from '../orchestrator.js';
+import type { Orchestrator } from '../orchestrator.js';
 
 const log = debug('agent-runner');
 
