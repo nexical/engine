@@ -29,7 +29,7 @@ export class OpenRouterCommandPlugin extends BasePlugin {
         }
 
         // Parse existing env vars
-        const envLines = envContent.split('\n');
+        const envLines = envContent.split('\n').filter(line => line.trim() !== '');
         const newEnvLines: string[] = [];
         let found = false;
 
