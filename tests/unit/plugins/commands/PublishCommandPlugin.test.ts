@@ -1,21 +1,25 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
 import type { PublishCommandPlugin as PublishCommandPluginType } from '../../../../src/plugins/commands/PublishCommandPlugin.js';
 
-const mockCloudflareService = {
-    deploy: jest.fn() as any,
-    linkDomain: jest.fn() as any
+const mockGitService = {
+    getCurrentBranch: jest.fn(),
+    checkout: jest.fn(),
+    merge: jest.fn(),
+    pull: jest.fn(),
+    push: jest.fn(),
+    runCommand: jest.fn()
 };
 
-const mockDeployUtils = {
-    loadConfig: jest.fn() as any
+const mockSavePlugin = {
+    execute: jest.fn<any>()
 };
 
-jest.unstable_mockModule('../../../../src/services/CloudflareService.js', () => ({
-    CloudflareService: jest.fn().mockImplementation(() => mockCloudflareService)
+jest.unstable_mockModule('../../../../src/services/GitService.js', () => ({
+    GitService: jest.fn().mockImplementation(() => mockGitService)
 }));
 
-jest.unstable_mockModule('../../../../src/models/Deployment.js', () => ({
-    DeployUtils: mockDeployUtils
+jest.unstable_mockModule('../../../../src/plugins/commands/SaveCommandPlugin.js', () => ({
+    SaveCommandPlugin: jest.fn().mockImplementation(() => mockSavePlugin)
 }));
 
 const { PublishCommandPlugin } = await import('../../../../src/plugins/commands/PublishCommandPlugin.js');
@@ -27,72 +31,40 @@ describe('PublishCommandPlugin', () => {
     beforeEach(() => {
         mockOrchestrator = {
             config: {},
-            git: {
-                runCommand: jest.fn(),
-                commit: jest.fn()
-            }
         };
         publishPlugin = new PublishCommandPlugin(mockOrchestrator);
 
-        mockCloudflareService.deploy.mockReset();
-        mockCloudflareService.linkDomain.mockReset();
-        mockDeployUtils.loadConfig.mockReset();
+        mockGitService.getCurrentBranch.mockReset();
+        mockGitService.checkout.mockReset();
+        mockGitService.merge.mockReset();
+        mockGitService.pull.mockReset();
+        mockGitService.push.mockReset();
+        mockSavePlugin.execute.mockReset();
     });
 
-    it('should deploy production environment', async () => {
-        mockDeployUtils.loadConfig.mockReturnValue({
-            project_name: 'test-project',
-            production_domain: 'example.com'
-        });
-        mockOrchestrator.git.runCommand.mockReturnValue(''); // Clean status
-        mockCloudflareService.deploy.mockResolvedValue('success');
-        mockCloudflareService.linkDomain.mockResolvedValue('success');
+    it('should publish from feature branch', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('feature-branch');
+        mockSavePlugin.execute.mockResolvedValue('Saved');
 
-        await publishPlugin.execute();
+        await publishPlugin.execute(['commit message']);
 
-        expect(mockDeployUtils.loadConfig).toHaveBeenCalledWith(mockOrchestrator.config);
-        expect(mockOrchestrator.git.runCommand).toHaveBeenCalledWith(['status', '--porcelain']);
-        expect(mockOrchestrator.git.commit).not.toHaveBeenCalled();
-        expect(mockCloudflareService.deploy).toHaveBeenCalledWith('test-project', '.', 'main');
-        expect(mockCloudflareService.linkDomain).toHaveBeenCalledWith('test-project', 'example.com');
+        expect(mockSavePlugin.execute).toHaveBeenCalledWith(['commit message']);
+        expect(mockGitService.checkout).toHaveBeenCalledWith('main');
+        expect(mockGitService.merge).toHaveBeenCalledWith('feature-branch');
+        expect(mockGitService.pull).toHaveBeenCalledWith('origin', 'main');
+        expect(mockGitService.push).toHaveBeenCalledWith('origin', 'main');
+        expect(mockGitService.checkout).toHaveBeenCalledWith('feature-branch');
     });
 
-    it('should auto-commit changes before deploy', async () => {
-        mockDeployUtils.loadConfig.mockReturnValue({
-            project_name: 'test-project'
-        });
-        mockOrchestrator.git.runCommand.mockReturnValue('M file.txt'); // Dirty status
-        mockCloudflareService.deploy.mockResolvedValue('success');
+    it('should handle publishing from main', async () => {
+        mockGitService.getCurrentBranch.mockReturnValue('main');
+        mockSavePlugin.execute.mockResolvedValue('Saved');
 
-        await publishPlugin.execute();
+        const result = await publishPlugin.execute([]);
 
-        expect(mockOrchestrator.git.commit).toHaveBeenCalledWith("Auto-commit before deployment");
-        expect(mockCloudflareService.deploy).toHaveBeenCalled();
-    });
-
-    it('should handle git check failure', async () => {
-        mockDeployUtils.loadConfig.mockReturnValue({
-            project_name: 'test-project'
-        });
-        mockOrchestrator.git.runCommand.mockImplementation(() => { throw new Error('Git error'); });
-
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
-        await publishPlugin.execute();
-        expect(consoleSpy).toHaveBeenCalledWith('Git check failed:', expect.any(Error));
-        expect(mockCloudflareService.deploy).not.toHaveBeenCalled();
-        consoleSpy.mockRestore();
-    });
-
-    it('should handle deployment failure', async () => {
-        mockDeployUtils.loadConfig.mockReturnValue({
-            project_name: 'test-project'
-        });
-        mockOrchestrator.git.runCommand.mockReturnValue('');
-        mockCloudflareService.deploy.mockRejectedValue(new Error('Deploy failed'));
-
-        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
-        await publishPlugin.execute();
-        expect(consoleSpy).toHaveBeenCalledWith('Deployment failed:', expect.any(Error));
-        consoleSpy.mockRestore();
+        expect(mockSavePlugin.execute).toHaveBeenCalledWith(['Publishing changes']);
+        expect(mockGitService.checkout).not.toHaveBeenCalled();
+        expect(mockGitService.merge).not.toHaveBeenCalled();
+        expect(result).toContain('Already on main');
     });
 });

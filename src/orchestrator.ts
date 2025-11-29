@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import { readdir } from 'fs/promises';
 import debug from 'debug';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 import { Application } from './models/Application.js';
 import { CommandPlugin, AgentPlugin } from './models/Plugins.js';
 import { Planner } from './planner.js';
@@ -41,7 +42,17 @@ export class Orchestrator {
         this.config.plotrisPath = path.join(this.config.projectPath, '.plotris');
         this.config.agentsPath = path.join(this.config.plotrisPath, 'agents')
         this.config.historyPath = path.join(this.config.plotrisPath, 'history')
-        this.config.deployConfigPath = path.join(this.config.plotrisPath, 'deploy.yml');
+        this.config.configPath = path.join(this.config.plotrisPath, 'config.yml');
+
+        // Load environment variables from .plotris/.env
+        const envPath = path.join(this.config.plotrisPath, '.env');
+        if (fs.existsSync(envPath)) {
+            dotenv.config({ path: envPath });
+            log(`Loaded environment variables from ${envPath}`);
+        } else {
+            // Fallback to root .env if .plotris/.env doesn't exist (backward compatibility or initial setup)
+            dotenv.config({ path: path.join(this.config.projectPath, '.env') });
+        }
 
         // Initialize Registries
         this.commandRegistry = new CommandRegistry();

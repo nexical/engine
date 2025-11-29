@@ -4,9 +4,9 @@ import { Orchestrator } from '../orchestrator.js';
 export class GitService {
     constructor(private core: Orchestrator) { }
 
-    runCommand(args: string[]): string {
+    runCommand(args: string[], cwd?: string): string {
         const result = spawnSync('git', args, {
-            cwd: this.core.config.projectPath,
+            cwd: cwd || this.core.config.projectPath,
             encoding: 'utf-8',
         });
 
@@ -17,13 +17,57 @@ export class GitService {
         return result.stdout.trim();
     }
 
+    init(cwd?: string): void {
+        this.runCommand(['init'], cwd);
+    }
+
+    clone(url: string, dir?: string): void {
+        const args = ['clone', url];
+        if (dir) {
+            args.push(dir);
+        }
+        // Clone runs in the parent directory of the project path usually, or current cwd
+        // But here we probably want to run it in the current working directory of the process
+        // if we are initializing a new project.
+        this.runCommand(args, '.');
+    }
+
+    addRemote(name: string, url: string): void {
+        this.runCommand(['remote', 'add', name, url]);
+    }
+
+    checkout(branch: string, create: boolean = false): void {
+        const args = ['checkout'];
+        if (create) {
+            args.push('-b');
+        }
+        args.push(branch);
+        this.runCommand(args);
+    }
+
+    merge(branch: string): void {
+        this.runCommand(['merge', branch]);
+    }
+
+    pull(remote: string = 'origin', branch: string = 'main'): void {
+        this.runCommand(['pull', remote, branch]);
+    }
+
+    add(files: string | string[]): void {
+        const fileList = Array.isArray(files) ? files : [files];
+        this.runCommand(['add', ...fileList]);
+    }
+
     commit(message: string): void {
-        this.runCommand(['add', '.']);
         this.runCommand(['commit', '-m', message]);
     }
 
     push(remote: string = 'origin', branch: string = 'main'): void {
         this.runCommand(['push', remote, branch]);
+    }
+
+    status(): string {
+        return this.runCommand(['status', '--porcelain']);
     }
 
     getCurrentBranch(): string {

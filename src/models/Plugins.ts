@@ -1,4 +1,4 @@
-import { Orchestrator } from '../orchestrator.js';
+import type { Orchestrator } from '../orchestrator.js';
 import { Agent } from './Agent.js';
 
 export interface CommandPlugin {

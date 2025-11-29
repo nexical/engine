@@ -17,9 +17,27 @@ export class CloudflareService {
         }
     }
 
-    async createProject(projectName: string): Promise<void> {
+    async createProject(projectName: string, source?: { type: 'github', owner: string, repo: string }): Promise<void> {
         log(`Creating Cloudflare Pages project: ${projectName}...`);
         const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects`;
+
+        const body: any = {
+            name: projectName,
+            production_branch: 'main'
+        };
+
+        if (source && source.type === 'github') {
+            body.source = {
+                type: 'github',
+                config: {
+                    owner: source.owner,
+                    repo_name: source.repo,
+                    production_branch: 'main',
+                    pr_comments_enabled: true,
+                    deployments_enabled: true
+                }
+            };
+        }
 
         try {
             const response = await fetch(url, {
@@ -28,10 +46,7 @@ export class CloudflareService {
                     'Authorization': `Bearer ${this.apiToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    name: projectName,
-                    production_branch: 'main'
-                })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
@@ -56,10 +71,10 @@ export class CloudflareService {
         }
     }
 
-    async ensureProjectExists(projectName: string): Promise<void> {
+    async ensureProjectExists(projectName: string, source?: { type: 'github', owner: string, repo: string }): Promise<void> {
         // We can try to create it, and catch 409, or check existence. 
         // Trying to create is atomic and simpler.
-        await this.createProject(projectName);
+        await this.createProject(projectName, source);
     }
 
     async deploy(projectName: string, directory: string = '.', branch?: string): Promise<string> {
