@@ -11,7 +11,7 @@ program
     .description('Extensible AI-driven multi-agent planner and orchstrator for local project development')
     .version('0.1.0')
     .option('--prompt <prompt>', 'A AI-driven prompt to drive orchestration engine or a /command.')
-    .argument('[command]', 'Command to execute', '')
+    .argument('[command]', 'Command to execute')
     .argument('[args...]', 'Arguments for the command');
 
 program.parse(process.argv);
