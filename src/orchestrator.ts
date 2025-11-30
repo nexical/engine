@@ -1,11 +1,9 @@
 import path from 'path';
 import fs from 'fs-extra';
-import { readdir } from 'fs/promises';
 import debug from 'debug';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import { Application } from './models/Application.js';
-import { CommandPlugin, AgentPlugin } from './models/Plugins.js';
 import { Planner } from './planner.js';
 import { Executor } from './executor.js';
 import { CommandRegistry } from './plugins/CommandRegistry.js';
@@ -30,10 +28,10 @@ export class Orchestrator {
     constructor(argv: string[]) {
         this.config = {} as Application;
         const cwd = process.cwd();
-        const websitePath = path.join(cwd, 'website');
+        const projectPath = path.join(cwd, 'dev_project');
 
-        if (fs.existsSync(websitePath) && fs.statSync(websitePath).isDirectory()) {
-            this.config.projectPath = websitePath;
+        if (fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory()) {
+            this.config.projectPath = projectPath;
         } else {
             this.config.projectPath = cwd;
         }
@@ -71,85 +69,10 @@ export class Orchestrator {
     }
 
     async init(): Promise<void> {
-        await this.loadPlugins();
-    }
-
-    private async loadPlugins(): Promise<void> {
         const pluginsDir = path.join(this.config.appPath, 'plugins');
-        const commandsDir = path.join(pluginsDir, 'commands');
-        const agentsDir = path.join(pluginsDir, 'agents');
 
-        await this.loadCommandPlugins(commandsDir);
-        await this.loadAgentPlugins(agentsDir);
-    }
-
-    private async loadCommandPlugins(dir: string): Promise<void> {
-        if (!fs.existsSync(dir)) return;
-
-        const files = await readdir(dir);
-        for (const file of files) {
-            if (file.endsWith('.ts') || file.endsWith('.js')) {
-                const modulePath = path.join(dir, file);
-                try {
-                    const module = await import(modulePath);
-                    for (const key in module) {
-                        const ExportedClass = module[key];
-                        if (typeof ExportedClass === 'function') {
-                            try {
-                                const instance = new ExportedClass(this);
-                                if (this.isCommandPlugin(instance)) {
-                                    log(`Registering command plugin: ${instance.name}`);
-                                    this.commandRegistry.register(instance);
-                                }
-                            } catch (e) {
-                                // Ignore if instantiation fails (e.g. not a class or needs args)
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Failed to load command plugin from ${file}:`, e);
-                }
-            }
-        }
-    }
-
-    private async loadAgentPlugins(dir: string): Promise<void> {
-        if (!fs.existsSync(dir)) return;
-
-        const files = await readdir(dir);
-        for (const file of files) {
-            if (file.endsWith('.ts') || file.endsWith('.js')) {
-                const modulePath = path.join(dir, file);
-                try {
-                    const module = await import(modulePath);
-                    for (const key in module) {
-                        const ExportedClass = module[key];
-                        if (typeof ExportedClass === 'function') {
-                            try {
-                                const instance = new ExportedClass(this);
-                                if (this.isAgentPlugin(instance)) {
-                                    const isDefault = instance.name === 'cli';
-                                    log(`Registering agent plugin: ${instance.name} (Default: ${isDefault})`);
-                                    this.agentRegistry.register(instance, isDefault);
-                                }
-                            } catch (e) {
-                                // Ignore
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Failed to load agent plugin from ${file}:`, e);
-                }
-            }
-        }
-    }
-
-    private isCommandPlugin(obj: any): obj is CommandPlugin {
-        return obj && typeof obj.name === 'string' && typeof obj.execute === 'function';
-    }
-
-    private isAgentPlugin(obj: any): obj is AgentPlugin {
-        return obj && typeof obj.name === 'string' && typeof obj.execute === 'function';
+        await this.commandRegistry.load(path.join(pluginsDir, 'commands'));
+        await this.agentRegistry.load(path.join(pluginsDir, 'agents'));
     }
 
     async runAIWorkflow(prompt: string): Promise<void> {
