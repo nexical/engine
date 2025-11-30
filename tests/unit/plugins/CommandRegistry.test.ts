@@ -11,7 +11,7 @@ describe('CommandRegistry', () => {
     let tempDir: string;
 
     beforeEach(() => {
-        registry = new CommandRegistry();
+        registry = new CommandRegistry({} as any);
         mockPlugin = {
             name: 'test-command',
             description: 'Test Command',

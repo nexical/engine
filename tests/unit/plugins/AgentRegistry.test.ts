@@ -11,7 +11,7 @@ describe('AgentRegistry', () => {
     let tempDir: string;
 
     beforeEach(() => {
-        registry = new AgentRegistry();
+        registry = new AgentRegistry({} as any);
         mockPlugin = {
             name: 'test-agent',
             description: 'Test Agent',
