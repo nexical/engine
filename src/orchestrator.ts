@@ -55,8 +55,8 @@ export class Orchestrator {
         }
 
         // Initialize Registries
-        this.commandRegistry = new CommandRegistry();
-        this.agentRegistry = new AgentRegistry();
+        this.commandRegistry = new CommandRegistry(this);
+        this.agentRegistry = new AgentRegistry(this);
 
         // Initialize shared services
         this.disk = new FileSystemService();

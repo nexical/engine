@@ -2,11 +2,11 @@ import path from 'path';
 import fs from 'fs-extra';
 import { readdir } from 'fs/promises';
 import debug from 'debug';
-import { AgentPlugin, PluginRegistry } from '../models/Plugins.js';
+import { AgentPlugin, PluginRegistry, BaseRegistry } from '../models/Plugins.js';
 
 const log = debug('agent-registry');
 
-export class AgentRegistry implements PluginRegistry<AgentPlugin> {
+export class AgentRegistry extends BaseRegistry implements PluginRegistry<AgentPlugin> {
     private plugins: Map<string, AgentPlugin> = new Map();
     private defaultPlugin: AgentPlugin | undefined;
 
@@ -45,7 +45,7 @@ export class AgentRegistry implements PluginRegistry<AgentPlugin> {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
                             try {
-                                const instance = new ExportedClass(this);
+                                const instance = new ExportedClass(this.core);
                                 if (this.isAgentPlugin(instance)) {
                                     const isDefault = instance.name === 'cli';
                                     log(`Registering agent plugin: ${instance.name} (Default: ${isDefault})`);

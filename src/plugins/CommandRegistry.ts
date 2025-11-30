@@ -2,11 +2,11 @@ import path from 'path';
 import fs from 'fs-extra';
 import { readdir } from 'fs/promises';
 import debug from 'debug';
-import { CommandPlugin, PluginRegistry } from '../models/Plugins.js';
+import { CommandPlugin, PluginRegistry, BaseRegistry } from '../models/Plugins.js';
 
 const log = debug('command-registry');
 
-export class CommandRegistry implements PluginRegistry<CommandPlugin> {
+export class CommandRegistry extends BaseRegistry implements PluginRegistry<CommandPlugin> {
     private plugins: Map<string, CommandPlugin> = new Map();
 
     register(plugin: CommandPlugin): void {
@@ -37,7 +37,7 @@ export class CommandRegistry implements PluginRegistry<CommandPlugin> {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
                             try {
-                                const instance = new ExportedClass(this);
+                                const instance = new ExportedClass(this.core);
                                 if (this.isCommandPlugin(instance)) {
                                     log(`Registering command plugin: ${instance.name}`);
                                     this.register(instance);

@@ -19,6 +19,10 @@ export interface PluginRegistry<T> {
     getAll(): T[];
 }
 
+export class BaseRegistry {
+    constructor(protected core: Orchestrator) { }
+}
+
 export class BasePlugin {
     constructor(protected core: Orchestrator) { }
 }
