@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import debug from 'debug';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Orchestrator } from './orchestrator.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJsonPath = path.resolve(__dirname, '../../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
 const log = debug('cli');
 const program = new Command();
@@ -9,7 +17,7 @@ const program = new Command();
 program
     .name('plotris')
     .description('Extensible AI-driven multi-agent planner and orchstrator for local project development')
-    .version('0.1.0')
+    .version(packageJson.version)
     .option('--prompt <prompt>', 'A AI-driven prompt to drive orchestration engine or a /command.')
     .argument('[command]', 'Command to execute')
     .argument('[args...]', 'Arguments for the command');
