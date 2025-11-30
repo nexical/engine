@@ -9,6 +9,9 @@
     "test": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit && jest tests/integration --collectCoverage=false",
     "cli": "npm run build && node dist/src/cli.js"
   },
+  "bin": {
+    "plotris": "./dist/src/cli.js"
+  },
   "keywords": [],
   "author": "Adrian Webb <adrian@cellebris.com>",
   "license": "Apache-2.0",
