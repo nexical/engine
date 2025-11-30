@@ -51,7 +51,7 @@ export class Orchestrator {
             log(`Loaded environment variables from ${envPath}`);
         } else {
             // Fallback to root .env if .plotris/.env doesn't exist (backward compatibility or initial setup)
-            dotenv.config({ path: path.join(this.config.projectPath, '.env') });
+            dotenv.config({ path: path.join(this.config.projectPath, '.env'), quiet: true });
         }
 
         // Initialize Registries
