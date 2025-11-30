@@ -47,7 +47,7 @@ export class Orchestrator {
         // Load environment variables from .plotris/.env
         const envPath = path.join(this.config.plotrisPath, '.env');
         if (fs.existsSync(envPath)) {
-            dotenv.config({ path: envPath });
+            dotenv.config({ path: envPath, quiet: true });
             log(`Loaded environment variables from ${envPath}`);
         } else {
             // Fallback to root .env if .plotris/.env doesn't exist (backward compatibility or initial setup)
