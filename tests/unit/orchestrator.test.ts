@@ -38,7 +38,8 @@ describe('Orchestrator', () => {
     let mockCommandRegistryInstance: any;
     let mockAgentRegistryInstance: any;
 
-    beforeEach(() => {
+    beforeEach(async () => {
+        jest.resetModules();
         mockFs.existsSync.mockReturnValue(false);
         (mockFsPromises.readdir as any).mockResolvedValue([]);
 

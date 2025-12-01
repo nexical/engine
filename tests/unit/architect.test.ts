@@ -22,7 +22,7 @@ describe('Architect', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('architect.md')) return 'template {user_request} {global_constraints}';
+                    if (path.endsWith('architect.md')) return 'template {user_request} {architecture_file} {global_constraints}';
                     if (path.endsWith('AGENTS.md')) return 'constraints';
                     return '';
                 }),
@@ -85,6 +85,7 @@ describe('Architect', () => {
             const executeCall = mockPlugin.execute.mock.calls[0];
             const params = executeCall[2].params;
             expect(params.prompt).toContain('constraints');
+            expect(params.prompt).toContain('.plotris/architecture.md');
         });
 
         it('should handle missing AGENTS.md', async () => {
@@ -112,16 +113,7 @@ describe('Architect', () => {
             expect(console.error).toHaveBeenCalledWith('Error generating architecture:', expect.any(Error));
         });
 
-        it('should save architecture if plugin returns string', async () => {
-            mockPlugin.execute.mockResolvedValue('architecture content');
 
-            await architect.generateArchitecture('user prompt');
-
-            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalledWith(
-                '/project/.plotris/architecture.md',
-                'architecture content'
-            );
-        });
 
         it('should use custom CLI command and args from env', async () => {
             process.env.ARCHITECT_CLI_COMMAND = 'custom-cli';

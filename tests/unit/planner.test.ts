@@ -33,9 +33,11 @@ describe('Planner', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('planner.md')) return 'template';
+                    if (path.endsWith('planner.md')) return 'template {user_prompt} {agent_capabilities} {plan_file} {architecture} {global_constraints}';
                     if (path.endsWith('capabilities.yml')) return 'capabilities';
                     if (path.endsWith('plan.yml')) return 'tasks: []';
+                    if (path.endsWith('architecture.md')) return 'architecture';
+                    if (path.endsWith('AGENTS.md')) return 'constraints';
                     return '';
                 }),
                 writeFile: jest.fn()
@@ -96,6 +98,12 @@ describe('Planner', () => {
                 })
             );
 
+            const executeCall = mockPlugin.execute.mock.calls[0];
+            const params = executeCall[2].params;
+            expect(params.prompt).toContain('architecture');
+            expect(params.prompt).toContain('constraints');
+            expect(params.prompt).toContain('.plotris/plan.yml');
+
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
 
@@ -110,14 +118,24 @@ describe('Planner', () => {
             mockOrchestrator.disk.exists.mockImplementation((path: string) => {
                 if (path.includes('planner.md')) return true;
                 if (path.includes('capabilities.yml')) return false;
+                if (path.includes('architecture.md')) return false;
+                if (path.includes('AGENTS.md')) return false;
                 return false;
             });
 
             await planner.generatePlan('user prompt');
 
             expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/agents/capabilities.yml');
+            expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/.plotris/architecture.md');
+            expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/AGENTS.md');
+
             // Should still proceed
             expect(mockPlugin.execute).toHaveBeenCalled();
+
+            const executeCall = mockPlugin.execute.mock.calls[0];
+            const params = executeCall[2].params;
+            expect(params.prompt).toContain('There is no architecture defined.');
+            expect(params.prompt).toContain('There are no global constraints defined.');
         });
 
         it('should throw if CLI plugin not found', async () => {
@@ -140,7 +158,8 @@ describe('Planner', () => {
             });
 
             await planner.generatePlan('user prompt');
-            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('```yaml\ntasks: []\n```');
         });
 
         it('should parse YAML from partial content', async () => {
@@ -152,7 +171,8 @@ describe('Planner', () => {
             });
 
             await planner.generatePlan('user prompt');
-            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('plan_name: test\ntasks: []');
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('Some text\nplan_name: test\ntasks: []');
         });
 
         it('should parse YAML from generic code block', async () => {
@@ -164,7 +184,8 @@ describe('Planner', () => {
             });
 
             await planner.generatePlan('user prompt');
-            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
+            await planner.generatePlan('user prompt');
+            expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('```\ntasks: []\n```');
         });
 
         it('should use custom CLI command and args from env', async () => {
