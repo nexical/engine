@@ -7,21 +7,7 @@ import { Agent } from '../models/Agent.js';
 const log = debug('architect');
 
 export class Architect {
-    private architectPrompt: string;
-
-    constructor(
-        private core: Orchestrator
-    ) {
-        const architectPromptFile = 'architect.md';
-        const coreArchitectPrompt = path.join(this.core.config.appPath, 'prompts', architectPromptFile);
-        const projectArchitectPrompt = path.join(this.core.config.agentsPath, architectPromptFile);
-
-        if (this.core.disk.exists(projectArchitectPrompt)) {
-            this.architectPrompt = this.core.disk.readFile(projectArchitectPrompt);
-        } else {
-            this.architectPrompt = this.core.disk.readFile(coreArchitectPrompt);
-        }
-    }
+    constructor(private core: Orchestrator) { }
 
     private getGlobalConstraints(): string {
         const agentsMdPath = path.join(this.core.config.projectPath, 'AGENTS.md');
@@ -45,11 +31,13 @@ export class Architect {
 
         const architectureFile = '.nexical/architecture.md';
         const personasDir = '.nexical/personas/';
-        const fullPrompt = this.architectPrompt
-            .replace('{user_request}', prompt)
-            .replace('{architecture_file}', architectureFile)
-            .replace('{global_constraints}', globalConstraints)
-            .replace('{personas_dir}', personasDir);
+
+        const fullPrompt = this.core.promptEngine.render('architect.md', {
+            user_request: prompt,
+            architecture_file: architectureFile,
+            global_constraints: globalConstraints,
+            personas_dir: personasDir
+        });
 
         const architectAgent: Agent = {
             name: 'architect',

@@ -70,23 +70,21 @@ export class AgentRunner {
         }
 
         let userPromptWithPersona = userPrompt;
+        let personaContext = '';
+
         if (task.persona) {
             const personaFile = path.join(this.core.config.projectPath, '.nexical/personas', `${task.persona}.md`);
             if (this.core.disk.exists(personaFile)) {
-                const personaContent = this.core.disk.readFile(personaFile);
-                userPromptWithPersona = `
-${userPrompt}
-
----
-**Persona Context:**
-
-${personaContent}
----
-`;
+                personaContext = this.core.disk.readFile(personaFile);
             } else {
                 console.warn(`Persona file not found: ${personaFile}`);
             }
         }
+
+        userPromptWithPersona = this.core.promptEngine.render('agent.md', {
+            user_prompt: userPrompt,
+            persona_context: personaContext
+        });
 
         try {
             await plugin.execute(profile, task.description, {

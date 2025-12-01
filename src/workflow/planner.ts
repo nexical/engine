@@ -8,21 +8,7 @@ import { Agent } from '../models/Agent.js';
 const log = debug('planner');
 
 export class Planner {
-    private plannerPrompt: string
-
-    constructor(
-        private core: Orchestrator
-    ) {
-        const plannerPromptFile = 'planner.md';
-        const corePlannerPrompt = path.join(this.core.config.appPath, 'prompts', plannerPromptFile);
-        const projectPlannerPrompt = path.join(this.core.config.agentsPath, plannerPromptFile);
-
-        if (this.core.disk.exists(projectPlannerPrompt)) {
-            this.plannerPrompt = this.core.disk.readFile(projectPlannerPrompt);
-        } else {
-            this.plannerPrompt = this.core.disk.readFile(corePlannerPrompt);
-        }
-    }
+    constructor(private core: Orchestrator) { }
 
     private getAgentCapabilities(): string {
         const capabilitiesPath = path.join(this.core.config.agentsPath, 'capabilities.yml');
@@ -81,13 +67,15 @@ export class Planner {
 
         const planFile = '.nexical/plan.yml';
         const personasDir = '.nexical/personas/';
-        const fullPrompt = this.plannerPrompt
-            .replace('{user_prompt}', prompt)
-            .replace('{agent_capabilities}', agentCapabilities)
-            .replace('{plan_file}', planFile)
-            .replace('{architecture}', architecture)
-            .replace('{global_constraints}', globalConstraints)
-            .replace('{personas_dir}', personasDir);
+
+        const fullPrompt = this.core.promptEngine.render('planner.md', {
+            user_prompt: prompt,
+            agent_capabilities: agentCapabilities,
+            plan_file: planFile,
+            architecture: architecture,
+            global_constraints: globalConstraints,
+            personas_dir: personasDir
+        });
 
         const plannerAgent: Agent = {
             name: 'planner',

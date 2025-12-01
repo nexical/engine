@@ -12,6 +12,7 @@ import { AgentRegistry } from './plugins/AgentRegistry.js';
 import { GitService } from './services/GitService.js';
 import { GitHubService } from './services/GitHubService.js';
 import { FileSystemService } from './services/FileSystemService.js';
+import { PromptEngine } from './services/PromptEngine.js';
 
 const log = debug('orchestrator');
 
@@ -22,6 +23,7 @@ export class Orchestrator {
     public github: GitHubService;
     public commandRegistry: CommandRegistry;
     public agentRegistry: AgentRegistry;
+    public promptEngine: PromptEngine;
 
     private planner: Planner;
     private architect: Architect;
@@ -64,6 +66,7 @@ export class Orchestrator {
         this.disk = new FileSystemService();
         this.git = new GitService(this);
         this.github = new GitHubService(this);
+        this.promptEngine = new PromptEngine(this);
 
         // Initialize orchestrator components
         this.planner = new Planner(this);
