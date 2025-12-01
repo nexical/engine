@@ -22,7 +22,6 @@ describe('Architect', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('architect.md')) return 'template {user_request} {architecture_file} {global_constraints} {personas_dir}';
                     if (path.endsWith('AGENTS.md')) return 'constraints';
                     return '';
                 }),
@@ -33,6 +32,9 @@ describe('Architect', () => {
                     if (name === 'cli') return mockPlugin;
                     return undefined;
                 })
+            },
+            promptEngine: {
+                render: jest.fn().mockReturnValue('rendered prompt')
             }
         };
 
@@ -45,26 +47,19 @@ describe('Architect', () => {
         jest.restoreAllMocks();
     });
 
-    describe('constructor', () => {
-        it('should load architect prompt from project if exists', () => {
-            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/agents/architect.md');
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/agents/architect.md');
-        });
-
-        it('should load architect prompt from core if project missing', () => {
-            mockOrchestrator.disk.exists.mockReturnValue(false);
-            // Re-instantiate to trigger constructor logic
-            new Architect(mockOrchestrator);
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/app/prompts/architect.md');
-        });
-    });
-
     describe('generateArchitecture', () => {
         it('should generate architecture successfully', async () => {
             await architect.generateArchitecture('user prompt');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/AGENTS.md');
             expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('cli');
+
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('architect.md', {
+                user_request: 'user prompt',
+                architecture_file: '.nexical/architecture.md',
+                global_constraints: 'constraints',
+                personas_dir: '.nexical/personas/'
+            });
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -76,22 +71,14 @@ describe('Architect', () => {
                 expect.objectContaining({
                     userPrompt: 'user prompt',
                     params: expect.objectContaining({
-                        prompt: expect.stringContaining('template')
+                        prompt: 'rendered prompt'
                     })
                 })
             );
-
-            // We check that constraints are injected
-            const executeCall = mockPlugin.execute.mock.calls[0];
-            const params = executeCall[2].params;
-            expect(params.prompt).toContain('constraints');
-            expect(params.prompt).toContain('.nexical/architecture.md');
-            expect(params.prompt).toContain('.nexical/personas/');
         });
 
         it('should handle missing AGENTS.md', async () => {
             mockOrchestrator.disk.exists.mockImplementation((path: string) => {
-                if (path.includes('architect.md')) return true;
                 if (path.includes('AGENTS.md')) return false;
                 return false;
             });
@@ -101,6 +88,10 @@ describe('Architect', () => {
             expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/AGENTS.md');
             // Should still proceed
             expect(mockPlugin.execute).toHaveBeenCalled();
+
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('architect.md', expect.objectContaining({
+                global_constraints: "There are no global constraints defined."
+            }));
         });
 
         it('should throw if CLI plugin not found', async () => {
@@ -113,8 +104,6 @@ describe('Architect', () => {
             await expect(architect.generateArchitecture('user prompt')).rejects.toThrow('Execution failed');
             expect(console.error).toHaveBeenCalledWith('Error generating architecture:', expect.any(Error));
         });
-
-
 
         it('should use custom CLI command and args from env', async () => {
             process.env.ARCHITECT_CLI_COMMAND = 'custom-cli';

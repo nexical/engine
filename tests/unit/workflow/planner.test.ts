@@ -33,7 +33,6 @@ describe('Planner', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('planner.md')) return 'template {user_prompt} {agent_capabilities} {plan_file} {architecture} {global_constraints} {personas_dir}';
                     if (path.endsWith('capabilities.yml')) return 'capabilities';
                     if (path.endsWith('plan.yml')) return 'tasks: []';
                     if (path.endsWith('architecture.md')) return 'architecture';
@@ -47,6 +46,9 @@ describe('Planner', () => {
                     if (name === 'cli') return mockPlugin;
                     return undefined;
                 })
+            },
+            promptEngine: {
+                render: jest.fn().mockReturnValue('rendered prompt')
             }
         };
 
@@ -62,26 +64,21 @@ describe('Planner', () => {
         jest.restoreAllMocks();
     });
 
-    describe('constructor', () => {
-        it('should load planner prompt from project if exists', () => {
-            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/agents/planner.md');
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/agents/planner.md');
-        });
-
-        it('should load planner prompt from core if project missing', () => {
-            mockOrchestrator.disk.exists.mockReturnValue(false);
-            // Re-instantiate to trigger constructor logic
-            new Planner(mockOrchestrator);
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/app/prompts/planner.md');
-        });
-    });
-
     describe('generatePlan', () => {
         it('should generate a plan successfully', async () => {
             const plan = await planner.generatePlan('user prompt');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/agents/capabilities.yml');
             expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('cli');
+
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('planner.md', {
+                user_prompt: 'user prompt',
+                agent_capabilities: 'capabilities',
+                plan_file: '.nexical/plan.yml',
+                architecture: 'architecture',
+                global_constraints: 'constraints',
+                personas_dir: '.nexical/personas/'
+            });
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -93,17 +90,10 @@ describe('Planner', () => {
                 expect.objectContaining({
                     userPrompt: 'user prompt',
                     params: expect.objectContaining({
-                        prompt: expect.stringContaining('template')
+                        prompt: 'rendered prompt'
                     })
                 })
             );
-
-            const executeCall = mockPlugin.execute.mock.calls[0];
-            const params = executeCall[2].params;
-            expect(params.prompt).toContain('architecture');
-            expect(params.prompt).toContain('constraints');
-            expect(params.prompt).toContain('.nexical/plan.yml');
-            expect(params.prompt).toContain('.nexical/personas/');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.nexical/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
@@ -117,7 +107,6 @@ describe('Planner', () => {
 
         it('should handle missing capabilities file', async () => {
             mockOrchestrator.disk.exists.mockImplementation((path: string) => {
-                if (path.includes('planner.md')) return true;
                 if (path.includes('capabilities.yml')) return false;
                 if (path.includes('architecture.md')) return false;
                 if (path.includes('AGENTS.md')) return false;
@@ -133,10 +122,11 @@ describe('Planner', () => {
             // Should still proceed
             expect(mockPlugin.execute).toHaveBeenCalled();
 
-            const executeCall = mockPlugin.execute.mock.calls[0];
-            const params = executeCall[2].params;
-            expect(params.prompt).toContain('There is no architecture defined.');
-            expect(params.prompt).toContain('There are no global constraints defined.');
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('planner.md', expect.objectContaining({
+                agent_capabilities: "No agent capabilities file found.",
+                architecture: "There is no architecture defined.",
+                global_constraints: "There are no global constraints defined."
+            }));
         });
 
         it('should throw if CLI plugin not found', async () => {

@@ -19,7 +19,8 @@ describe('AgentRunner', () => {
 
         mockOrchestrator = {
             config: {
-                agentsPath: '/agents'
+                agentsPath: '/agents',
+                projectPath: '/project'
             },
             disk: {
                 isDirectory: jest.fn().mockReturnValue(true),
@@ -30,6 +31,9 @@ describe('AgentRunner', () => {
             agentRegistry: {
                 get: jest.fn().mockReturnValue(mockPlugin),
                 getDefault: jest.fn().mockReturnValue(mockPlugin)
+            },
+            promptEngine: {
+                render: jest.fn().mockReturnValue('rendered prompt')
             }
         };
 
@@ -104,11 +108,17 @@ describe('AgentRunner', () => {
             await agentRunner.runAgent(task, 'user prompt');
 
             expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('test-provider');
+
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('agent.md', {
+                user_prompt: 'user prompt',
+                persona_context: ''
+            });
+
             expect(mockPlugin.execute).toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'test-agent' }),
                 'Do something',
                 expect.objectContaining({
-                    userPrompt: 'user prompt',
+                    userPrompt: 'rendered prompt',
                     taskId: 'task-1',
                     params: { foo: 'bar' }
                 })
@@ -140,11 +150,16 @@ describe('AgentRunner', () => {
             expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.nexical/personas/frontend.md');
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.nexical/personas/frontend.md');
 
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('agent.md', {
+                user_prompt: 'user prompt',
+                persona_context: 'You are a frontend expert.'
+            });
+
             expect(mockPlugin.execute).toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'test-agent' }),
                 'Do something',
                 expect.objectContaining({
-                    userPrompt: expect.stringContaining('You are a frontend expert.')
+                    userPrompt: 'rendered prompt'
                 })
             );
         });
