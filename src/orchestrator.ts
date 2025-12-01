@@ -89,21 +89,22 @@ export class Orchestrator {
         }
     }
 
+    async runCommand(commandName: string, args: string[]): Promise<void> {
+        const command = this.commandRegistry.get(commandName);
+        if (command) {
+            log(`Executing command: ${commandName}`);
+            await command.execute(args);
+        } else {
+            console.error(`Unknown command: /${commandName}`);
+        }
+    }
+
     async execute(input: string): Promise<void> {
         input = input.trim();
         if (input.startsWith('/')) {
             // Command execution
             const parts = input.slice(1).split(' ');
-            const commandName = parts[0];
-            const args = parts.slice(1);
-
-            const command = this.commandRegistry.get(commandName);
-            if (command) {
-                log(`Executing command: ${commandName}`);
-                await command.execute(args);
-            } else {
-                console.error(`Unknown command: /${commandName}`);
-            }
+            await this.runCommand(parts[0], parts.slice(1));
         } else {
             // AI Workflow
             await this.runAIWorkflow(input);
