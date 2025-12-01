@@ -1,13 +1,13 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import { Planner } from '../../src/planner.js';
-import { Orchestrator } from '../../src/orchestrator.js';
-import { AgentRegistry } from '../../src/plugins/AgentRegistry.js';
-import { FileSystemService } from '../../src/services/FileSystemService.js';
-import { AgentPlugin } from '../../src/models/Plugins.js';
+import { Planner } from '../../../src/workflow/planner.js';
+import { Orchestrator } from '../../../src/orchestrator.js';
+import { AgentRegistry } from '../../../src/plugins/AgentRegistry.js';
+import { FileSystemService } from '../../../src/services/FileSystemService.js';
+import { AgentPlugin } from '../../../src/models/Plugins.js';
 
 // Mock dependencies
-jest.mock('../../src/plugins/AgentRegistry.js');
-jest.mock('../../src/services/FileSystemService.js');
+jest.mock('../../../src/plugins/AgentRegistry.js');
+jest.mock('../../../src/services/FileSystemService.js');
 
 describe('Planner Integration Tests', () => {
     let orchestrator: Orchestrator;

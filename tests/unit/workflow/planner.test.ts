@@ -1,17 +1,17 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { Planner as PlannerType } from '../../src/planner.js';
-import type { Plan } from '../../src/models/Plan.js';
+import type { Planner as PlannerType } from '../../../src/workflow/planner.js';
+import type { Plan } from '../../../src/models/Plan.js';
 
 const mockPlanUtils = {
     toYaml: jest.fn(),
     fromYaml: jest.fn()
 };
 
-jest.unstable_mockModule('../../src/models/Plan.js', () => ({
+jest.unstable_mockModule('../../../src/models/Plan.js', () => ({
     PlanUtils: mockPlanUtils
 }));
 
-const { Planner } = await import('../../src/planner.js');
+const { Planner } = await import('../../../src/workflow/planner.js');
 
 describe('Planner', () => {
     let planner: PlannerType;

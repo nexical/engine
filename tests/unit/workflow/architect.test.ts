@@ -1,7 +1,7 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import type { Architect as ArchitectType } from '../../src/architect.js';
+import type { Architect as ArchitectType } from '../../../src/workflow/architect.js';
 
-const { Architect } = await import('../../src/architect.js');
+const { Architect } = await import('../../../src/workflow/architect.js');
 
 describe('Architect', () => {
     let architect: ArchitectType;

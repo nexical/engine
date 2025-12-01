@@ -1,8 +1,8 @@
 import path from 'path';
 import debug from 'debug';
 import yaml from 'js-yaml';
-import type { Orchestrator } from './orchestrator.js';
-import { Agent } from './models/Agent.js';
+import type { Orchestrator } from '../orchestrator.js';
+import { Agent } from '../models/Agent.js';
 
 const log = debug('architect');
 

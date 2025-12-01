@@ -1,5 +1,5 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
-import { Plan } from '../../src/models/Plan.js';
+import { Plan } from '../../../src/models/Plan.js';
 
 const mockAgentRunner = {
     runAgent: jest.fn(),
@@ -9,15 +9,15 @@ const mockOrchestrator = {
     agentRunner: mockAgentRunner,
 };
 
-jest.unstable_mockModule('../../src/orchestrator.js', () => ({
+jest.unstable_mockModule('../../../src/orchestrator.js', () => ({
     Orchestrator: jest.fn().mockImplementation(() => mockOrchestrator),
 }));
 
-jest.unstable_mockModule('../../src/services/AgentRunner.js', () => ({
+jest.unstable_mockModule('../../../src/services/AgentRunner.js', () => ({
     AgentRunner: jest.fn().mockImplementation(() => mockAgentRunner),
 }));
 
-const { Executor } = await import('../../src/executor.js');
+const { Executor } = await import('../../../src/workflow/executor.js');
 
 describe('Executor', () => {
     let executor: any;

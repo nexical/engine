@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
-import type { Executor } from '../../src/executor.js';
-import type { Orchestrator } from '../../src/orchestrator.js';
-import type { AgentRunner } from '../../src/services/AgentRunner.js';
-import { Plan } from '../../src/models/Plan.js';
-import { Task } from '../../src/models/Task.js';
+import type { Executor } from '../../../src/workflow/executor.js';
+import type { Orchestrator } from '../../../src/orchestrator.js';
+import type { AgentRunner } from '../../../src/services/AgentRunner.js';
+import { Plan } from '../../../src/models/Plan.js';
+import { Task } from '../../../src/models/Task.js';
 
 // Define the mock factory
 const mockRunAgent = jest.fn<(task: Task, userPrompt: string) => Promise<void>>().mockResolvedValue(undefined);
@@ -23,7 +23,7 @@ describe('Executor Integration Tests', () => {
 
     beforeAll(async () => {
         // Import the module under test AFTER mocking dependencies
-        const module = await import('../../src/executor.js');
+        const module = await import('../../../src/workflow/executor.js');
         ExecutorClass = module.Executor;
     });
 

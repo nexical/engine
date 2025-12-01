@@ -20,9 +20,9 @@ const mockFileSystemService = jest.fn();
 
 jest.unstable_mockModule('fs-extra', () => ({ default: mockFs }));
 jest.unstable_mockModule('fs/promises', () => mockFsPromises);
-jest.unstable_mockModule('../../src/planner.js', () => ({ Planner: mockPlanner }));
-jest.unstable_mockModule('../../src/architect.js', () => ({ Architect: mockArchitect }));
-jest.unstable_mockModule('../../src/executor.js', () => ({ Executor: mockExecutor }));
+jest.unstable_mockModule('../../src/workflow/planner.js', () => ({ Planner: mockPlanner }));
+jest.unstable_mockModule('../../src/workflow/architect.js', () => ({ Architect: mockArchitect }));
+jest.unstable_mockModule('../../src/workflow/executor.js', () => ({ Executor: mockExecutor }));
 jest.unstable_mockModule('../../src/plugins/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
 jest.unstable_mockModule('../../src/plugins/AgentRegistry.js', () => ({ AgentRegistry: mockAgentRegistry }));
 jest.unstable_mockModule('../../src/services/GitService.js', () => ({ GitService: mockGitService }));

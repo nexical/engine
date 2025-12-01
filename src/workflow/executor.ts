@@ -1,8 +1,8 @@
 import debug from 'debug';
-import { Plan } from './models/Plan.js';
-import { Task } from './models/Task.js';
-import type { Orchestrator } from './orchestrator.js';
-import { AgentRunner } from './services/AgentRunner.js';
+import { Plan } from '../models/Plan.js';
+import { Task } from '../models/Task.js';
+import type { Orchestrator } from '../orchestrator.js';
+import { AgentRunner } from '../services/AgentRunner.js';
 
 const log = debug('executor');
 
