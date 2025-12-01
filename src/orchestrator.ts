@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { Application } from './models/Application.js';
 import { Planner } from './planner.js';
+import { Architect } from './architect.js';
 import { Executor } from './executor.js';
 import { CommandRegistry } from './plugins/CommandRegistry.js';
 import { AgentRegistry } from './plugins/AgentRegistry.js';
@@ -23,6 +24,7 @@ export class Orchestrator {
     public agentRegistry: AgentRegistry;
 
     private planner: Planner;
+    private architect: Architect;
     private executor: Executor;
 
     constructor(argv: string[]) {
@@ -65,6 +67,7 @@ export class Orchestrator {
 
         // Initialize orchestrator components
         this.planner = new Planner(this);
+        this.architect = new Architect(this);
         this.executor = new Executor(this);
     }
 
@@ -78,6 +81,7 @@ export class Orchestrator {
     async runAIWorkflow(prompt: string): Promise<void> {
         log("Starting AI-driven workflow...");
         try {
+            await this.architect.generateArchitecture(prompt);
             const plan = await this.planner.generatePlan(prompt);
             await this.executor.executePlan(plan, prompt);
         } catch (e) {

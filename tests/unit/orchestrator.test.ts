@@ -11,6 +11,7 @@ const mockFsPromises = {
 };
 
 const mockPlanner = jest.fn();
+const mockArchitect = jest.fn();
 const mockExecutor = jest.fn();
 const mockCommandRegistry = jest.fn();
 const mockAgentRegistry = jest.fn();
@@ -20,6 +21,7 @@ const mockFileSystemService = jest.fn();
 jest.unstable_mockModule('fs-extra', () => ({ default: mockFs }));
 jest.unstable_mockModule('fs/promises', () => mockFsPromises);
 jest.unstable_mockModule('../../src/planner.js', () => ({ Planner: mockPlanner }));
+jest.unstable_mockModule('../../src/architect.js', () => ({ Architect: mockArchitect }));
 jest.unstable_mockModule('../../src/executor.js', () => ({ Executor: mockExecutor }));
 jest.unstable_mockModule('../../src/plugins/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
 jest.unstable_mockModule('../../src/plugins/AgentRegistry.js', () => ({ AgentRegistry: mockAgentRegistry }));
@@ -31,6 +33,7 @@ const { Orchestrator } = await import('../../src/orchestrator.js');
 describe('Orchestrator', () => {
     let orchestrator: OrchestratorType;
     let mockPlannerInstance: any;
+    let mockArchitectInstance: any;
     let mockExecutorInstance: any;
     let mockCommandRegistryInstance: any;
     let mockAgentRegistryInstance: any;
@@ -40,11 +43,13 @@ describe('Orchestrator', () => {
         (mockFsPromises.readdir as any).mockResolvedValue([]);
 
         mockPlannerInstance = { generatePlan: jest.fn() };
+        mockArchitectInstance = { generateArchitecture: jest.fn() };
         mockExecutorInstance = { executePlan: jest.fn() };
         mockCommandRegistryInstance = { register: jest.fn(), get: jest.fn(), load: jest.fn() };
         mockAgentRegistryInstance = { register: jest.fn(), get: jest.fn(), load: jest.fn() };
 
         (mockPlanner as any).mockImplementation(() => mockPlannerInstance);
+        (mockArchitect as any).mockImplementation(() => mockArchitectInstance);
         (mockExecutor as any).mockImplementation(() => mockExecutorInstance);
         (mockCommandRegistry as any).mockImplementation(() => mockCommandRegistryInstance);
         (mockAgentRegistry as any).mockImplementation(() => mockAgentRegistryInstance);
@@ -61,7 +66,9 @@ describe('Orchestrator', () => {
             expect(mockAgentRegistry).toHaveBeenCalled();
             expect(mockFileSystemService).toHaveBeenCalled();
             expect(mockGitService).toHaveBeenCalled();
+            expect(mockGitService).toHaveBeenCalled();
             expect(mockPlanner).toHaveBeenCalled();
+            expect(mockArchitect).toHaveBeenCalled();
             expect(mockExecutor).toHaveBeenCalled();
         });
 
@@ -120,6 +127,7 @@ describe('Orchestrator', () => {
 
             await orchestrator.runAIWorkflow('prompt');
 
+            expect(mockArchitectInstance.generateArchitecture).toHaveBeenCalledWith('prompt');
             expect(mockPlannerInstance.generatePlan).toHaveBeenCalledWith('prompt');
             expect(mockExecutorInstance.executePlan).toHaveBeenCalledWith(plan, 'prompt');
         });
