@@ -12,6 +12,9 @@ coverage
 dev_project
 test_project*
 
+# Cloudflare files
+.wrangler
+
 # MacOS specific files
 .DS_Store
 
