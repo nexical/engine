@@ -8,10 +8,11 @@ The application follows a modular architecture centered around an **Orchestrator
 
 ### Core Components
 
-- **Orchestrator** (`src/orchestrator.ts`): The central controller. It initializes the application, loads plugins, and routes execution to either the `CommandRegistry` (for deterministic commands) or the `Planner` (for AI workflows).
-- **Planner** (`src/planner.ts`): Responsible for generating execution plans from user prompts. It interfaces with an LLM (via the `gemini` CLI) to convert natural language requests into structured YAML plans containing a series of tasks.
-- **Executor** (`src/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution, handling both sequential and parallel workflows.
-- **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for discovering and executing agents. It delegates the actual execution logic to the appropriate `AgentPlugin`.
+- **Orchestrator** (`src/orchestrator.ts`): The central controller. It initializes the application, loads plugins, and routes execution.
+- **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.plotris/architecture.md`) and defines the required team personas (`.plotris/personas/*.md`).
+- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.plotris/plan.yml`), assigning specific personas to each task.
+- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution.
+- **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for executing agents. It injects the specific **Persona** context into the agent's prompt during execution, ensuring the agent adopts the correct role, tone, and standards.
 
 ### Services
 
@@ -42,12 +43,22 @@ These plugins define how different types of agents are executed.
 - **CLIAgentPlugin**: The default plugin. It executes agents that are defined as CLI tools (wrapping external binaries or scripts).
 - **ImageGenAgentPlugin**: A specialized plugin for generating images using AI APIs.
 
+### Workflow & Persona System
+
+The system uses a multi-stage workflow to ensure high-quality output:
+
+1.  **Architect Phase**: The **Architect** analyzes the request and generates a solution architecture. Crucially, it also defines **Personas** (e.g., `frontend`, `backend`, `qa`).
+    -   Personas are stored as markdown files in `.plotris/personas/`.
+    -   They define the **Role**, **Tone**, and **Standards** (e.g., "Use React functional components", "Write unit tests").
+2.  **Planning Phase**: The **Planner** reads the architecture and available personas. It creates a plan where each task is explicitly assigned a `persona`.
+3.  **Execution Phase**: The **Executor** runs the tasks. When the **AgentRunner** executes a task, it reads the assigned persona file and injects it into the agent's context. This ensures that a generic "Coder" agent acts as a "Senior Frontend Engineer" when working on UI tasks, adhering to the specific standards defined for that role.
+
 ### Task Execution Model
 
 The **Executor** implements a **Directed Acyclic Graph (DAG)** execution model:
 - **Parallel Execution**: Tasks with no shared dependencies are executed concurrently.
 - **Sequential Execution**: Tasks wait for their dependencies to complete.
-- **Plan Structure**: Plans are YAML-based, where each task has an `id` and a list of `dependencies`.
+- **Plan Structure**: Plans are YAML-based, where each task has an `id`, a `persona`, and a list of `dependencies`.
 
 ## Usage
 
@@ -95,8 +106,8 @@ npm run cli
 You can run deterministic commands directly:
 
 ```bash
-npm run cli -- /publish
-npm run cli -- /init
+npm run cli -- publish
+npm run cli -- init
 ```
 
 ## Agent Definition Patterns
@@ -165,6 +176,7 @@ Secrets are stored in `.plotris/.env` or `.env`:
 ```env
 CLOUDFLARE_API_TOKEN=your_token
 CLOUDFLARE_ACCOUNT_ID=your_account_id
+GITHUB_ORG=your_github_org
 GITHUB_TOKEN=your_github_token
 OPENROUTER_API_KEY=your_openrouter_key
 ```
