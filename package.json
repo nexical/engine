@@ -29,12 +29,14 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.72",
+    "@types/nunjucks": "^3.2.6",
     "ai": "^5.0.101",
     "commander": "^14.0.2",
     "debug": "^4.4.3",
     "dotenv": "^17.2.3",
     "fs-extra": "^11.3.2",
     "js-yaml": "^4.1.1",
+    "nunjucks": "^3.2.4",
     "zod": "^4.1.12"
   }
 }
