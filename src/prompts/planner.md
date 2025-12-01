@@ -36,7 +36,7 @@ Review the design above if there is information provided. Your plan must impleme
 Instructions:
 1. Analyze the user's request and break it down into a series of dependent tasks.
 2. Assign each task to the most appropriate agent based on their capabilities.
-3. **CRITICAL**: You must assign a `persona` to each task. This must match a filename from the personas directory without the md file extension (e.g., `frontend` for `@.plotris/personas/frontend.md`).
+3. **CRITICAL**: You must assign a `persona` to each task. This must match a filename from the personas directory without the md file extension (e.g., `frontend` for `@{personas_dir}frontend.md`).
 4. Ensure tasks are logically ordered and dependencies are correctly defined.
 5. **CRITICAL**: You must write the final plan to the file: @{plan_file}
 6. **CRITICAL**: For each task, if the agent needs to write code or content to a file, you MUST explicitly instruct the agent to write to the file using the `@` prefix (e.g., "Write the code to @src/components/Header.astro"). The agents do not infer file paths; you must provide them in the task description.
