@@ -167,7 +167,7 @@ The `AgentRunner` supports dynamic variable interpolation in `prompt_template` a
 
 ## Configuration
 
-Project configuration is managed in `.plotris/config.yml` and `.plotris/deploy.yml`.
+Project configuration is managed in `.plotris/config.yml`.
 
 ### Environment Variables
 
