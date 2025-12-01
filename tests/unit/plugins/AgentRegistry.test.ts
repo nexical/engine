@@ -17,7 +17,7 @@ describe('AgentRegistry', () => {
             description: 'Test Agent',
             execute: jest.fn()
         } as any;
-        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plotris-test-'));
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nexical-test-'));
         fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({ type: 'module' }));
     });
 

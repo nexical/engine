@@ -21,19 +21,19 @@ export async function setupTestProject(id: string) {
     await fs.remove(testProjectRoot);
     await fs.ensureDir(testProjectRoot);
 
-    // Copy fixtures to .plotris directory in test project
-    const plotrisDir = path.join(testProjectRoot, '.plotris');
-    await fs.ensureDir(plotrisDir);
+    // Copy fixtures to .nexical directory in test project
+    const nexicalDir = path.join(testProjectRoot, '.nexical');
+    await fs.ensureDir(nexicalDir);
 
     // Copy agents
-    await fs.copy(path.join(FIXTURES_DIR, 'agents'), path.join(plotrisDir, 'agents'));
+    await fs.copy(path.join(FIXTURES_DIR, 'agents'), path.join(nexicalDir, 'agents'));
 
-    // Copy deploy.yml to root of test project (or .plotris? deploy command usually looks in root or .plotris)
-    // Let's check where Orchestrator looks for it. Usually it's expected in the project root or .plotris.
-    // Based on previous knowledge, it might be in .plotris/deploy.yml or root deploy.yml.
+    // Copy deploy.yml to root of test project (or .nexical? deploy command usually looks in root or .nexical)
+    // Let's check where Orchestrator looks for it. Usually it's expected in the project root or .nexical.
+    // Based on previous knowledge, it might be in .nexical/deploy.yml or root deploy.yml.
     // Let's put it in both to be safe or check the code.
-    // Copy deploy.yml to .plotris directory (where Orchestrator expects it)
-    await fs.copy(path.join(FIXTURES_DIR, 'deploy.yml'), path.join(plotrisDir, 'deploy.yml'));
+    // Copy deploy.yml to .nexical directory (where Orchestrator expects it)
+    await fs.copy(path.join(FIXTURES_DIR, 'deploy.yml'), path.join(nexicalDir, 'deploy.yml'));
 
     // Initialize a git repo because some commands might rely on git
     const { spawnSync } = await import('child_process');

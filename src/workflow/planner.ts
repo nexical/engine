@@ -33,7 +33,7 @@ export class Planner {
     }
 
     private getArchitecture(): string {
-        const architecturePath = path.join(this.core.config.projectPath, '.plotris/architecture.md');
+        const architecturePath = path.join(this.core.config.projectPath, '.nexical/architecture.md');
         if (this.core.disk.exists(architecturePath)) {
             return this.core.disk.readFile(architecturePath);
         }
@@ -79,8 +79,8 @@ export class Planner {
             plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const planFile = '.plotris/plan.yml';
-        const personasDir = '.plotris/personas/';
+        const planFile = '.nexical/plan.yml';
+        const personasDir = '.nexical/personas/';
         const fullPrompt = this.plannerPrompt
             .replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities)

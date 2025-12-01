@@ -102,10 +102,10 @@ describe('Planner', () => {
             const params = executeCall[2].params;
             expect(params.prompt).toContain('architecture');
             expect(params.prompt).toContain('constraints');
-            expect(params.prompt).toContain('.plotris/plan.yml');
-            expect(params.prompt).toContain('.plotris/personas/');
+            expect(params.prompt).toContain('.nexical/plan.yml');
+            expect(params.prompt).toContain('.nexical/personas/');
 
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/plan.yml');
+            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.nexical/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
 
             // Verify history saving is called (generic check here, specific check in separate test)
@@ -127,7 +127,7 @@ describe('Planner', () => {
             await planner.generatePlan('user prompt');
 
             expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/agents/capabilities.yml');
-            expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/.plotris/architecture.md');
+            expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/.nexical/architecture.md');
             expect(mockOrchestrator.disk.readFile).not.toHaveBeenCalledWith('/project/AGENTS.md');
 
             // Should still proceed

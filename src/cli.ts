@@ -15,7 +15,7 @@ const log = debug('cli');
 const program = new Command();
 
 program
-    .name('plotris')
+    .name('nexical')
     .description('Extensible AI-driven multi-agent planner and orchstrator for local project development')
     .version(packageJson.version)
     .option('--prompt <prompt>', 'A AI-driven prompt to drive orchestration engine or a /command.')

@@ -14,7 +14,7 @@ describe('GitService Integration Tests', () => {
 
     beforeAll(async () => {
         originalCwd = process.cwd();
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'plotris-git-test-'));
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nexical-git-test-'));
 
         // Initialize git repo
         spawnSync('git', ['init'], { cwd: tempDir });

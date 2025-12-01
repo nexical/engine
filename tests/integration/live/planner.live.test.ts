@@ -44,7 +44,7 @@ describe('Planner Live Integration Tests', () => {
         expect(plan.tasks.length).toBeGreaterThan(0);
 
         // Verify plan file creation
-        const planPath = path.join(testProjectRoot, '.plotris', 'history', 'plan.yml');
+        const planPath = path.join(testProjectRoot, '.nexical', 'history', 'plan.yml');
         expect(await fs.pathExists(planPath)).toBe(true);
 
         const agentNames = plan.tasks.map((t: any) => t.agent);

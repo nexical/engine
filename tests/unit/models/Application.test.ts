@@ -19,10 +19,10 @@ describe('ProjectUtils', () => {
         mockApp = {
             appPath: '/app',
             projectPath: '/project',
-            plotrisPath: '/project/.plotris',
-            agentsPath: '/project/.plotris/agents',
-            historyPath: '/project/.plotris/history',
-            configPath: '/project/.plotris/config.yml'
+            nexicalPath: '/project/.nexical',
+            agentsPath: '/project/.nexical/agents',
+            historyPath: '/project/.nexical/history',
+            configPath: '/project/.nexical/config.yml'
         };
         mockFs.existsSync.mockReset();
         mockFs.readFileSync.mockReset();
@@ -40,7 +40,7 @@ describe('ProjectUtils', () => {
         it('should throw if config file does not exist', () => {
             mockFs.existsSync.mockReturnValue(false);
 
-            expect(() => ProjectUtils.loadConfig(mockApp)).toThrow('/project/.plotris/config.yml not found');
+            expect(() => ProjectUtils.loadConfig(mockApp)).toThrow('/project/.nexical/config.yml not found');
         });
 
         it('should return undefined if config is invalid', () => {
@@ -53,7 +53,7 @@ describe('ProjectUtils', () => {
             // Let's check the implementation again.
             // It falls through to the throw.
 
-            expect(() => ProjectUtils.loadConfig(mockApp)).toThrow('/project/.plotris/config.yml not found');
+            expect(() => ProjectUtils.loadConfig(mockApp)).toThrow('/project/.nexical/config.yml not found');
         });
     });
 });

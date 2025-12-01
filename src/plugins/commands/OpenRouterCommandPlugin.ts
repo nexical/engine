@@ -12,7 +12,7 @@ export class OpenRouterCommandPlugin extends BasePlugin implements CommandPlugin
         }
 
         const apiKey = args[0];
-        const envPath = path.join(this.core.config.projectPath, '.plotris', '.env');
+        const envPath = path.join(this.core.config.projectPath, '.nexical', '.env');
 
         let envContent = '';
         if (this.core.disk.exists(envPath)) {

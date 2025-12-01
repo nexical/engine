@@ -85,8 +85,8 @@ describe('Architect', () => {
             const executeCall = mockPlugin.execute.mock.calls[0];
             const params = executeCall[2].params;
             expect(params.prompt).toContain('constraints');
-            expect(params.prompt).toContain('.plotris/architecture.md');
-            expect(params.prompt).toContain('.plotris/personas/');
+            expect(params.prompt).toContain('.nexical/architecture.md');
+            expect(params.prompt).toContain('.nexical/personas/');
         });
 
         it('should handle missing AGENTS.md', async () => {

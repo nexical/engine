@@ -1,6 +1,6 @@
-# Plotris CLI (TypeScript)
+# Nexical CLI (TypeScript)
 
-Plotris is a sophisticated, TypeScript-based CLI application designed to orchestrate AI agents for complex software development tasks, specifically focusing on website modification and deployment. It leverages a modular architecture to manage workflows, execute deterministic commands, and coordinate AI-driven planning and execution.
+Nexical is a sophisticated, TypeScript-based CLI application designed to orchestrate AI agents for complex software development tasks, specifically focusing on website modification and deployment. It leverages a modular architecture to manage workflows, execute deterministic commands, and coordinate AI-driven planning and execution.
 
 ## Architecture
 
@@ -9,8 +9,8 @@ The application follows a modular architecture centered around an **Orchestrator
 ### Core Components
 
 - **Orchestrator** (`src/orchestrator.ts`): The central controller. It initializes the application, loads plugins, and routes execution.
-- **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.plotris/architecture.md`) and defines the required team personas (`.plotris/personas/*.md`).
-- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.plotris/plan.yml`), assigning specific personas to each task.
+- **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.nexical/architecture.md`) and defines the required team personas (`.nexical/personas/*.md`).
+- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task.
 - **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution.
 - **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for executing agents. It injects the specific **Persona** context into the agent's prompt during execution, ensuring the agent adopts the correct role, tone, and standards.
 
@@ -48,7 +48,7 @@ These plugins define how different types of agents are executed.
 The system uses a multi-stage workflow to ensure high-quality output:
 
 1.  **Architect Phase**: The **Architect** analyzes the request and generates a solution architecture. Crucially, it also defines **Personas** (e.g., `frontend`, `backend`, `qa`).
-    -   Personas are stored as markdown files in `.plotris/personas/`.
+    -   Personas are stored as markdown files in `.nexical/personas/`.
     -   They define the **Role**, **Tone**, and **Standards** (e.g., "Use React functional components", "Write unit tests").
 2.  **Planning Phase**: The **Planner** reads the architecture and available personas. It creates a plan where each task is explicitly assigned a `persona`.
 3.  **Execution Phase**: The **Executor** runs the tasks. When the **AgentRunner** executes a task, it reads the assigned persona file and injects it into the agent's context. This ensures that a generic "Coder" agent acts as a "Senior Frontend Engineer" when working on UI tasks, adhering to the specific standards defined for that role.
@@ -112,7 +112,7 @@ npm run cli -- init
 
 ## Agent Definition Patterns
 
-Agents are defined as YAML files located in `.plotris/agents/` (or `dev_project/.plotris/agents/` during development). This data-driven approach allows for easy creation and modification of agents without changing code.
+Agents are defined as YAML files located in `.nexical/agents/` (or `dev_project/.nexical/agents/` during development). This data-driven approach allows for easy creation and modification of agents without changing code.
 
 ### Agent Profile Format (`.agent.yml`)
 
@@ -161,17 +161,17 @@ The `AgentRunner` supports dynamic variable interpolation in `prompt_template` a
 
 ### Adding a New Agent
 
-1.  Create a new `.agent.yml` file in `.plotris/agents/`.
+1.  Create a new `.agent.yml` file in `.nexical/agents/`.
 2.  Specify the `provider` (usually `cli`) and the `command` to run.
 3.  No TypeScript code changes are needed for standard CLI-based agents.
 
 ## Configuration
 
-Project configuration is managed in `.plotris/config.yml`.
+Project configuration is managed in `.nexical/config.yml`.
 
 ### Environment Variables
 
-Secrets are stored in `.plotris/.env` or `.env`:
+Secrets are stored in `.nexical/.env` or `.env`:
 
 ```env
 CLOUDFLARE_API_TOKEN=your_token

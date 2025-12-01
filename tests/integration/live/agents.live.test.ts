@@ -44,13 +44,13 @@ describe('Agents Live Integration Tests', () => {
 
         // We can get the profile using AgentRunner logic, or just manually load it for the test.
         // Let's manually load it to ensure we are testing what we think we are.
-        // const agentPath = path.join(testProjectRoot, '.plotris', 'agents', `${agentName.toLowerCase().replace('agent', '')}.agent.yml`);
+        // const agentPath = path.join(testProjectRoot, '.nexical', 'agents', `${agentName.toLowerCase().replace('agent', '')}.agent.yml`);
         // Wait, filenames are like 'developer.agent.yml'
         // agentName is 'DeveloperAgent'
 
         // Let's try to find the file.
         const shortName = agentName.replace('Agent', '').toLowerCase();
-        const possiblePath = path.join(testProjectRoot, '.plotris', 'agents', `${shortName}.agent.yml`);
+        const possiblePath = path.join(testProjectRoot, '.nexical', 'agents', `${shortName}.agent.yml`);
 
         if (!fs.existsSync(possiblePath)) {
             throw new Error(`Agent file not found at ${possiblePath}`);

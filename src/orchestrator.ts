@@ -41,18 +41,18 @@ export class Orchestrator {
         log(`Project path: ${this.config.projectPath}`);
 
         this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
-        this.config.plotrisPath = path.join(this.config.projectPath, '.plotris');
-        this.config.agentsPath = path.join(this.config.plotrisPath, 'agents')
-        this.config.historyPath = path.join(this.config.plotrisPath, 'history')
-        this.config.configPath = path.join(this.config.plotrisPath, 'config.yml');
+        this.config.nexicalPath = path.join(this.config.projectPath, '.nexical');
+        this.config.agentsPath = path.join(this.config.nexicalPath, 'agents')
+        this.config.historyPath = path.join(this.config.nexicalPath, 'history')
+        this.config.configPath = path.join(this.config.nexicalPath, 'config.yml');
 
-        // Load environment variables from .plotris/.env
-        const envPath = path.join(this.config.plotrisPath, '.env');
+        // Load environment variables from .nexical/.env
+        const envPath = path.join(this.config.nexicalPath, '.env');
         if (fs.existsSync(envPath)) {
             dotenv.config({ path: envPath, quiet: true });
             log(`Loaded environment variables from ${envPath}`);
         } else {
-            // Fallback to root .env if .plotris/.env doesn't exist (backward compatibility or initial setup)
+            // Fallback to root .env if .nexical/.env doesn't exist (backward compatibility or initial setup)
             dotenv.config({ path: path.join(this.config.projectPath, '.env'), quiet: true });
         }
 

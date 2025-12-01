@@ -11,11 +11,11 @@ describe('Configuration Loading Integration Tests', () => {
 
     beforeAll(async () => {
         originalCwd = process.cwd();
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'plotris-test-'));
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nexical-test-'));
 
         // Setup project structure
-        const plotrisDir = path.join(tempDir, '.plotris');
-        const agentsDir = path.join(plotrisDir, 'agents');
+        const nexicalDir = path.join(tempDir, '.nexical');
+        const agentsDir = path.join(nexicalDir, 'agents');
         await fs.ensureDir(agentsDir);
 
         // Create capabilities.yml
@@ -56,7 +56,7 @@ args: ["hello"]
         await orchestrator.init();
 
         expect(orchestrator.config.projectPath).toBe(tempDir);
-        expect(orchestrator.config.agentsPath).toBe(path.join(tempDir, '.plotris', 'agents'));
+        expect(orchestrator.config.agentsPath).toBe(path.join(tempDir, '.nexical', 'agents'));
     });
 
     it('should load capabilities.yml for the planner', async () => {

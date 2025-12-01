@@ -137,8 +137,8 @@ describe('AgentRunner', () => {
 
             await agentRunner.runAgent(task, 'user prompt');
 
-            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.plotris/personas/frontend.md');
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/personas/frontend.md');
+            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.nexical/personas/frontend.md');
+            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.nexical/personas/frontend.md');
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
                 expect.objectContaining({ name: 'test-agent' }),
@@ -165,7 +165,7 @@ describe('AgentRunner', () => {
 
             await agentRunner.runAgent(task, 'user prompt');
 
-            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.plotris/personas/missing-persona.md');
+            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.nexical/personas/missing-persona.md');
             expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Persona file not found'));
 
             consoleSpy.mockRestore();

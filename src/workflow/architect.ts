@@ -43,8 +43,8 @@ export class Architect {
             architectCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const architectureFile = '.plotris/architecture.md';
-        const personasDir = '.plotris/personas/';
+        const architectureFile = '.nexical/architecture.md';
+        const personasDir = '.nexical/personas/';
         const fullPrompt = this.architectPrompt
             .replace('{user_request}', prompt)
             .replace('{architecture_file}', architectureFile)

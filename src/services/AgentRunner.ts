@@ -71,7 +71,7 @@ export class AgentRunner {
 
         let userPromptWithPersona = userPrompt;
         if (task.persona) {
-            const personaFile = path.join(this.core.config.projectPath, '.plotris/personas', `${task.persona}.md`);
+            const personaFile = path.join(this.core.config.projectPath, '.nexical/personas', `${task.persona}.md`);
             if (this.core.disk.exists(personaFile)) {
                 const personaContent = this.core.disk.readFile(personaFile);
                 userPromptWithPersona = `

@@ -7,7 +7,7 @@ export class ConfigCommandPlugin extends BasePlugin implements CommandPlugin {
     description = 'Get or set configuration values. Usage: /config [key] [value]';
 
     async execute(args: string[]): Promise<void> {
-        const configPath = path.join(this.core.config.projectPath, '.plotris', 'config.yml');
+        const configPath = path.join(this.core.config.projectPath, '.nexical', 'config.yml');
 
         if (!this.core.disk.exists(configPath)) {
             console.error('Configuration file not found. Run /init first.');

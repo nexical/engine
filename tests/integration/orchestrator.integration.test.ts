@@ -26,11 +26,11 @@ describe('Orchestrator Integration Tests', () => {
 
     beforeAll(async () => {
         originalCwd = process.cwd();
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'plotris-orch-test-'));
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nexical-orch-test-'));
 
         // Setup project structure with a dummy agent
-        const plotrisDir = path.join(tempDir, '.plotris');
-        const agentsDir = path.join(plotrisDir, 'agents');
+        const nexicalDir = path.join(tempDir, '.nexical');
+        const agentsDir = path.join(nexicalDir, 'agents');
         await fs.ensureDir(agentsDir);
 
         const dummyAgentContent = `

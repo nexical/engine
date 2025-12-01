@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 export interface Application {
     appPath: string;
     projectPath: string;
-    plotrisPath: string;
+    nexicalPath: string;
     agentsPath: string;
     historyPath: string;
     configPath: string;

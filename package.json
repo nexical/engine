@@ -1,5 +1,5 @@
 {
-  "name": "plotris",
+  "name": "nexical",
   "version": "0.1.0",
   "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
   "scripts": {
@@ -10,7 +10,7 @@
     "cli": "npm run build && node dist/src/cli.js"
   },
   "bin": {
-    "plotris": "./dist/src/cli.js"
+    "nexical": "./dist/src/cli.js"
   },
   "keywords": [],
   "author": "Adrian Webb <adrian@cellebris.com>",

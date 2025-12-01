@@ -17,7 +17,7 @@ describe('CLI Entry Point Integration Tests', () => {
 
     it('should show help', async () => {
         const { stdout } = await execAsync(`node ${cliPath} --help`);
-        expect(stdout).toContain('Usage: plotris');
+        expect(stdout).toContain('Usage: nexical');
         expect(stdout).toContain('Options:');
     });
 

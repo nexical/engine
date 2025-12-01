@@ -53,9 +53,9 @@ export class InitCommandPlugin extends BasePlugin implements CommandPlugin {
             this.core.git.clone(repoUrl, directory);
         }
 
-        // Ensure .plotris directory and config files
-        const plotrisDir = path.join(targetPath, '.plotris');
-        const agentsDir = path.join(plotrisDir, 'agents');
+        // Ensure .nexical directory and config files
+        const nexicalDir = path.join(targetPath, '.nexical');
+        const agentsDir = path.join(nexicalDir, 'agents');
 
         await this.core.disk.ensureDir(agentsDir);
 
@@ -64,9 +64,9 @@ export class InitCommandPlugin extends BasePlugin implements CommandPlugin {
             await this.core.disk.writeFile(capabilitiesFile, '# Agent capabilities\n');
         }
 
-        const configFile = path.join(plotrisDir, 'config.yml');
+        const configFile = path.join(nexicalDir, 'config.yml');
         if (!this.core.disk.exists(configFile)) {
-            await this.core.disk.writeFile(configFile, '# Plotris configuration\nproject_name: ' + repo + '\n');
+            await this.core.disk.writeFile(configFile, '# Nexical configuration\nproject_name: ' + repo + '\n');
         }
 
         console.log(`Initialized project in ${directory} linked to ${repoIdentifier}`);

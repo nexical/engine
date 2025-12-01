@@ -13,7 +13,7 @@ export class GitHubCommandPlugin extends BasePlugin implements CommandPlugin {
 
         const org = args[0];
         const apiKey = args[1];
-        const envPath = path.join(this.core.config.projectPath, '.plotris', '.env');
+        const envPath = path.join(this.core.config.projectPath, '.nexical', '.env');
 
         let envContent = '';
         if (this.core.disk.exists(envPath)) {
