@@ -24,7 +24,8 @@ describe('AgentRunner', () => {
             disk: {
                 isDirectory: jest.fn().mockReturnValue(true),
                 listFiles: jest.fn().mockReturnValue(['test.agent.yml']),
-                readFile: jest.fn().mockReturnValue('name: test-agent\nprovider: test-provider')
+                readFile: jest.fn().mockReturnValue('name: test-agent\nprovider: test-provider'),
+                exists: jest.fn().mockReturnValue(true)
             },
             agentRegistry: {
                 get: jest.fn().mockReturnValue(mockPlugin),
@@ -112,6 +113,62 @@ describe('AgentRunner', () => {
                     params: { foo: 'bar' }
                 })
             );
+        });
+
+        it('should inject persona context if persona is assigned', async () => {
+            const task: Task = {
+                id: 'task-1',
+                description: 'Do something',
+                message: 'Running task',
+                agent: 'test-agent',
+                persona: 'frontend',
+                params: { foo: 'bar' }
+            };
+
+            mockOrchestrator.config.projectPath = '/project';
+            mockOrchestrator.disk.exists.mockImplementation((path: string) => {
+                if (path.endsWith('frontend.md')) return true;
+                return false;
+            });
+            mockOrchestrator.disk.readFile.mockImplementation((path: string) => {
+                if (path.endsWith('frontend.md')) return 'You are a frontend expert.';
+                return '';
+            });
+
+            await agentRunner.runAgent(task, 'user prompt');
+
+            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.plotris/personas/frontend.md');
+            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/personas/frontend.md');
+
+            expect(mockPlugin.execute).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'test-agent' }),
+                'Do something',
+                expect.objectContaining({
+                    userPrompt: expect.stringContaining('You are a frontend expert.')
+                })
+            );
+        });
+
+        it('should warn if persona file not found', async () => {
+            const task: Task = {
+                id: 'task-1',
+                description: 'Do something',
+                message: 'Running task',
+                agent: 'test-agent',
+                persona: 'missing-persona',
+                params: { foo: 'bar' }
+            };
+
+            mockOrchestrator.config.projectPath = '/project';
+            mockOrchestrator.disk.exists.mockReturnValue(false);
+            const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
+
+            await agentRunner.runAgent(task, 'user prompt');
+
+            expect(mockOrchestrator.disk.exists).toHaveBeenCalledWith('/project/.plotris/personas/missing-persona.md');
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Persona file not found'));
+
+            consoleSpy.mockRestore();
         });
 
         it('should throw if agent not found', async () => {

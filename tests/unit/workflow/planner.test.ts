@@ -33,7 +33,7 @@ describe('Planner', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('planner.md')) return 'template {user_prompt} {agent_capabilities} {plan_file} {architecture} {global_constraints}';
+                    if (path.endsWith('planner.md')) return 'template {user_prompt} {agent_capabilities} {plan_file} {architecture} {global_constraints} {personas_dir}';
                     if (path.endsWith('capabilities.yml')) return 'capabilities';
                     if (path.endsWith('plan.yml')) return 'tasks: []';
                     if (path.endsWith('architecture.md')) return 'architecture';
@@ -103,6 +103,7 @@ describe('Planner', () => {
             expect(params.prompt).toContain('architecture');
             expect(params.prompt).toContain('constraints');
             expect(params.prompt).toContain('.plotris/plan.yml');
+            expect(params.prompt).toContain('.plotris/personas/');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');

@@ -22,7 +22,7 @@ describe('Architect', () => {
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
-                    if (path.endsWith('architect.md')) return 'template {user_request} {architecture_file} {global_constraints}';
+                    if (path.endsWith('architect.md')) return 'template {user_request} {architecture_file} {global_constraints} {personas_dir}';
                     if (path.endsWith('AGENTS.md')) return 'constraints';
                     return '';
                 }),
@@ -86,6 +86,7 @@ describe('Architect', () => {
             const params = executeCall[2].params;
             expect(params.prompt).toContain('constraints');
             expect(params.prompt).toContain('.plotris/architecture.md');
+            expect(params.prompt).toContain('.plotris/personas/');
         });
 
         it('should handle missing AGENTS.md', async () => {
