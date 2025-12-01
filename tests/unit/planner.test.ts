@@ -96,7 +96,7 @@ describe('Planner', () => {
                 })
             );
 
-            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/history/plan.yml');
+            expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/.plotris/plan.yml');
             expect(mockPlanUtils.fromYaml).toHaveBeenCalledWith('tasks: []');
 
             // Verify history saving is called (generic check here, specific check in separate test)

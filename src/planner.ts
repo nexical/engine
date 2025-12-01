@@ -32,6 +32,22 @@ export class Planner {
         return "No agent capabilities file found.";
     }
 
+    private getArchitecture(): string {
+        const architecturePath = path.join(this.core.config.projectPath, '.plotris/architecture.md');
+        if (this.core.disk.exists(architecturePath)) {
+            return this.core.disk.readFile(architecturePath);
+        }
+        return "There is no architecture defined.";
+    }
+
+    private getGlobalConstraints(): string {
+        const agentsMdPath = path.join(this.core.config.projectPath, 'AGENTS.md');
+        if (this.core.disk.exists(agentsMdPath)) {
+            return this.core.disk.readFile(agentsMdPath);
+        }
+        return "There are no global constraints defined.";
+    }
+
     private savePlanToHistory(plan: Plan): void {
         const now = new Date();
         const year = now.getFullYear();
@@ -50,7 +66,10 @@ export class Planner {
     }
 
     async generatePlan(prompt: string): Promise<Plan> {
+        const architecture = this.getArchitecture();
+        const globalConstraints = this.getGlobalConstraints();
         const agentCapabilities = this.getAgentCapabilities();
+
         const plannerCliCommand = process.env.PLANNER_CLI_COMMAND || 'gemini';
         let plannerCliArgs: string[];
 
@@ -60,13 +79,13 @@ export class Planner {
             plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const planFile = '.plotris/history/plan.yml';
-        const planFileWithPrefix = `@${planFile}`;
-
+        const planFile = '.plotris/plan.yml';
         const fullPrompt = this.plannerPrompt
             .replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities)
-            .replace('{plan_file}', planFileWithPrefix);
+            .replace('{plan_file}', planFile)
+            .replace('{architecture}', architecture)
+            .replace('{global_constraints}', globalConstraints);
 
         const plannerAgent: Agent = {
             name: 'planner',
@@ -76,8 +95,6 @@ export class Planner {
         };
 
         try {
-            // Let's pass fullPrompt as 'prompt' in params.
-
             const plugin = this.core.agentRegistry.get('cli');
             if (!plugin) {
                 throw new Error("CLI plugin not found for planner.");
@@ -93,23 +110,8 @@ export class Planner {
 
             // Read the plan from the file
             const planContent = this.core.disk.readFile(path.join(this.core.config.projectPath, planFile));
+            const plan = PlanUtils.fromYaml(planContent);
 
-            // Parse the YAML
-            // Extract YAML block if wrapped in markdown
-            let yamlContent = planContent;
-            const yamlBlockMatch = planContent.match(/```yaml\n([\s\S]*?)\n```/) || planContent.match(/```\n([\s\S]*?)\n```/);
-
-            if (yamlBlockMatch) {
-                yamlContent = yamlBlockMatch[1];
-            } else {
-                // Try to find the start of the YAML object (plan_name:)
-                const yamlStart = planContent.indexOf('plan_name:');
-                if (yamlStart !== -1) {
-                    yamlContent = planContent.substring(yamlStart);
-                }
-            }
-
-            const plan = PlanUtils.fromYaml(yamlContent);
             this.savePlanToHistory(plan);
             return plan;
 
