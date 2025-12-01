@@ -69,9 +69,28 @@ export class AgentRunner {
             throw new Error("No agent plugin found for execution.");
         }
 
+        let userPromptWithPersona = userPrompt;
+        if (task.persona) {
+            const personaFile = path.join(this.core.config.projectPath, '.plotris/personas', `${task.persona}.md`);
+            if (this.core.disk.exists(personaFile)) {
+                const personaContent = this.core.disk.readFile(personaFile);
+                userPromptWithPersona = `
+${userPrompt}
+
+---
+**Persona Context:**
+
+${personaContent}
+---
+`;
+            } else {
+                console.warn(`Persona file not found: ${personaFile}`);
+            }
+        }
+
         try {
             await plugin.execute(profile, task.description, {
-                userPrompt: userPrompt,
+                userPrompt: userPromptWithPersona,
                 taskId: task.id,
                 params: task.params
             });

@@ -3,6 +3,7 @@ export interface Task {
     message: string;
     description: string;
     agent: string;
+    persona?: string;
     params?: Record<string, any>;
     dependencies?: string[];
 }

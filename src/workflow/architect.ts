@@ -44,10 +44,12 @@ export class Architect {
         }
 
         const architectureFile = '.plotris/architecture.md';
+        const personasDir = '.plotris/personas/';
         const fullPrompt = this.architectPrompt
             .replace('{user_request}', prompt)
             .replace('{architecture_file}', architectureFile)
-            .replace('{global_constraints}', globalConstraints);
+            .replace('{global_constraints}', globalConstraints)
+            .replace('{personas_dir}', personasDir);
 
         const architectAgent: Agent = {
             name: 'architect',

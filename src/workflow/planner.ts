@@ -80,12 +80,14 @@ export class Planner {
         }
 
         const planFile = '.plotris/plan.yml';
+        const personasDir = '.plotris/personas/';
         const fullPrompt = this.plannerPrompt
             .replace('{user_prompt}', prompt)
             .replace('{agent_capabilities}', agentCapabilities)
             .replace('{plan_file}', planFile)
             .replace('{architecture}', architecture)
-            .replace('{global_constraints}', globalConstraints);
+            .replace('{global_constraints}', globalConstraints)
+            .replace('{personas_dir}', personasDir);
 
         const plannerAgent: Agent = {
             name: 'planner',
