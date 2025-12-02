@@ -22,7 +22,16 @@ describe('ProjectUtils', () => {
             nexicalPath: '/project/.nexical',
             agentsPath: '/project/.nexical/agents',
             historyPath: '/project/.nexical/history',
-            configPath: '/project/.nexical/config.yml'
+            configPath: '/project/.nexical/config.yml',
+            statePath: '/project/.nexical/state.yml',
+            signalsPath: '/project/.nexical/signals',
+            archivePath: '/project/.nexical/archive',
+            logPath: '/project/log.md',
+            agentsDefinitionPath: '/project/AGENTS.md',
+            architecturePath: '/project/.nexical/architecture.md',
+            personasPath: '/project/.nexical/personas/',
+            planPath: '/project/.nexical/plan.yml',
+            capabilitiesPath: '/project/.nexical/agents/capabilities.yml'
         };
         mockFs.existsSync.mockReset();
         mockFs.readFileSync.mockReset();

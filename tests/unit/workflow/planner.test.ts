@@ -28,7 +28,12 @@ describe('Planner', () => {
                 projectPath: '/project',
                 appPath: '/app',
                 agentsPath: '/agents',
-                historyPath: '/history'
+                historyPath: '/history',
+                agentsDefinitionPath: '/project/AGENTS.md',
+                architecturePath: '/project/.nexical/architecture.md',
+                personasPath: '/project/.nexical/personas/',
+                planPath: '/project/.nexical/plan.yml',
+                capabilitiesPath: '/agents/capabilities.yml'
             },
             disk: {
                 exists: jest.fn().mockReturnValue(true),
@@ -74,10 +79,12 @@ describe('Planner', () => {
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('planner.md', {
                 user_prompt: 'user prompt',
                 agent_capabilities: 'capabilities',
-                plan_file: '.nexical/plan.yml',
+                plan_file: '/project/.nexical/plan.yml',
                 architecture: 'architecture',
                 global_constraints: 'constraints',
-                personas_dir: '.nexical/personas/'
+                personas_dir: '/project/.nexical/personas/',
+                active_signal: 'None',
+                completed_tasks: 'None'
             });
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
@@ -125,7 +132,9 @@ describe('Planner', () => {
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('planner.md', expect.objectContaining({
                 agent_capabilities: "No agent capabilities file found.",
                 architecture: "There is no architecture defined.",
-                global_constraints: "There are no global constraints defined."
+                global_constraints: "There are no global constraints defined.",
+                active_signal: 'None',
+                completed_tasks: 'None'
             }));
         });
 
@@ -212,6 +221,23 @@ describe('Planner', () => {
             expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
 
             jest.useRealTimers();
+        });
+
+        it('should include active signal and completed tasks in prompt', async () => {
+            const activeSignal = {
+                type: 'REPLAN' as const,
+                source: 'agent',
+                reason: 'error',
+                timestamp: 'now'
+            };
+            const completedTasks = ['task-1', 'task-2'];
+
+            await planner.generatePlan('user prompt', activeSignal, completedTasks);
+
+            expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('planner.md', expect.objectContaining({
+                active_signal: expect.stringContaining('REPLAN'),
+                completed_tasks: expect.stringContaining('task-1')
+            }));
         });
     });
 });

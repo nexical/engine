@@ -17,12 +17,17 @@ describe('Architect', () => {
             config: {
                 projectPath: '/project',
                 appPath: '/app',
-                agentsPath: '/agents'
+                agentsPath: '/agents',
+                agentsDefinitionPath: '/project/AGENTS.md',
+                architecturePath: '/project/.nexical/architecture.md',
+                personasPath: '/project/.nexical/personas/',
+                logPath: '/project/log.md'
             },
             disk: {
                 exists: jest.fn().mockReturnValue(true),
                 readFile: jest.fn<any>().mockImplementation((path: any) => {
                     if (path.endsWith('AGENTS.md')) return 'constraints';
+                    if (path.endsWith('log.md')) return 'evolution log';
                     return '';
                 }),
                 writeFile: jest.fn()
@@ -56,9 +61,10 @@ describe('Architect', () => {
 
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('architect.md', {
                 user_request: 'user prompt',
-                architecture_file: '.nexical/architecture.md',
+                architecture_file: '/project/.nexical/architecture.md',
                 global_constraints: 'constraints',
-                personas_dir: '.nexical/personas/'
+                personas_dir: '/project/.nexical/personas/',
+                evolution_log: 'evolution log'
             });
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
@@ -90,7 +96,8 @@ describe('Architect', () => {
             expect(mockPlugin.execute).toHaveBeenCalled();
 
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('architect.md', expect.objectContaining({
-                global_constraints: "There are no global constraints defined."
+                global_constraints: "There are no global constraints defined.",
+                evolution_log: "No historical failures recorded."
             }));
         });
 
