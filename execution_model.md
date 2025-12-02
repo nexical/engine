@@ -36,7 +36,7 @@ The system is composed of four main components managed by the `Orchestrator` cla
 
 ### 1. The Orchestrator (`src/orchestrator.ts`)
 The brain of the operation. It:
-- Manages the `state.yml` file.
+- Manages the `state.yml` file using **Atomic Writes** to prevent corruption.
 - Transitions between states (Architecting -> Planning -> Executing).
 - Monitors for Signals.
 - Handles interruptions and resumption.
@@ -49,16 +49,17 @@ Responsible for high-level design.
 
 ### 3. The Planner (`src/workflow/planner.ts`)
 Responsible for tactical execution steps.
-- **Input**: Architecture, agent capabilities, active signals, completed tasks.
+- **Input**: Architecture, agent capabilities, active signals, completed tasks, and the **Evolution Log**.
 - **Output**: `plan.yml`.
-- **Role**: Breaks the architecture into a dependency graph of `Task`s. It assigns each task to a specific Agent.
+- **Role**: Breaks the architecture into a dependency graph of `Task`s. It assigns each task to a specific Agent. The Evolution Log provides historical context to prevent repetitive failures.
 
 ### 4. The Executor (`src/workflow/executor.ts`)
 Responsible for getting things done.
 - **Input**: `plan.yml`.
 - **Action**: Executes tasks in topological order (respecting dependencies). Parallelizes independent tasks.
 - **Mechanism**: Uses `AgentRunner` to invoke the assigned agent for each task.
-- **Signal Check**: After every task, it checks for new signals.
+- **Resumption**: Skips tasks that are already marked as completed in the state. Relies on **Strict Task IDs** for deterministic tracking.
+- **Signal Check**: After every task, it checks for new signals. It prioritizes `REARCHITECT` signals over `REPLAN` signals to ensure critical issues are addressed first.
 
 ---
 
