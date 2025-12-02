@@ -10,15 +10,24 @@ export class Architect {
     constructor(private core: Orchestrator) { }
 
     private getGlobalConstraints(): string {
-        const agentsMdPath = path.join(this.core.config.projectPath, 'AGENTS.md');
+        const agentsMdPath = this.core.config.agentsDefinitionPath;
         if (this.core.disk.exists(agentsMdPath)) {
             return this.core.disk.readFile(agentsMdPath);
         }
         return "There are no global constraints defined.";
     }
 
+    private getEvolutionLog(): string {
+        const logPath = this.core.config.logPath;
+        if (this.core.disk.exists(logPath)) {
+            return this.core.disk.readFile(logPath);
+        }
+        return "No historical failures recorded.";
+    }
+
     async generateArchitecture(prompt: string): Promise<void> {
         const globalConstraints = this.getGlobalConstraints();
+        const evolutionLog = this.getEvolutionLog();
 
         const architectCliCommand = process.env.ARCHITECT_CLI_COMMAND || 'gemini';
         let architectCliArgs: string[];
@@ -29,14 +38,15 @@ export class Architect {
             architectCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const architectureFile = '.nexical/architecture.md';
-        const personasDir = '.nexical/personas/';
+        const architectureFile = this.core.config.architecturePath;
+        const personasDir = this.core.config.personasPath;
 
         const fullPrompt = this.core.promptEngine.render('architect.md', {
             user_request: prompt,
             architecture_file: architectureFile,
             global_constraints: globalConstraints,
-            personas_dir: personasDir
+            personas_dir: personasDir,
+            evolution_log: evolutionLog
         });
 
         const architectAgent: Agent = {

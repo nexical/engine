@@ -8,6 +8,15 @@ export interface Application {
     agentsPath: string;
     historyPath: string;
     configPath: string;
+    statePath: string;
+    signalsPath: string;
+    archivePath: string;
+    logPath: string;
+    agentsDefinitionPath: string;
+    architecturePath: string;
+    personasPath: string;
+    planPath: string;
+    capabilitiesPath: string;
 }
 
 export interface Project {

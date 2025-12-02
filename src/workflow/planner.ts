@@ -4,6 +4,7 @@ import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
 import { Plan, PlanUtils } from '../models/Plan.js';
 import { Agent } from '../models/Agent.js';
+import { Signal } from '../models/State.js';
 
 const log = debug('planner');
 
@@ -11,7 +12,7 @@ export class Planner {
     constructor(private core: Orchestrator) { }
 
     private getAgentCapabilities(): string {
-        const capabilitiesPath = path.join(this.core.config.agentsPath, 'capabilities.yml');
+        const capabilitiesPath = this.core.config.capabilitiesPath;
         if (this.core.disk.exists(capabilitiesPath)) {
             return this.core.disk.readFile(capabilitiesPath);
         }
@@ -19,7 +20,7 @@ export class Planner {
     }
 
     private getArchitecture(): string {
-        const architecturePath = path.join(this.core.config.projectPath, '.nexical/architecture.md');
+        const architecturePath = this.core.config.architecturePath;
         if (this.core.disk.exists(architecturePath)) {
             return this.core.disk.readFile(architecturePath);
         }
@@ -27,7 +28,7 @@ export class Planner {
     }
 
     private getGlobalConstraints(): string {
-        const agentsMdPath = path.join(this.core.config.projectPath, 'AGENTS.md');
+        const agentsMdPath = this.core.config.agentsDefinitionPath;
         if (this.core.disk.exists(agentsMdPath)) {
             return this.core.disk.readFile(agentsMdPath);
         }
@@ -51,10 +52,27 @@ export class Planner {
         log(`Saved plan history to: ${filePath}`);
     }
 
-    async generatePlan(prompt: string): Promise<Plan> {
+    async generatePlan(prompt: string, activeSignal?: Signal, completedTasks: string[] = []): Promise<Plan> {
         const architecture = this.getArchitecture();
         const globalConstraints = this.getGlobalConstraints();
         const agentCapabilities = this.getAgentCapabilities();
+
+        let activeSignalText = "None";
+        if (activeSignal) {
+            activeSignalText = `
+**Type:** ${activeSignal.type}
+**Source:** ${activeSignal.source}
+**Timestamp:** ${activeSignal.timestamp}
+
+**Reason/Context:**
+${activeSignal.reason}
+`;
+        }
+
+        let completedTasksText = "None";
+        if (completedTasks && completedTasks.length > 0) {
+            completedTasksText = completedTasks.map(t => `- ${t}`).join('\n');
+        }
 
         const plannerCliCommand = process.env.PLANNER_CLI_COMMAND || 'gemini';
         let plannerCliArgs: string[];
@@ -65,8 +83,8 @@ export class Planner {
             plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
         }
 
-        const planFile = '.nexical/plan.yml';
-        const personasDir = '.nexical/personas/';
+        const planFile = this.core.config.planPath;
+        const personasDir = this.core.config.personasPath;
 
         const fullPrompt = this.core.promptEngine.render('planner.md', {
             user_prompt: prompt,
@@ -74,7 +92,9 @@ export class Planner {
             plan_file: planFile,
             architecture: architecture,
             global_constraints: globalConstraints,
-            personas_dir: personasDir
+            personas_dir: personasDir,
+            active_signal: activeSignalText,
+            completed_tasks: completedTasksText
         });
 
         const plannerAgent: Agent = {
@@ -99,7 +119,7 @@ export class Planner {
             });
 
             // Read the plan from the file
-            const planContent = this.core.disk.readFile(path.join(this.core.config.projectPath, planFile));
+            const planContent = this.core.disk.readFile(this.core.config.planPath);
             const plan = PlanUtils.fromYaml(planContent);
 
             this.savePlanToHistory(plan);

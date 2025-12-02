@@ -24,6 +24,24 @@ export class FileSystemService {
         }
     }
 
+    appendFile(filePath: string, content: string): void {
+        try {
+            fs.ensureDirSync(path.dirname(filePath));
+            fs.appendFileSync(filePath, content, 'utf-8');
+        } catch (error) {
+            console.error(`Error appending to file ${filePath}:`, error);
+        }
+    }
+
+    move(source: string, destination: string, options?: { overwrite?: boolean }): void {
+        try {
+            fs.ensureDirSync(path.dirname(destination));
+            fs.moveSync(source, destination, options);
+        } catch (error) {
+            console.error(`Error moving file from ${source} to ${destination}:`, error);
+        }
+    }
+
     ensureDir(dirPath: string): void {
         try {
             fs.ensureDirSync(dirPath);

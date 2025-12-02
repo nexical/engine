@@ -16,6 +16,12 @@ Your goal is to design the SOLUTION ARCHITECTURE that other agents will develop.
 {{ global_constraints }}
 ---
 
+### Historical Constraints (Evolution Log)
+This log tracks previous strategic failures. You MUST NOT repeat mistakes listed here.
+---
+{{ evolution_log }}
+---
+
 **Existing Team:**
 
 ---
