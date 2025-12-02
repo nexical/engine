@@ -33,7 +33,8 @@ describe('Planner', () => {
                 architecturePath: '/project/.nexical/architecture.md',
                 personasPath: '/project/.nexical/personas/',
                 planPath: '/project/.nexical/plan.yml',
-                capabilitiesPath: '/agents/capabilities.yml'
+                capabilitiesPath: '/agents/capabilities.yml',
+                logPath: '/project/log.md'
             },
             disk: {
                 exists: jest.fn().mockReturnValue(true),
@@ -42,9 +43,11 @@ describe('Planner', () => {
                     if (path.endsWith('plan.yml')) return 'tasks: []';
                     if (path.endsWith('architecture.md')) return 'architecture';
                     if (path.endsWith('AGENTS.md')) return 'constraints';
+                    if (path.endsWith('log.md')) return 'evolution log';
                     return '';
                 }),
-                writeFile: jest.fn()
+                writeFile: jest.fn(),
+                writeFileAtomic: jest.fn()
             },
             agentRegistry: {
                 get: jest.fn<any>().mockImplementation((name: any) => {
@@ -84,7 +87,8 @@ describe('Planner', () => {
                 global_constraints: 'constraints',
                 personas_dir: '/project/.nexical/personas/',
                 active_signal: 'None',
-                completed_tasks: 'None'
+                completed_tasks: 'None',
+                evolution_log: 'evolution log'
             });
 
             expect(mockPlugin.execute).toHaveBeenCalledWith(
@@ -107,7 +111,7 @@ describe('Planner', () => {
 
             // Verify history saving is called (generic check here, specific check in separate test)
             expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
-            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalled();
+            expect(mockOrchestrator.disk.writeFileAtomic).toHaveBeenCalled();
 
             expect(plan).toEqual({ tasks: [] });
         });
@@ -217,7 +221,7 @@ describe('Planner', () => {
             const expectedFilename = 'plan-2023-01-01.12-00-00.yml';
             const expectedPath = '/history/' + expectedFilename;
 
-            expect(mockOrchestrator.disk.writeFile).toHaveBeenCalledWith(expectedPath, 'yaml content');
+            expect(mockOrchestrator.disk.writeFileAtomic).toHaveBeenCalledWith(expectedPath, 'yaml content');
             expect(mockPlanUtils.toYaml).toHaveBeenCalledWith({ tasks: [] });
 
             jest.useRealTimers();

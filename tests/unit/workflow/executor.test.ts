@@ -95,7 +95,7 @@ describe('Executor', () => {
         expect(mockAgentRunner.runAgent).toHaveBeenCalledTimes(3);
     });
 
-    it('should assign temporary IDs to tasks without IDs', async () => {
+    it('should throw error if task has no ID', async () => {
         const plan = {
             plan_name: 'Test Plan',
             tasks: [
@@ -103,12 +103,7 @@ describe('Executor', () => {
             ]
         };
 
-        await executor.executePlan(plan as any, 'prompt');
-
-        expect(mockAgentRunner.runAgent).toHaveBeenCalled();
-        const taskArg = mockAgentRunner.runAgent.mock.calls[0][0] as any;
-        expect(taskArg.id).toBeDefined();
-        expect(taskArg.id).toMatch(/^temp-/);
+        await expect(executor.executePlan(plan as any, 'prompt')).rejects.toThrow('Task missing ID: Doing task 1. All tasks must have a unique ID.');
     });
 
     it('should throw if dependency not found', async () => {
@@ -228,5 +223,97 @@ describe('Executor', () => {
         mockFs.readdirSync.mockReturnValue([]);
 
         await expect(executor.executePlan(plan, 'prompt')).resolves.not.toThrow();
+    });
+
+    it('should skip completed tasks during resumption', async () => {
+        const plan = {
+            plan_name: 'Resumption Plan',
+            tasks: [
+                { id: 'task-1', description: 'Task 1', message: 'Doing task 1', agent: 'agent-1' },
+                { id: 'task-2', description: 'Task 2', message: 'Doing task 2', agent: 'agent-1', dependencies: ['task-1'] }
+            ]
+        };
+
+        const completedTasks = ['task-1'];
+        await executor.executePlan(plan, 'prompt', completedTasks);
+
+        expect(mockAgentRunner.runAgent).toHaveBeenCalledTimes(1);
+        expect(mockAgentRunner.runAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-2' }), 'prompt');
+    });
+
+    it('should prioritize REARCHITECT signal over REPLAN', async () => {
+        const plan = {
+            plan_name: 'Test Plan',
+            tasks: [
+                { id: 'task-1', description: 'Task 1', message: 'Doing task 1', agent: 'agent-1' }
+            ]
+        };
+
+        // Mock signal files
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readdirSync.mockReturnValue(['REPLAN_1.md', 'REARCHITECT_1.md']);
+        mockFs.readFileSync.mockImplementation((path: any) => {
+            if (path.includes('REARCHITECT')) return 'Reason: bad architecture';
+            return 'Reason: replan';
+        });
+
+        await expect(executor.executePlan(plan, 'prompt')).rejects.toThrow(SignalDetectedError);
+
+        try {
+            await executor.executePlan(plan, 'prompt');
+        } catch (e) {
+            if (e instanceof SignalDetectedError) {
+                expect(e.signal.type).toBe('REARCHITECT');
+            }
+        }
+    });
+
+    it('should sort signals of same type by name (timestamp)', async () => {
+        const plan = {
+            plan_name: 'Test Plan',
+            tasks: [
+                { id: 'task-1', description: 'Task 1', message: 'Doing task 1', agent: 'agent-1' }
+            ]
+        };
+
+        // Mock signal files
+        mockFs.existsSync.mockReturnValue(true);
+        mockFs.readdirSync.mockReturnValue(['REPLAN_2023-01-02.md', 'REPLAN_2023-01-01.md']);
+        mockFs.readFileSync.mockReturnValue('Reason: replan');
+
+        await expect(executor.executePlan(plan, 'prompt')).rejects.toThrow(SignalDetectedError);
+
+        try {
+            await executor.executePlan(plan, 'prompt');
+        } catch (e) {
+            if (e instanceof SignalDetectedError) {
+                expect(e.signal.source).toBe('REPLAN_2023-01-01.md'); // Oldest first
+            }
+        }
+    });
+
+    it('should skip task if marked completed by dependency execution', async () => {
+        const plan = {
+            plan_name: 'Dependency Completion Plan',
+            tasks: [
+                { id: 'task-A', description: 'Task A', message: 'Doing task A', agent: 'agent-1', dependencies: ['task-B'] },
+                { id: 'task-B', description: 'Task B', message: 'Doing task B', agent: 'agent-1' }
+            ]
+        };
+
+        const completedTasks: string[] = [];
+
+        // Mock execution
+        (mockAgentRunner.runAgent as any).mockImplementation(async (task: any) => {
+            if (task.id === 'task-B') {
+                // Simulate side effect where task-A becomes completed
+                completedTasks.push('task-A');
+            }
+        });
+
+        await executor.executePlan(plan, 'prompt', completedTasks);
+
+        expect(mockAgentRunner.runAgent).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-B' }), 'prompt');
+        expect(mockAgentRunner.runAgent).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'task-A' }), 'prompt');
     });
 });

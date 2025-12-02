@@ -35,6 +35,14 @@ export class Planner {
         return "There are no global constraints defined.";
     }
 
+    private getEvolutionLog(): string {
+        const logPath = this.core.config.logPath;
+        if (this.core.disk.exists(logPath)) {
+            return this.core.disk.readFile(logPath);
+        }
+        return "No historical failures recorded.";
+    }
+
     private savePlanToHistory(plan: Plan): void {
         const now = new Date();
         const year = now.getFullYear();
@@ -48,7 +56,7 @@ export class Planner {
         const filePath = path.join(this.core.config.historyPath, filename);
 
         const yamlContent = PlanUtils.toYaml(plan);
-        this.core.disk.writeFile(filePath, yamlContent);
+        this.core.disk.writeFileAtomic(filePath, yamlContent);
         log(`Saved plan history to: ${filePath}`);
     }
 
@@ -56,6 +64,7 @@ export class Planner {
         const architecture = this.getArchitecture();
         const globalConstraints = this.getGlobalConstraints();
         const agentCapabilities = this.getAgentCapabilities();
+        const evolutionLog = this.getEvolutionLog();
 
         let activeSignalText = "None";
         if (activeSignal) {
@@ -94,7 +103,8 @@ ${activeSignal.reason}
             global_constraints: globalConstraints,
             personas_dir: personasDir,
             active_signal: activeSignalText,
-            completed_tasks: completedTasksText
+            completed_tasks: completedTasksText,
+            evolution_log: evolutionLog
         });
 
         const plannerAgent: Agent = {

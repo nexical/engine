@@ -18,6 +18,12 @@ The following tasks have already been successfully completed. Do NOT include the
 {{ completed_tasks }}
 ---
 
+### Evolution Log (History of Failures/Changes)
+This log contains the history of signals and reasons for previous replans. Use this to avoid repeating past mistakes.
+---
+{{ evolution_log }}
+---
+
 **Available Agents:**
 The following agents are available to execute tasks. Each agent has a specific purpose and may have dependencies on other agents.
 

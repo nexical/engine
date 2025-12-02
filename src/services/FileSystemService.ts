@@ -13,11 +13,11 @@ export class FileSystemService {
 
     writeFile(filePath: string, content: string | Buffer): void {
         try {
-            fs.ensureDirSync(path.dirname(filePath));
-            if (Buffer.isBuffer(content)) {
-                fs.writeFileSync(filePath, content);
-            } else {
+            this.ensureDir(path.dirname(filePath));
+            if (typeof content === 'string') {
                 fs.writeFileSync(filePath, content, 'utf-8');
+            } else {
+                fs.writeFileSync(filePath, content);
             }
         } catch (error) {
             console.error(`Error writing file ${filePath}:`, error);
@@ -67,6 +67,25 @@ export class FileSystemService {
             return fs.readdirSync(dirPath);
         } catch {
             return [];
+        }
+    }
+
+    writeFileAtomic(filePath: string, content: string): void {
+        const tempPath = `${filePath}.tmp.${Math.random().toString(36).substring(7)}`;
+        try {
+            this.writeFile(tempPath, content);
+            fs.renameSync(tempPath, filePath);
+        } catch (error) {
+            console.error(`Error writing atomic file ${filePath}:`, error);
+            // Try to clean up temp file
+            if (this.exists(tempPath)) {
+                try {
+                    fs.unlinkSync(tempPath);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+            throw error;
         }
     }
 }

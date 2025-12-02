@@ -31,6 +31,7 @@ const mockFileSystemService = {
     exists: jest.fn(),
     isDirectory: jest.fn(),
     listFiles: jest.fn(),
+    writeFileAtomic: jest.fn(),
 };
 const MockFileSystemServiceConstructor = jest.fn(() => {
     console.log('MockFileSystemServiceConstructor called');
@@ -98,7 +99,7 @@ describe('Orchestrator Loop', () => {
         expect(mockArchitectInstance.generateArchitecture).toHaveBeenCalled();
         expect(mockPlannerInstance.generatePlan).toHaveBeenCalled();
         expect(mockExecutorInstance.executePlan).toHaveBeenCalled();
-        expect(mockFileSystemService.writeFile).toHaveBeenCalled(); // State updates
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalled(); // State updates
     });
 
     it('should handle REPLAN signal', async () => {
@@ -164,7 +165,7 @@ describe('Orchestrator Loop', () => {
 
         await orchestrator.runAIWorkflow('test prompt');
 
-        expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('status: FAILED')
         );
@@ -194,7 +195,7 @@ describe('Orchestrator Loop', () => {
         await orchestrator.runAIWorkflow('test prompt');
 
         // Should not reset to ARCHITECTING
-        expect(mockFileSystemService.writeFile).not.toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).not.toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('status: ARCHITECTING')
         );
@@ -218,7 +219,7 @@ describe('Orchestrator Loop', () => {
         await orchestrator.runAIWorkflow('test prompt');
 
         // Should have cleared completed tasks (verified by state save)
-        expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('completed: []')
         );
@@ -229,11 +230,11 @@ describe('Orchestrator Loop', () => {
 
         await expect(orchestrator.runAIWorkflow('test prompt')).resolves.not.toThrow(); // It catches and logs
 
-        expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('status: FAILED')
         );
-        expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('status: FAILED')
         );
@@ -250,7 +251,7 @@ describe('Orchestrator Loop', () => {
 
         await orchestrator.runAIWorkflow('test prompt');
 
-        expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+        expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
             expect.stringContaining('state.yml'),
             expect.stringContaining('status: INTERRUPTED')
         );

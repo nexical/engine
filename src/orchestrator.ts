@@ -117,7 +117,7 @@ export class Orchestrator {
 
     private saveState(): void {
         const content = yaml.dump(this.state);
-        this.disk.writeFile(this.config.statePath, content);
+        this.disk.writeFileAtomic(this.config.statePath, content);
     }
 
     private appendEvolutionLog(signal: Signal): void {
@@ -220,7 +220,7 @@ export class Orchestrator {
                         const planContent = this.disk.readFile(planPath);
                         const plan = yaml.load(planContent) as any; // Cast to any or Plan interface if available
 
-                        await this.executor.executePlan(plan, prompt);
+                        await this.executor.executePlan(plan, prompt, this.state.tasks.completed);
 
                         // If execution finishes without error, we are done
                         this.state.status = 'COMPLETED';

@@ -10,6 +10,8 @@ const mockFs = {
     existsSync: jest.fn(),
     statSync: jest.fn(),
     readdirSync: jest.fn(),
+    renameSync: jest.fn(),
+    unlinkSync: jest.fn(),
 };
 
 jest.unstable_mockModule('fs-extra', () => ({ default: mockFs }));
@@ -19,6 +21,7 @@ describe('FileSystemService', () => {
 
     beforeEach(async () => {
         jest.resetModules();
+        jest.clearAllMocks();
         const { FileSystemService } = await import('../../../src/services/FileSystemService.js');
         fileSystem = new FileSystemService();
     });
@@ -139,4 +142,48 @@ describe('FileSystemService', () => {
             expect(fileSystem.listFiles('dir')).toEqual([]);
         });
     });
+
+    describe('writeFileAtomic', () => {
+        it('should write file atomically', () => {
+            fileSystem.writeFileAtomic('test.txt', 'content');
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('test.txt.tmp'), 'content', 'utf-8');
+            expect(mockFs.renameSync).toHaveBeenCalledWith(expect.stringContaining('test.txt.tmp'), 'test.txt');
+        });
+
+        it('should cleanup temp file on error', () => {
+            mockFs.renameSync.mockImplementation(() => { throw new Error('rename error'); });
+            mockFs.existsSync.mockReturnValue(true);
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+            expect(() => fileSystem.writeFileAtomic('test.txt', 'content')).toThrow('rename error');
+
+            expect(mockFs.unlinkSync).toHaveBeenCalledWith(expect.stringContaining('test.txt.tmp'));
+            expect(consoleSpy).toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('should handle cleanup error', () => {
+            mockFs.renameSync.mockImplementation(() => { throw new Error('rename error'); });
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.unlinkSync.mockImplementation(() => { throw new Error('unlink error'); });
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+            expect(() => fileSystem.writeFileAtomic('test.txt', 'content')).toThrow('rename error');
+
+            expect(mockFs.unlinkSync).toHaveBeenCalled();
+            // Should still throw the original error
+            consoleSpy.mockRestore();
+        });
+        it('should skip cleanup if temp file does not exist', () => {
+            mockFs.renameSync.mockImplementation(() => { throw new Error('rename error'); });
+            mockFs.existsSync.mockReturnValue(false);
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+            expect(() => fileSystem.writeFileAtomic('test.txt', 'content')).toThrow('rename error');
+
+            expect(mockFs.unlinkSync).not.toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+    });
 });
+

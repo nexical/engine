@@ -32,6 +32,7 @@ const mockFileSystemService = {
     exists: jest.fn(),
     isDirectory: jest.fn(),
     listFiles: jest.fn(),
+    writeFileAtomic: jest.fn(),
 };
 const MockFileSystemServiceConstructor = jest.fn(() => mockFileSystemService);
 
@@ -153,7 +154,7 @@ describe('Orchestrator', () => {
 
             expect(mockArchitectInstance.generateArchitecture).toHaveBeenCalledWith('prompt');
             expect(mockPlannerInstance.generatePlan).toHaveBeenCalledWith('prompt', undefined, []);
-            expect(mockExecutorInstance.executePlan).toHaveBeenCalledWith(plan, 'prompt');
+            expect(mockExecutorInstance.executePlan).toHaveBeenCalledWith(plan, 'prompt', []);
         });
 
         it('should handle errors', async () => {
@@ -177,7 +178,7 @@ describe('Orchestrator', () => {
             await orchestrator.runAIWorkflow('prompt');
 
             // Verify initial state save
-            expect(mockFileSystemService.writeFile).toHaveBeenCalledWith(
+            expect(mockFileSystemService.writeFileAtomic).toHaveBeenCalledWith(
                 expect.stringContaining('state.yml'),
                 expect.stringContaining('status: ARCHITECTING')
             );
