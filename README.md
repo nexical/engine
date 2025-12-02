@@ -8,10 +8,10 @@ The application follows a modular architecture centered around an **Orchestrator
 
 ### Core Components
 
-- **Orchestrator** (`src/orchestrator.ts`): The central controller. It implements a **State Machine Loop** (`ARCHITECTING` -> `PLANNING` -> `EXECUTING`) to manage the lifecycle of a request. It handles state persistence, signal processing, and error recovery.
+- **Orchestrator** (`src/orchestrator.ts`): The central controller. It implements a **State Machine Loop** (`ARCHITECTING` -> `PLANNING` -> `EXECUTING`) to manage the lifecycle of a request. It handles state persistence using **Atomic Writes**, signal processing, and error recovery.
 - **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.nexical/architecture.md`) and defines the required team personas (`.nexical/personas/*.md`).
-- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task. It supports **Delta Planning**, allowing it to update plans based on new signals or completed tasks.
-- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution. It actively monitors for **Signals** (interrupts) from agents.
+- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture, personas, and an **Evolution Log** (history of failures/signals) to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task. It supports **Delta Planning**, allowing it to update plans based on new signals or completed tasks.
+- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution. It actively monitors for **Signals** (interrupts) from agents and supports **Resumption** by skipping completed tasks (enforced by strict Task IDs).
 - **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for executing agents. It injects the specific **Persona** context into the agent's prompt during execution, ensuring the agent adopts the correct role, tone, and standards.
 - **PromptEngine** (`src/services/PromptEngine.ts`): A centralized template engine using **Nunjucks**. It manages all system prompts, allowing for project-level overrides and dynamic context injection.
 
@@ -61,7 +61,7 @@ The Orchestrator implements a robust **Signal System** to handle dynamic changes
 - **REPLAN**: Indicates that the current plan is insufficient or blocked. The Orchestrator pauses execution and triggers the **Planner** to generate a delta plan.
 - **REARCHITECT**: Indicates a fundamental flaw in the design. The Orchestrator pauses execution and triggers the **Architect** to revise the architecture. If the `invalidates_previous_work` flag is set, completed tasks are discarded.
 
-Signals are detected by the **Executor** and bubbled up to the **Orchestrator** loop.
+Signals are detected by the **Executor** and bubbled up to the **Orchestrator** loop. The system prioritizes `REARCHITECT` signals over `REPLAN` signals, and processes them in chronological order to ensure the most critical issues are addressed first.
 
 ### State Management
 
