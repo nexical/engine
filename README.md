@@ -8,11 +8,12 @@ The application follows a modular architecture centered around an **Orchestrator
 
 ### Core Components
 
-- **Orchestrator** (`src/orchestrator.ts`): The central controller. It initializes the application, loads plugins, and routes execution.
+- **Orchestrator** (`src/orchestrator.ts`): The central controller. It implements a **State Machine Loop** (`ARCHITECTING` -> `PLANNING` -> `EXECUTING`) to manage the lifecycle of a request. It handles state persistence, signal processing, and error recovery.
 - **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.nexical/architecture.md`) and defines the required team personas (`.nexical/personas/*.md`).
-- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task.
-- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution.
+- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture and personas defined by the Architect to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task. It supports **Delta Planning**, allowing it to update plans based on new signals or completed tasks.
+- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution. It actively monitors for **Signals** (interrupts) from agents.
 - **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for executing agents. It injects the specific **Persona** context into the agent's prompt during execution, ensuring the agent adopts the correct role, tone, and standards.
+- **PromptEngine** (`src/services/PromptEngine.ts`): A centralized template engine using **Nunjucks**. It manages all system prompts, allowing for project-level overrides and dynamic context injection.
 
 ### Services
 
@@ -53,12 +54,31 @@ The system uses a multi-stage workflow to ensure high-quality output:
 2.  **Planning Phase**: The **Planner** reads the architecture and available personas. It creates a plan where each task is explicitly assigned a `persona`.
 3.  **Execution Phase**: The **Executor** runs the tasks. When the **AgentRunner** executes a task, it reads the assigned persona file and injects it into the agent's context. This ensures that a generic "Coder" agent acts as a "Senior Frontend Engineer" when working on UI tasks, adhering to the specific standards defined for that role.
 
-### Task Execution Model
+### Signal System
 
-The **Executor** implements a **Directed Acyclic Graph (DAG)** execution model:
-- **Parallel Execution**: Tasks with no shared dependencies are executed concurrently.
-- **Sequential Execution**: Tasks wait for their dependencies to complete.
-- **Plan Structure**: Plans are YAML-based, where each task has an `id`, a `persona`, and a list of `dependencies`.
+The Orchestrator implements a robust **Signal System** to handle dynamic changes and interruptions during execution. Agents can emit signals to request changes to the plan or architecture.
+
+- **REPLAN**: Indicates that the current plan is insufficient or blocked. The Orchestrator pauses execution and triggers the **Planner** to generate a delta plan.
+- **REARCHITECT**: Indicates a fundamental flaw in the design. The Orchestrator pauses execution and triggers the **Architect** to revise the architecture. If the `invalidates_previous_work` flag is set, completed tasks are discarded.
+
+Signals are detected by the **Executor** and bubbled up to the **Orchestrator** loop.
+
+### State Management
+
+The Orchestrator maintains a persistent state in `.nexical/state.yml`. This allows the workflow to be paused, resumed, or recovered after a crash.
+
+- **Session ID**: Unique identifier for the current run.
+- **Status**: Current state (`ARCHITECTING`, `PLANNING`, `EXECUTING`, `INTERRUPTED`, `COMPLETED`, `FAILED`).
+- **Loop Count**: Tracks the number of iterations to prevent infinite loops.
+- **Tasks**: Tracks `completed`, `failed`, and `pending` tasks.
+
+## Template Engine
+
+Nexical uses **Nunjucks** for prompt templating, managed by the `PromptEngine`.
+
+- **Templates**: Stored in `src/prompts/` (default) or `.nexical/prompts/` (project overrides).
+- **Context Injection**: Templates have access to dynamic context variables (e.g., `user_request`, `architecture`, `plan`, `personas`).
+- **Extensibility**: Users can override default system prompts by placing files with the same name in their project's `.nexical/prompts/` directory.
 
 ## Usage
 
