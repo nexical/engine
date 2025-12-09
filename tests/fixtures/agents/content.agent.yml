@@ -2,6 +2,11 @@
 name: "ContentAgent"
 description: "Writes and edits Markdown content files."
 provider: "cli"
+command: "gemini"
+args:
+  - "prompt"
+  - "{prompt}"
+  - "--yolo"
 
 # The prompt template. The AgentRunner will inject variables.
 prompt_template: |

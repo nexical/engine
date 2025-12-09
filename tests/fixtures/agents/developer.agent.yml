@@ -2,6 +2,11 @@
 name: "DeveloperAgent"
 description: "Creates or modifies layout templates, page components, or other structural code files."
 provider: "cli"
+command: "gemini"
+args:
+  - "prompt"
+  - "{prompt}"
+  - "--yolo"
 
 prompt_template: |
   You are an expert web developer specializing in Astro, HTML, and TypeScript.

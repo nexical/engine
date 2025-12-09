@@ -58,12 +58,18 @@ export class AgentRunner {
         // Determine which skill to use. 
         let skill;
         if (profile.provider) {
+            console.log(`[DEBUG] Agent ${profile.name} provider: ${profile.provider}`);
             skill = this.core.skillRegistry.get(profile.provider);
             if (!skill) {
                 throw new Error(`Skill '${profile.provider}' not found.`);
             }
         } else {
+            console.log(`[DEBUG] Agent ${profile.name} has no provider, using default`);
             skill = this.core.skillRegistry.getDefault();
+        }
+
+        if (skill) {
+            console.log(`[DEBUG] Resolved skill: ${skill.name}`);
         }
 
         if (!skill) {

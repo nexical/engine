@@ -134,6 +134,19 @@ describe('SkillRegistry', () => {
             expect(registry.getAll()).toHaveLength(0);
         });
 
+        it('should ignore skills that throw on instantiation', async () => {
+            const skillContent = `
+                export class BrokenSkill {
+                    constructor(core) {
+                        throw new Error('Broken constructor');
+                    }
+                }
+            `;
+            fs.writeFileSync(path.join(tempDir, 'BrokenSkill.js'), skillContent);
+            await registry.load(tempDir);
+            expect(registry.getAll()).toHaveLength(0);
+        });
+
         it('should ignore non-function exports', async () => {
             const pluginContent = `
                 export const notAnAgent = "I am a string";

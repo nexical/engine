@@ -11,7 +11,6 @@ const { CloudflareService } = await import('../../../src/services/CloudflareServ
 
 describe('CloudflareService', () => {
     let cloudflareService: CloudflareServiceType;
-    let mockOrchestrator: any;
     let originalEnv: NodeJS.ProcessEnv;
     let mockFetch: any;
 
@@ -19,10 +18,7 @@ describe('CloudflareService', () => {
         originalEnv = process.env;
         process.env = { ...originalEnv, CLOUDFLARE_API_TOKEN: 'token', CLOUDFLARE_ACCOUNT_ID: 'account' };
 
-        mockOrchestrator = {};
-        cloudflareService = new CloudflareService(mockOrchestrator);
-
-        mockSpawnSync.mockReset();
+        cloudflareService = new CloudflareService();
 
         mockFetch = jest.fn() as any;
         global.fetch = mockFetch;
@@ -32,177 +28,143 @@ describe('CloudflareService', () => {
         process.env = originalEnv;
     });
 
-    describe('constructor', () => {
-        it('should throw if env vars are missing', () => {
-            process.env = { ...originalEnv };
+    describe('ensureProjectExists', () => {
+        it('should return true if project exists (200 OK)', async () => {
+            mockFetch.mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ success: true })
+            });
+
+            const result = await cloudflareService.ensureProjectExists('test-project', 'https://github.com/owner/repo');
+
+            expect(result).toBe(true);
+            const [url] = mockFetch.mock.calls[0];
+            expect(url).toContain('/pages/projects/test-project');
+        });
+
+        it('should create project if it does not exist (404)', async () => {
+            // First call returns 404
+            mockFetch.mockResolvedValueOnce({
+                status: 404,
+                text: async () => 'Not Found'
+            });
+            // Second call (create) returns 200
+            mockFetch.mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ success: true })
+            });
+
+            const result = await cloudflareService.ensureProjectExists('test-project', 'https://github.com/owner/repo');
+
+            expect(result).toBe(true);
+            expect(mockFetch).toHaveBeenCalledTimes(2);
+            // Check second call payload
+            const [createUrl, createOptions] = mockFetch.mock.calls[1];
+            const body = JSON.parse(createOptions.body);
+            expect(body.name).toBe('test-project');
+            expect(body.source.config.owner).toBe('owner');
+            expect(body.source.config.repo_name).toBe('repo');
+        });
+
+        it('should fail if credentials are missing', async () => {
             delete process.env.CLOUDFLARE_API_TOKEN;
-            expect(() => new CloudflareService(mockOrchestrator)).toThrow();
-        });
-    });
-
-    describe('createProject', () => {
-        it('should create a project with GitHub source', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: true })
-            });
-
-            await cloudflareService.createProject('test-project', { type: 'github', owner: 'owner', repo: 'repo' });
-
-            const [url, options] = mockFetch.mock.calls[0];
-            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects');
-            expect(options.method).toBe('POST');
-            expect(options.headers['Authorization']).toBe('Bearer token');
-            const body = JSON.parse(options.body);
-            expect(body).toEqual({
-                name: 'test-project',
-                production_branch: 'main',
-                source: {
-                    type: 'github',
-                    config: {
-                        owner: 'owner',
-                        repo_name: 'repo',
-                        production_branch: 'main',
-                        pr_comments_enabled: true,
-                        deployments_enabled: true
-                    }
-                }
-            });
+            // Re-instantiate to pick up env change (constructor reads env)
+            cloudflareService = new CloudflareService();
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
         });
 
-        it('should create a project successfully', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: true })
-            });
-
-            await cloudflareService.createProject('test-project');
-
-            const [url, options] = mockFetch.mock.calls[0];
-            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects');
-            expect(options.method).toBe('POST');
-            expect(options.headers['Authorization']).toBe('Bearer token');
-            const body = JSON.parse(options.body);
-            expect(body).toEqual({
-                name: 'test-project',
-                production_branch: 'main'
-            });
-        });
-
-        it('should throw error if API returns failure', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                status: 200,
-                json: async () => ({ success: false, errors: ['API Error'] })
-            });
-
-            await expect(cloudflareService.createProject('test-project')).rejects.toThrow('Cloudflare API error: ["API Error"]');
-        });
-
-        it('should handle conflict (409) gracefully', async () => {
-            mockFetch.mockResolvedValue({
-                ok: false,
-                status: 409,
-                text: async () => 'Conflict'
-            });
-
-            await expect(cloudflareService.createProject('test-project')).resolves.not.toThrow();
-        });
-
-        it('should throw on other errors', async () => {
-            mockFetch.mockResolvedValue({
-                ok: false,
+        it('should return false if checkUrl returns non-200/404', async () => {
+            mockFetch.mockResolvedValueOnce({
                 status: 500,
-                statusText: 'Internal Server Error',
-                text: async () => 'Error'
+                statusText: 'Server Error',
+                text: async () => 'Internal Error'
             });
 
-            await expect(cloudflareService.createProject('test-project')).rejects.toThrow('Failed to create project');
-        });
-    });
-
-    describe('deploy', () => {
-        it('should deploy successfully', async () => {
-            // Mock ensureProjectExists (createProject)
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: true })
-            });
-
-            mockSpawnSync.mockReturnValue({
-                status: 0
-            });
-
-            const result = await cloudflareService.deploy('test-project', 'dist', 'main');
-
-            expect(result).toBe('Deployment successful');
-            expect(mockSpawnSync).toHaveBeenCalledWith('npx', ['wrangler', 'pages', 'deploy', 'dist', '--project-name', 'test-project', '--branch', 'main'], expect.any(Object));
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
         });
 
-        it('should throw on deployment failure', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: true })
-            });
-
-            mockSpawnSync.mockReturnValue({
-                status: 1
-            });
-
-            await expect(cloudflareService.deploy('test-project')).rejects.toThrow('Cloudflare deployment failed');
-        });
-    });
-
-    describe('linkDomain', () => {
-        it('should link domain successfully', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: true })
-            });
-
-            await cloudflareService.linkDomain('test-project', 'example.com');
-
-            const [url, options] = mockFetch.mock.calls[0];
-            expect(url).toBe('https://api.cloudflare.com/client/v4/accounts/account/pages/projects/test-project/domains');
-            expect(options.method).toBe('POST');
-            const body = JSON.parse(options.body);
-            expect(body).toEqual({
-                name: 'example.com'
-            });
-        });
-        it('should throw error if API returns failure', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
+        it('should return false if createProject fails (API error logic)', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockResolvedValueOnce({
                 status: 200,
-                json: async () => ({ success: false, errors: ['API Error'] })
+                json: async () => ({ success: false, errors: ['Failed'] })
             });
 
-            await expect(cloudflareService.linkDomain('test-project', 'example.com')).rejects.toThrow('Cloudflare API error: ["API Error"]');
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
         });
 
-        it('should throw if link domain fails', async () => {
-            mockFetch.mockResolvedValue({
-                ok: false,
-                status: 400,
-                statusText: 'Bad Request',
-                text: async () => 'Invalid domain'
+        it('should return false if createProject fails (Network error)', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockRejectedValueOnce(new Error('Network Error'));
+
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
+        });
+
+        it('should return false if createProject returns non-200 status', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockResolvedValueOnce({
+                status: 500,
+                text: async () => 'Server Error'
             });
 
-            await expect(cloudflareService.linkDomain('test-project', 'invalid.com')).rejects.toThrow('Failed to link domain');
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
         });
 
-        it('should throw if API returns error', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ success: false, errors: ['API Error'] })
+        it('should handle non-matching repo URL without source config', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ success: true })
             });
 
-            await expect(cloudflareService.linkDomain('test-project', 'example.com')).rejects.toThrow('Cloudflare API error');
+            const result = await cloudflareService.ensureProjectExists('test-project', 'invalid-url');
+            expect(result).toBe(true);
+
+            const [createUrl, createOptions] = mockFetch.mock.calls[1];
+            const body = JSON.parse(createOptions.body);
+            expect(body.source).toBeUndefined();
         });
 
-        it('should handle network errors', async () => {
-            mockFetch.mockRejectedValue(new Error('Network error'));
-            await expect(cloudflareService.linkDomain('test-project', 'example.com')).rejects.toThrow('Network error');
+        it('should return false if checkUrl throws exception', async () => {
+            mockFetch.mockRejectedValueOnce(new Error('Network Error'));
+            const result = await cloudflareService.ensureProjectExists('test-project', 'repo');
+            expect(result).toBe(false);
+        });
+        it('should use default empty strings if env vars missing', () => {
+            const originalId = process.env.CLOUDFLARE_ACCOUNT_ID;
+            delete process.env.CLOUDFLARE_ACCOUNT_ID;
+            const service = new CloudflareService();
+            // access private field via any
+            expect((service as any).accountId).toBe('');
+            process.env.CLOUDFLARE_ACCOUNT_ID = originalId;
+        });
+
+        it('should handle missing repoUrl in createProject', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockResolvedValueOnce({ status: 200, json: async () => ({ success: true }) });
+
+            await cloudflareService.ensureProjectExists('test', '');
+            // Should succeed but without source config
+            const [createUrl, createOptions] = mockFetch.mock.calls[1];
+            const body = JSON.parse(createOptions.body);
+            expect(body.source).toBeUndefined();
+        });
+
+        it('should use messages if errors missing in failure', async () => {
+            mockFetch.mockResolvedValueOnce({ status: 404, text: async () => 'Not Found' });
+            mockFetch.mockResolvedValueOnce({
+                status: 200,
+                json: async () => ({ success: false, messages: ['Some Message'] })
+            });
+
+            const result = await cloudflareService.ensureProjectExists('test', 'repo');
+            expect(result).toBe(false);
         });
     });
 });
+

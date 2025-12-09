@@ -12,6 +12,10 @@ const mockClientKeys = {
     workers: {
         acquireJob: jest.fn(),
     },
+    projects: {
+        get: jest.fn<any>().mockResolvedValue({ id: 456, name: 'test-project', repoUrl: 'http://foo' }),
+        update: jest.fn(),
+    },
     setToken: jest.fn(),
 };
 
@@ -37,6 +41,16 @@ const mockOrchestrator = jest.fn(() => ({
     init: mockOrchestratorInit,
     runAIWorkflow: mockRunAIWorkflow,
     execute: mockExecute,
+    git: {
+        clone: jest.fn(),
+        init: jest.fn(),
+        checkout: jest.fn(),
+        add: jest.fn(),
+        status: jest.fn(),
+        commit: jest.fn(),
+        push: jest.fn(),
+        pull: jest.fn(),
+    }
 }));
 jest.unstable_mockModule('../../../src/orchestrator.js', () => ({
     Orchestrator: mockOrchestrator
@@ -115,7 +129,17 @@ describe('FactoryWorker Integration', () => {
             init: mockOrchestratorInit,
             runAIWorkflow: mockRunAIWorkflow,
             // Mock execute to throw
-            execute: jest.fn<() => Promise<void>>().mockRejectedValue(new Error('Kaboom'))
+            execute: jest.fn<() => Promise<void>>().mockRejectedValue(new Error('Kaboom')),
+            git: {
+                clone: jest.fn(),
+                init: jest.fn(),
+                checkout: jest.fn(),
+                add: jest.fn(),
+                status: jest.fn(),
+                commit: jest.fn(),
+                push: jest.fn(),
+                pull: jest.fn(),
+            }
         }));
 
         // We expect start() to reject because processor re-throws

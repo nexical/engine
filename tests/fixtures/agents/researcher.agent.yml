@@ -2,6 +2,11 @@
 name: "ResearcherAgent"
 description: "Performs research and answers questions to help guide content creation, theme design, and component or section layout development."
 provider: "cli"
+command: "gemini"
+args:
+  - "prompt"
+  - "{prompt}"
+  - "--yolo"
 
 prompt_template: |
   You are an expert researcher and technical consultant.

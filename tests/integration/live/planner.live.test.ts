@@ -4,6 +4,19 @@ import { setupTestProject, cleanupTestProject } from './setup.js';
 import path from 'path';
 import fs from 'fs-extra';
 
+import { spawnSync } from 'child_process';
+
+const hasGemini = () => {
+    try {
+        const result = spawnSync('which', ['gemini'], { encoding: 'utf-8' });
+        return result.status === 0 && result.stdout.trim().length > 0;
+    } catch (e) {
+        return false;
+    }
+};
+
+const runOrSkip = hasGemini() ? it : it.skip;
+
 describe('Planner Live Integration Tests', () => {
     let orchestrator: Orchestrator;
     let originalCwd: string;
@@ -32,9 +45,9 @@ describe('Planner Live Integration Tests', () => {
         jest.restoreAllMocks();
     });
 
-    it('should generate a plan based on user prompt', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping planner live test: GEMINI_API_KEY not found');
+    runOrSkip('should generate a plan based on user prompt', async () => {
+        if (!hasGemini()) {
+            console.warn('Skipping planner live test: gemini executable not found');
             return;
         }
         await orchestrator.init();

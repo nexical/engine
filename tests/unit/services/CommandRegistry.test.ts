@@ -110,6 +110,19 @@ describe('CommandRegistry', () => {
             expect(registry.getAll()).toHaveLength(0);
         });
 
+        it('should ignore plugins that throw on instantiation', async () => {
+            const pluginContent = `
+                export class BrokenPlugin {
+                    constructor(core) {
+                        throw new Error('Broken constructor');
+                    }
+                }
+            `;
+            fs.writeFileSync(path.join(tempDir, 'BrokenPlugin.js'), pluginContent);
+            await registry.load(tempDir);
+            expect(registry.getAll()).toHaveLength(0);
+        });
+
         it('should ignore non-function exports', async () => {
             const pluginContent = `
                 export const notAPlugin = "I am a string";

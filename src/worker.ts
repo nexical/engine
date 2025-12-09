@@ -1,9 +1,10 @@
 import { fileURLToPath } from 'url';
-import { NexicalClient, NexicalWorker, Job } from '@nexical/sdk';
+import { NexicalClient, NexicalWorker, Job, Project } from '@nexical/sdk';
 import { Orchestrator } from './orchestrator.js';
 import { WorkspaceManager } from './services/WorkspaceManager.js';
 import { JobService } from './services/JobService.js';
 import { IdentityManager } from './services/IdentityManager.js';
+import { CloudflareService } from './services/CloudflareService.js';
 import debug from 'debug';
 
 const log = debug('worker');
@@ -18,12 +19,14 @@ export class FactoryWorker {
     private worker: NexicalWorker;
     private workspaceManager: WorkspaceManager;
     private jobService: JobService;
+    private cloudflareService: CloudflareService;
 
     constructor(
         client?: NexicalClient,
         worker?: NexicalWorker,
         workspaceManager?: WorkspaceManager,
-        jobService?: JobService
+        jobService?: JobService,
+        cloudflareService?: CloudflareService
     ) {
         // Initialize Services
         this.client = client || /* istanbul ignore next */ new NexicalClient({
@@ -37,6 +40,7 @@ export class FactoryWorker {
 
         this.workspaceManager = workspaceManager || /* istanbul ignore next */ new WorkspaceManager();
         this.jobService = jobService || /* istanbul ignore next */ new JobService(this.client);
+        this.cloudflareService = cloudflareService || /* istanbul ignore next */ new CloudflareService();
     }
 
     async start() {
@@ -71,6 +75,14 @@ export class FactoryWorker {
         let workspacePath: string = '';
 
         try {
+            // 0. Fetch Project Details to get Repo URL
+            let project: Project;
+            try {
+                project = await this.client.projects.get(logJob.teamId, logJob.projectId);
+            } catch (err: any) {
+                throw new Error(`Failed to retrieve project ${logJob.projectId}: ${err.message}`);
+            }
+
             // 1. Create Workspace
             workspacePath = await this.workspaceManager.createWorkspace(jobId);
 
@@ -82,12 +94,34 @@ export class FactoryWorker {
                     jobId: logJob.id,
                     projectId: logJob.projectId,
                     teamId: logJob.teamId,
-                    mode: 'managed' // Default for now, or fetch from job? Job doesn't have mode. Assuming managed.
+                    mode: project.mode || 'managed'
                 }
             });
             await orchestrator.init();
 
-            // 3. Execute Job logic
+            // 3. Setup Logic: Clone Repo & Create Branch
+            log(`Initializing project in ${workspacePath} from ${project.repoUrl || 'empty'}`);
+            if (project.repoUrl) {
+                // Clone into current directory (.)
+                await orchestrator.git.clone(project.repoUrl, '.');
+            } else {
+                log('No repository URL provided. Initializing empty git repository.');
+                orchestrator.git.init();
+            }
+
+            // Create and checkout branch
+            const branchName = `job-${jobId}`;
+            log(`Creating branch ${branchName}`);
+            try {
+                orchestrator.git.checkout(branchName, true);
+            } catch (err: any) {
+                // If branch exists or other error, try simple checkout or assume we are on it?
+                // Or maybe the clone checked out main, so -b should work.
+                log(`Checkout -b failed (${err.message}). Attempting checkout existing.`);
+                orchestrator.git.checkout(branchName);
+            }
+
+            // 4. Execute Job logic
             const inputs = job.inputs || /* istanbul ignore next */ {};
 
             if (inputs.prompt) {
@@ -104,18 +138,47 @@ export class FactoryWorker {
 
             await this.jobService.streamLog(logJob, 'Job completed successfully.');
 
+            // 5. Publish Logic: Commit, Push, Ensure Cloudflare
+            log(`Publishing results for Job ${jobId}...`);
+            orchestrator.git.add('.');
+            try {
+                // Only commit if there are changes
+                const status = orchestrator.git.status();
+                if (status) {
+                    orchestrator.git.commit(`Job ${jobId} completion`);
+                    log(`Changes committed.`);
+                } else {
+                    log(`No changes to commit.`);
+                }
+            } catch (err: any) {
+                // git commit fails if nothing to commit (sometimes), but we checked status above?
+                // GitService.status returns string.
+                log(`Commit warning: ${err.message}`);
+            }
+
+            // Push to origin
+            if (project.repoUrl) {
+                log(`Pushing to ${branchName}...`);
+                orchestrator.git.push('origin', branchName);
+
+                // 6. Cloudflare Sync
+                // Ensure project exists on Cloudflare
+                await this.cloudflareService.ensureProjectExists(project.name, project.repoUrl);
+            }
+
         } catch (error) {
             log(`Job ${jobId} failed:`, error);
             await this.jobService.streamLog(logJob, `Job failed: ${/* istanbul ignore next */ error instanceof Error ? error.message : String(error)}`, 'error');
             throw error;
         } finally {
-            // 4. Teardown Workspace
+            // 7. Teardown Workspace
             if (workspacePath) {
                 await this.workspaceManager.cleanupWorkspace(jobId);
             }
         }
     }
 }
+
 
 // Entry point
 /* istanbul ignore next */

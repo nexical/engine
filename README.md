@@ -30,14 +30,8 @@ The application is highly extensible through a plugin system:
 
 #### Command Plugins (`src/plugins/commands/`)
 These plugins extend the CLI with deterministic commands (prefixed with `/`).
-- **InitCommandPlugin** (`/init`): Initializes a new project.
-- **ConfigCommandPlugin** (`/config`): Manages project configuration.
 - **StartCommandPlugin** (`/start`): Starts the development server.
-- **PublishCommandPlugin** (`/publish`): Deploys the project to Cloudflare.
-- **SaveCommandPlugin** (`/save`): Commits changes to git.
-- **GitHubCommandPlugin** (`/github`): Interacts with GitHub.
 - **OpenRouterCommandPlugin** (`/openrouter`): Configures OpenRouter settings.
-- **CloudflareCommandPlugin** (`/cloudflare`): Configures Cloudflare settings.
 
 #### Agent Plugins (`src/plugins/agents/`)
 These plugins define how different types of agents are executed.
@@ -126,8 +120,7 @@ npm run cli
 You can run deterministic commands directly:
 
 ```bash
-npm run cli -- publish
-npm run cli -- init
+npm run cli -- start master
 ```
 
 ## Agent Definition Patterns

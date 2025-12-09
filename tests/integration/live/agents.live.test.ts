@@ -1,9 +1,25 @@
 import { jest, describe, it, beforeEach, afterEach, beforeAll, afterAll, expect } from '@jest/globals';
 import path from 'path';
 import fs from 'fs-extra';
+import { spawnSync } from 'child_process';
 import { Orchestrator } from '../../../src/orchestrator.js';
 import { setupTestProject, cleanupTestProject } from './setup.js';
 import { Agent } from '../../../src/models/Agent.js';
+
+const hasGemini = () => {
+    try {
+        const result = spawnSync('which', ['gemini'], { encoding: 'utf-8' });
+        return result.status === 0 && result.stdout.trim().length > 0;
+    } catch (e) {
+        return false;
+    }
+};
+
+const runOrSkip = hasGemini() ? it : it.skip;
+
+if (!hasGemini()) {
+    console.warn('Skipping Agents Live Integration Tests: "gemini" executable not found.');
+}
 
 describe('Agents Live Integration Tests', () => {
     let orchestrator: Orchestrator;
@@ -37,9 +53,7 @@ describe('Agents Live Integration Tests', () => {
     const executeAgent = async (agentName: string, taskPrompt: string, params: any = {}) => {
         // Ensure CLI skill is loaded (since most agents use it)
         if (!orchestrator.skillRegistry.get('cli')) {
-            // If not loaded, maybe we need to wait or it failed.
-            // But init() awaits loadSkills().
-            // Let's just log a warning if missing, but rely on executePlan to fail if so.
+            // Let it fail if missing
         }
 
         const shortName = agentName.replace('Agent', '').toLowerCase();
@@ -65,11 +79,7 @@ describe('Agents Live Integration Tests', () => {
         await (orchestrator as any).executor.executePlan(plan, taskPrompt);
     };
 
-    it('should execute ResearcherAgent', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping test: GEMINI_API_KEY not found');
-            return;
-        }
+    runOrSkip('should execute ResearcherAgent', async () => {
         const fileName = 'research.md';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
@@ -83,11 +93,7 @@ describe('Agents Live Integration Tests', () => {
         expect(content).toMatch(/Paris/i);
     }, 30000);
 
-    it('should execute DeveloperAgent', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping test: GEMINI_API_KEY not found');
-            return;
-        }
+    runOrSkip('should execute DeveloperAgent', async () => {
         const fileName = 'test-component.html';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
@@ -102,11 +108,7 @@ describe('Agents Live Integration Tests', () => {
         expect(content).toContain('Hello World');
     }, 30000);
 
-    it('should execute ContentAgent', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping test: GEMINI_API_KEY not found');
-            return;
-        }
+    runOrSkip('should execute ContentAgent', async () => {
         const fileName = 'blog-post.md';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
@@ -120,11 +122,7 @@ describe('Agents Live Integration Tests', () => {
         expect(content).toContain('#'); // Markdown header
     }, 30000);
 
-    it('should execute DesignerAgent', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping test: GEMINI_API_KEY not found');
-            return;
-        }
+    runOrSkip('should execute DesignerAgent', async () => {
         const fileName = 'style.css';
         const taskPrompt = `Create a CSS file @${fileName} with a class .container that has a red background.`;
 
@@ -137,9 +135,9 @@ describe('Agents Live Integration Tests', () => {
         expect(logs).toMatch(/background/);
     }, 30000);
 
-    it('should execute IllustratorAgent', async () => {
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn('Skipping test: GEMINI_API_KEY not found');
+    runOrSkip('should execute IllustratorAgent', async () => {
+        if (!process.env.OPENROUTER_API_KEY) {
+            console.warn('Skipping IllustratorAgent test: OPENROUTER_API_KEY not found');
             return;
         }
         const outputPath = 'image.png';
@@ -155,12 +153,14 @@ describe('Agents Live Integration Tests', () => {
             const stats = await fs.stat(filePath);
             expect(stats.size).toBeGreaterThan(0);
         } catch (error: any) {
+            // In --yolo mode with gemini configured, it should work or fail with helpful error.
+            // If we want to allow failures due to auth/quota during integration, we can keep the catch.
+            // But valid `gemini` command implies we expect it to try.
             if (error.message.includes('401 Unauthorized') || error.message.includes('Authentication error') || error.message.includes('Method Not Allowed')) {
-                console.warn('Image generation failed with API Error (expected if config is invalid, but proves integration):', error.message);
-                // Pass test
+                console.warn('Image generation failed with API Error (proving integration attempt):', error.message);
             } else {
                 throw error;
             }
         }
-    }, 60000); // Longer timeout for image gen
+    }, 60000);
 });

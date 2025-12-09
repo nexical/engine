@@ -2,6 +2,11 @@
 name: "DesignerAgent"
 description: "Creates or modifies theme files, CSS stylesheets, and generates images or icons."
 provider: "cli"
+command: "gemini"
+args:
+  - "prompt"
+  - "{prompt}"
+  - "--yolo"
 
 prompt_template: |
   You are a creative designer.
