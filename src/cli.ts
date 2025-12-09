@@ -28,7 +28,9 @@ const options = program.opts();
 const args = program.args;
 
 try {
-    const orchestrator = new Orchestrator(process.argv);
+    const orchestrator = new Orchestrator({
+        workingDirectory: process.cwd()
+    });
     await orchestrator.init();
 
     if (options.prompt) {

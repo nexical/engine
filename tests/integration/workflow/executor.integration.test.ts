@@ -12,7 +12,7 @@ const MockAgentRunner = jest.fn(() => ({
 }));
 
 // Mock the module using unstable_mockModule
-jest.unstable_mockModule('../../src/services/AgentRunner.js', () => ({
+jest.unstable_mockModule('../../../src/services/AgentRunner.js', () => ({
     AgentRunner: MockAgentRunner
 }));
 
@@ -31,7 +31,8 @@ describe('Executor Integration Tests', () => {
         // Create a partial mock of Orchestrator
         orchestrator = {
             config: {
-                agentsPath: '/mock/agents'
+                agentsPath: '/mock/agents',
+                nexicalPath: '/mock/.nexical'
             },
             disk: {
                 isDirectory: jest.fn().mockReturnValue(false)

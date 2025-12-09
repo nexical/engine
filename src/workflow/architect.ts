@@ -56,18 +56,31 @@ export class Architect {
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
+        if (this.core.identityManager && this.core.jobContext) {
+            try {
+                const { teamId, projectId, jobId } = this.core.jobContext;
+                const token = await this.core.identityManager.getAgentToken(teamId, projectId, jobId);
+                if (token) {
+                    process.env.NEXICAL_AGENT_TOKEN = token;
+                }
+            } catch (e) {
+                console.error("Failed to get agent token for architect:", e);
+            }
+        }
+
         try {
-            const plugin = this.core.agentRegistry.get('cli');
-            if (!plugin) {
-                throw new Error("CLI plugin not found for architect.");
+            const skill = this.core.skillRegistry.get('cli');
+            if (!skill) {
+                throw new Error("CLI skill not found for architect.");
             }
 
             // Execute the architect agent. It should write the architectur to architectureFile.
-            await plugin.execute(architectAgent, '', {
+            await skill.execute(architectAgent, '', {
                 userPrompt: prompt,
                 params: {
                     prompt: fullPrompt
-                }
+                },
+                env: process.env.NEXICAL_AGENT_TOKEN ? { NEXICAL_AGENT_TOKEN: process.env.NEXICAL_AGENT_TOKEN } : {}
             });
 
         } catch (e) {

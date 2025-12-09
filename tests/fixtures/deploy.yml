@@ -1,0 +1,7 @@
+name: deploy
+description: Deploy execution plan
+tasks:
+  - id: deploy-step
+    message: Deploy to production
+    agent: cli
+    dependencies: []

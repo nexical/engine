@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Build Output
+dist
+
+# Environment Variables
+.env
+.env.*
+
+# Nexical Data
+.nexical/history
+.nexical/archive
+.nexical/state.yml
+.nexical/plan.yml
+
+# Test Artifacts
+tests
+coverage
+test_project_*
+test_output.txt
+integration_failures*.txt
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Documentation
+task.md
+implementation_plan.md
+walkthrough.md

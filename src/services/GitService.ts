@@ -21,15 +21,34 @@ export class GitService {
         this.runCommand(['init'], cwd);
     }
 
-    clone(url: string, dir?: string): void {
-        const args = ['clone', url];
+    async clone(url: string, dir?: string): Promise<void> {
+        let authUrl = url;
+        if (this.core.identityManager && this.core.jobContext) {
+            try {
+                const { teamId, projectId, jobId, mode } = this.core.jobContext;
+                const token = await this.core.identityManager.getGitToken(teamId, projectId, jobId, mode);
+                if (token) {
+                    // Inject token into URL: https://<token>@github.com/...
+                    // Assuming URL is https. If ssh, we need different handling.
+                    if (url.startsWith('https://')) {
+                        authUrl = url.replace('https://', `https://${token}@`);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to get git token:', error);
+                // Proceed with original URL (public repo?) or fail later
+            }
+        }
+
+        const args = ['clone', authUrl];
         if (dir) {
             args.push(dir);
         }
         // Clone runs in the parent directory of the project path usually, or current cwd
         // But here we probably want to run it in the current working directory of the process
         // if we are initializing a new project.
-        this.runCommand(args, '.');
+        // use projectPath which is the sandbox root or the project root.
+        this.runCommand(args, this.core.config.projectPath);
     }
 
     addRemote(name: string, url: string): void {

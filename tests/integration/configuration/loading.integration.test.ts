@@ -52,7 +52,7 @@ args: ["hello"]
     });
 
     it('should correctly identify project path and load configuration', async () => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         await orchestrator.init();
 
         expect(orchestrator.config.projectPath).toBe(tempDir);

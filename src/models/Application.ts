@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import yaml from 'js-yaml';
 
 export interface Application {
+    workingDirectory: string;
     appPath: string;
     projectPath: string;
     nexicalPath: string;
@@ -17,6 +18,22 @@ export interface Application {
     personasPath: string;
     planPath: string;
     capabilitiesPath: string;
+}
+
+import { IdentityManager } from '../services/IdentityManager.js';
+
+export interface JobContext {
+    jobId: number;
+    projectId: number;
+    teamId: number;
+    mode: 'managed' | 'self_hosted';
+}
+
+export interface RuntimeConfig {
+    workingDirectory: string;
+    identityManager?: IdentityManager;
+    jobContext?: JobContext;
+    env?: Record<string, string>;
 }
 
 export interface Project {

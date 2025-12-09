@@ -21,7 +21,7 @@ const mockPlanner = jest.fn();
 const mockArchitect = jest.fn();
 const mockExecutor = jest.fn();
 const mockCommandRegistry = jest.fn();
-const mockAgentRegistry = jest.fn();
+const mockSkillRegistry = jest.fn();
 const mockGitService = jest.fn();
 const mockFileSystemService = {
     readFile: jest.fn(),
@@ -41,8 +41,8 @@ jest.unstable_mockModule('fs/promises', () => mockFsPromises);
 jest.unstable_mockModule('../../src/workflow/planner.js', () => ({ Planner: mockPlanner }));
 jest.unstable_mockModule('../../src/workflow/architect.js', () => ({ Architect: mockArchitect }));
 jest.unstable_mockModule('../../src/workflow/executor.js', () => ({ Executor: mockExecutor }));
-jest.unstable_mockModule('../../src/plugins/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
-jest.unstable_mockModule('../../src/plugins/AgentRegistry.js', () => ({ AgentRegistry: mockAgentRegistry }));
+jest.unstable_mockModule('../../src/services/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
+jest.unstable_mockModule('../../src/services/SkillRegistry.js', () => ({ SkillRegistry: mockSkillRegistry }));
 jest.unstable_mockModule('../../src/services/GitService.js', () => ({ GitService: mockGitService }));
 jest.unstable_mockModule('../../src/services/FileSystemService.js', () => ({ FileSystemService: MockFileSystemServiceConstructor }));
 
@@ -54,7 +54,7 @@ describe('Orchestrator', () => {
     let mockArchitectInstance: any;
     let mockExecutorInstance: any;
     let mockCommandRegistryInstance: any;
-    let mockAgentRegistryInstance: any;
+    let mockSkillRegistryInstance: any;
 
     beforeEach(async () => {
         jest.resetModules();
@@ -67,38 +67,39 @@ describe('Orchestrator', () => {
         mockArchitectInstance = { generateArchitecture: jest.fn() };
         mockExecutorInstance = { executePlan: jest.fn() };
         mockCommandRegistryInstance = { register: jest.fn(), get: jest.fn(), load: jest.fn() };
-        mockAgentRegistryInstance = { register: jest.fn(), get: jest.fn(), load: jest.fn() };
+        mockSkillRegistryInstance = { register: jest.fn(), get: jest.fn(), load: jest.fn(), getDefault: jest.fn() };
 
         (mockPlanner as any).mockImplementation(() => mockPlannerInstance);
         (mockArchitect as any).mockImplementation(() => mockArchitectInstance);
         (mockExecutor as any).mockImplementation(() => mockExecutorInstance);
         (mockCommandRegistry as any).mockImplementation(() => mockCommandRegistryInstance);
-        (mockAgentRegistry as any).mockImplementation(() => mockAgentRegistryInstance);
+        (mockSkillRegistry as any).mockImplementation(() => mockSkillRegistryInstance);
         (mockGitService as any).mockImplementation(() => ({}));
         // FileSystemService mock is already set up via the constructor mock
 
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: '/test/project' });
     });
 
     describe('constructor', () => {
-        it('should initialize with default paths', () => {
-            expect(orchestrator.config.projectPath).toBe(process.cwd());
+        it('should initialize with provided working directory', () => {
+            expect(orchestrator.config.projectPath).toBe('/test/project');
             expect(mockCommandRegistry).toHaveBeenCalled();
-            expect(mockAgentRegistry).toHaveBeenCalled();
+            expect(mockSkillRegistry).toHaveBeenCalled();
             expect(MockFileSystemServiceConstructor).toHaveBeenCalled();
-            expect(mockGitService).toHaveBeenCalled();
             expect(mockGitService).toHaveBeenCalled();
             expect(mockPlanner).toHaveBeenCalled();
             expect(mockArchitect).toHaveBeenCalled();
             expect(mockExecutor).toHaveBeenCalled();
         });
 
-        it('should detect website directory', () => {
+        // The logic for detecting 'dev_project' was removed in favor of explicit working directory.
+        // We can either remove this test or update it to ensure it DOESN'T magically append dev_project.
+        it('should strictly use working directory', () => {
             mockFileSystemService.exists.mockReturnValue(true);
             mockFileSystemService.isDirectory.mockReturnValue(true);
 
-            const orch = new Orchestrator([]);
-            expect(orch.config.projectPath).toContain('dev_project');
+            const orch = new Orchestrator({ workingDirectory: '/test/project' });
+            expect(orch.config.projectPath).toBe('/test/project');
         });
     });
 
@@ -107,8 +108,8 @@ describe('Orchestrator', () => {
             mockFileSystemService.exists.mockReturnValue(true);
             await orchestrator.init();
 
-            expect(mockCommandRegistryInstance.load).toHaveBeenCalledWith(expect.stringContaining('plugins/commands'));
-            expect(mockAgentRegistryInstance.load).toHaveBeenCalledWith(expect.stringContaining('plugins/agents'));
+            expect(mockCommandRegistryInstance.load).toHaveBeenCalledWith(expect.stringContaining('commands'));
+            expect(mockSkillRegistryInstance.load).toHaveBeenCalledWith(expect.stringContaining('skills'));
         });
     });
 

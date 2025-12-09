@@ -22,7 +22,7 @@ describe('Planner Live Integration Tests', () => {
     });
 
     beforeEach(() => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         // Suppress console logs
         jest.spyOn(console, 'log').mockImplementation(() => { });
         jest.spyOn(console, 'error').mockImplementation(() => { });
@@ -33,6 +33,10 @@ describe('Planner Live Integration Tests', () => {
     });
 
     it('should generate a plan based on user prompt', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping planner live test: GEMINI_API_KEY not found');
+            return;
+        }
         await orchestrator.init();
 
         const planner = (orchestrator as any).planner;
@@ -44,7 +48,7 @@ describe('Planner Live Integration Tests', () => {
         expect(plan.tasks.length).toBeGreaterThan(0);
 
         // Verify plan file creation
-        const planPath = path.join(testProjectRoot, '.nexical', 'history', 'plan.yml');
+        const planPath = path.join(testProjectRoot, '.nexical', 'plan.yml');
         expect(await fs.pathExists(planPath)).toBe(true);
 
         const agentNames = plan.tasks.map((t: any) => t.agent);

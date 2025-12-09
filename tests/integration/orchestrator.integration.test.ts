@@ -3,13 +3,20 @@ import path from 'path';
 import fs from 'fs-extra';
 import os from 'os';
 import { Plan } from '../../src/models/Plan.js';
-import { AgentPlugin } from '../../src/models/Plugins.js';
+import { Skill } from '../../src/models/Skill.js';
 
 // Mock Planner to avoid LLM calls
-const mockGeneratePlan = jest.fn<(prompt: string) => Promise<Plan>>();
-jest.unstable_mockModule('../../src/planner.js', () => ({
+const mockGeneratePlan = jest.fn<(prompt: string, signal?: any, completed?: any[]) => Promise<Plan>>();
+jest.unstable_mockModule('../../src/workflow/planner.js', () => ({
     Planner: jest.fn().mockImplementation(() => ({
         generatePlan: mockGeneratePlan
+    }))
+}));
+
+const mockGenerateArchitecture = jest.fn();
+jest.unstable_mockModule('../../src/workflow/architect.js', () => ({
+    Architect: jest.fn().mockImplementation(() => ({
+        generateArchitecture: mockGenerateArchitecture
     }))
 }));
 
@@ -52,15 +59,25 @@ provider: dummy
     beforeEach(() => {
         jest.clearAllMocks();
         // @ts-ignore - Dynamic import makes constructor usage tricky with types
-        orchestrator = new Orchestrator(['node', 'cli']);
-
-        // Register dummy plugin
-        const dummyPlugin: AgentPlugin = {
-            name: 'dummy',
-            description: 'Dummy agent',
-            execute: jest.fn<AgentPlugin['execute']>().mockResolvedValue('success')
+        const runtimeConfig = {
+            workingDirectory: tempDir,
+            jobContext: {
+                job_id: 'test-job',
+                project_id: 'test-project',
+                organization_id: 'test-org',
+                step_id: 'test-step'
+            }
         };
-        orchestrator.agentRegistry.register(dummyPlugin);
+        orchestrator = new Orchestrator(runtimeConfig as any);
+
+        // Register dummy skill
+        const dummySkill: Skill = {
+            name: 'dummy',
+            description: 'Dummy skill',
+            execute: jest.fn<Skill['execute']>().mockResolvedValue('success'),
+            isSupported: jest.fn<Skill['isSupported']>().mockReturnValue(true)
+        };
+        orchestrator.skillRegistry.register(dummySkill);
 
         // Suppress console logs
         jest.spyOn(console, 'log').mockImplementation(() => { });
@@ -86,13 +103,17 @@ provider: dummy
             ]
         };
 
-        mockGeneratePlan.mockResolvedValue(mockPlan);
+        mockGeneratePlan.mockImplementation(async () => {
+            const planPath = path.join(tempDir, '.nexical', 'plan.yml');
+            await fs.writeFile(planPath, JSON.stringify(mockPlan));
+            return mockPlan;
+        });
 
         await orchestrator.runAIWorkflow(prompt);
 
-        expect(mockGeneratePlan).toHaveBeenCalledWith(prompt);
+        expect(mockGeneratePlan).toHaveBeenCalledWith(prompt, undefined, expect.anything());
 
-        const dummyPlugin = orchestrator.agentRegistry.get('dummy');
+        const dummyPlugin = orchestrator.skillRegistry.get('dummy');
         expect(dummyPlugin?.execute).toHaveBeenCalledWith(
             expect.objectContaining({ name: 'dummy' }),
             'Do it',

@@ -23,7 +23,7 @@ describe('Agents Live Integration Tests', () => {
     });
 
     beforeEach(async () => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         await orchestrator.init();
         // Suppress console logs
         jest.spyOn(console, 'log').mockImplementation(() => { });
@@ -35,33 +35,19 @@ describe('Agents Live Integration Tests', () => {
     });
 
     const executeAgent = async (agentName: string, taskPrompt: string, params: any = {}) => {
-        // Ensure CLI plugin is loaded (since most agents use it)
-        if (!orchestrator.agentRegistry.get('cli')) {
+        // Ensure CLI skill is loaded (since most agents use it)
+        if (!orchestrator.skillRegistry.get('cli')) {
             // If not loaded, maybe we need to wait or it failed.
-            // But init() awaits loadPlugins().
+            // But init() awaits loadSkills().
             // Let's just log a warning if missing, but rely on executePlan to fail if so.
         }
 
-        // We can get the profile using AgentRunner logic, or just manually load it for the test.
-        // Let's manually load it to ensure we are testing what we think we are.
-        // const agentPath = path.join(testProjectRoot, '.nexical', 'agents', `${agentName.toLowerCase().replace('agent', '')}.agent.yml`);
-        // Wait, filenames are like 'developer.agent.yml'
-        // agentName is 'DeveloperAgent'
-
-        // Let's try to find the file.
         const shortName = agentName.replace('Agent', '').toLowerCase();
         const possiblePath = path.join(testProjectRoot, '.nexical', 'agents', `${shortName}.agent.yml`);
 
         if (!fs.existsSync(possiblePath)) {
             throw new Error(`Agent file not found at ${possiblePath}`);
         }
-
-        // We need to parse YAML. Orchestrator has a yaml parser? 
-        // Or we can just use the AgentRunner's loadAgent method if we can access it.
-        // Accessing private members is messy.
-
-        // Let's use the Executor to run a single task?
-        // Executor.executePlan takes a plan. We can create a 1-task plan.
 
         const plan = {
             plan_name: `Test ${agentName}`,
@@ -76,10 +62,14 @@ describe('Agents Live Integration Tests', () => {
         };
 
         // Access private executor
-        await (orchestrator as any).executor.executePlan(plan);
+        await (orchestrator as any).executor.executePlan(plan, taskPrompt);
     };
 
     it('should execute ResearcherAgent', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping test: GEMINI_API_KEY not found');
+            return;
+        }
         const fileName = 'research.md';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
@@ -94,11 +84,15 @@ describe('Agents Live Integration Tests', () => {
     }, 30000);
 
     it('should execute DeveloperAgent', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping test: GEMINI_API_KEY not found');
+            return;
+        }
         const fileName = 'test-component.html';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
 
-        const taskPrompt = `Write code to @${fileName} with a simple div containing "Hello World".`;
+        const taskPrompt = `Write the code to @${fileName}. The code should be a simple div containing "Hello World".`;
 
         await executeAgent('DeveloperAgent', taskPrompt);
 
@@ -109,6 +103,10 @@ describe('Agents Live Integration Tests', () => {
     }, 30000);
 
     it('should execute ContentAgent', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping test: GEMINI_API_KEY not found');
+            return;
+        }
         const fileName = 'blog-post.md';
         const filePath = path.join(testProjectRoot, fileName);
         await fs.ensureFile(filePath); // Create empty file
@@ -123,53 +121,16 @@ describe('Agents Live Integration Tests', () => {
     }, 30000);
 
     it('should execute DesignerAgent', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping test: GEMINI_API_KEY not found');
+            return;
+        }
         const fileName = 'style.css';
         const taskPrompt = `Create a CSS file @${fileName} with a class .container that has a red background.`;
 
         await executeAgent('DesignerAgent', taskPrompt);
 
-        // DesignerAgent might output code or an image prompt.
-        // The prompt template says: "For CSS/theme files, output ONLY the new file content."
-        // But CLIAgentPlugin just runs the command.
-        // If the command is 'gemini', it outputs text.
-        // Does it save to file?
-        // The DeveloperAgent prompt explicitly asks to generate code for a file.
-        // But CLIAgentPlugin doesn't automatically save to file unless the *Agent* (CLI tool) does it, 
-        // OR if the plugin handles it.
-        // Looking at CLIAgentPlugin.ts, it just returns stdout.
-        // Wait, DeveloperAgent test passed?
-        // If DeveloperAgent test passes, it means the 'gemini' CLI tool is writing the file?
-        // Or the CLIAgentPlugin is?
-        // CLIAgentPlugin.ts:
-        // execute(...) { ... return result.stdout; }
-        // It does NOT write to file.
-
-        // So 'gemini' CLI must be writing the file?
-        // If 'gemini' CLI is just an LLM wrapper, it might just output text.
-        // Unless 'gemini' CLI has file writing capabilities?
-        // The prompt says "Output ONLY the new file content".
-
-        // If the system relies on the user (or another tool) to save the output, 
-        // then my DeveloperAgent test expectation might be wrong IF 'gemini' doesn't write files.
-        // BUT, the user said "live integration tests... assume live environment variables and required CLI utilities".
-
-        // If 'gemini' CLI is just a text generator, then the file won't be created.
-        // However, maybe the 'gemini' tool used here is a wrapper that CAN write files?
-        // Or maybe I should check the output (stdout) instead of file existence for Designer/Developer?
-
-        // Let's assume for now we check stdout for the content, 
-        // UNLESS we know 'gemini' writes files.
-        // The prompt says "Output ONLY the new file content".
-        // This suggests it expects the output to be piped or used.
-
-        // Let's adjust the test to check stdout (via logs) AND file existence (just in case).
-        // If file doesn't exist, we check logs.
-
-        // Actually, looking at `DeveloperAgent`, it says "Creates or modifies...".
-        // If it's using `provider: cli` and `command: gemini`, it's just running gemini.
-
-        // Let's check logs for the content.
-
+        // Check logs for the content if file not written by CLI
         const logMock = console.log as jest.Mock;
         const logs = logMock.mock.calls.flat().join(' ');
         expect(logs).toMatch(/\.container/);
@@ -177,11 +138,12 @@ describe('Agents Live Integration Tests', () => {
     }, 30000);
 
     it('should execute IllustratorAgent', async () => {
+        if (!process.env.GEMINI_API_KEY) {
+            console.warn('Skipping test: GEMINI_API_KEY not found');
+            return;
+        }
         const outputPath = 'image.png';
         const taskPrompt = 'Generate an image of a futuristic city.';
-
-        // IllustratorAgent uses 'image-gen' provider.
-        // ImageGenAgentPlugin DOES write to file.
 
         try {
             await executeAgent('IllustratorAgent', taskPrompt, { output_path: outputPath });

@@ -3,12 +3,13 @@ import fs from 'fs-extra';
 import debug from 'debug';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { Application } from './models/Application.js';
+import { Application, RuntimeConfig, JobContext } from './models/Application.js';
+import { IdentityManager } from './services/IdentityManager.js';
 import { Planner } from './workflow/planner.js';
 import { Architect } from './workflow/architect.js';
 import { Executor } from './workflow/executor.js';
-import { CommandRegistry } from './plugins/CommandRegistry.js';
-import { AgentRegistry } from './plugins/AgentRegistry.js';
+import { CommandRegistry } from './services/CommandRegistry.js';
+import { SkillRegistry } from './services/SkillRegistry.js';
 import { GitService } from './services/GitService.js';
 import { GitHubService } from './services/GitHubService.js';
 import { FileSystemService } from './services/FileSystemService.js';
@@ -25,8 +26,11 @@ export class Orchestrator {
     public git: GitService;
     public github: GitHubService;
     public commandRegistry: CommandRegistry;
-    public agentRegistry: AgentRegistry;
+    public skillRegistry: SkillRegistry;
     public promptEngine: PromptEngine;
+    public identityManager?: IdentityManager;
+
+    public jobContext?: JobContext;
 
     private planner: Planner;
     private architect: Architect;
@@ -34,18 +38,19 @@ export class Orchestrator {
 
     private state!: ExecutionState;
 
-    constructor(argv: string[]) {
+    constructor(runtimeConfig: RuntimeConfig) {
         this.config = {} as Application;
         this.disk = new FileSystemService();
+        this.identityManager = runtimeConfig.identityManager;
+        this.jobContext = runtimeConfig.jobContext;
 
-        const cwd = process.cwd();
-        const projectPath = path.join(cwd, 'dev_project');
-
-        if (this.disk.exists(projectPath) && this.disk.isDirectory(projectPath)) {
-            this.config.projectPath = projectPath;
-        } else {
-            this.config.projectPath = cwd;
-        }
+        this.config.workingDirectory = runtimeConfig.workingDirectory;
+        // Legacy support or specific logic for project path can be adjusted here.
+        // For now, we assume the working directory IS the project path or contains it.
+        // The original code used a 'dev_project' subdir if present, or cwd.
+        // We will adhere to the directive: "Orchestrator must be strictly sandboxed within dynamically generated paths."
+        // So projectPath = workingDirectory.
+        this.config.projectPath = this.config.workingDirectory;
 
         log(`Project path: ${this.config.projectPath}`);
 
@@ -75,19 +80,12 @@ export class Orchestrator {
         this.disk.ensureDir(this.config.signalsPath);
         this.disk.ensureDir(this.config.archivePath);
 
-        // Load environment variables from .nexical/.env
-        const envPath = path.join(this.config.nexicalPath, '.env');
-        if (this.disk.exists(envPath)) {
-            dotenv.config({ path: envPath, quiet: true });
-            log(`Loaded environment variables from ${envPath}`);
-        } else {
-            // Fallback to root .env if .nexical/.env doesn't exist (backward compatibility or initial setup)
-            dotenv.config({ path: path.join(this.config.projectPath, '.env'), quiet: true });
-        }
+        // Env vars are now expected to be injected by the worker/runtime, 
+        // removing internal dotenv loading as per directives.
 
         // Initialize Registries
         this.commandRegistry = new CommandRegistry(this);
-        this.agentRegistry = new AgentRegistry(this);
+        this.skillRegistry = new SkillRegistry(this);
 
         // Initialize orchestrator components
         this.planner = new Planner(this);
@@ -139,10 +137,11 @@ export class Orchestrator {
     }
 
     async init(): Promise<void> {
-        const pluginsDir = path.join(this.config.appPath, 'plugins');
+        const commandsDir = path.join(this.config.appPath, 'commands');
+        const skillsDir = path.join(this.config.appPath, 'skills');
 
-        await this.commandRegistry.load(path.join(pluginsDir, 'commands'));
-        await this.agentRegistry.load(path.join(pluginsDir, 'agents'));
+        await this.commandRegistry.load(commandsDir);
+        await this.skillRegistry.load(skillsDir);
     }
 
     async runAIWorkflow(prompt: string): Promise<void> {

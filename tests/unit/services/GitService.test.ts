@@ -63,24 +63,109 @@ describe('GitService', () => {
     });
 
     describe('clone', () => {
-        it('should run git clone', () => {
+        it('should run git clone', async () => {
             mockSpawnSync.mockReturnValue({
                 status: 0,
                 stdout: '',
                 stderr: ''
             });
-            gitService.clone('url', 'dir');
-            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['clone', 'url', 'dir'], expect.objectContaining({ cwd: '.' }));
+            await gitService.clone('url', 'dir');
+            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['clone', 'url', 'dir'], expect.objectContaining({ cwd: '/test/project' }));
         });
 
-        it('should run git clone without dir', () => {
+        it('should run git clone without dir', async () => {
             mockSpawnSync.mockReturnValue({
                 status: 0,
                 stdout: '',
                 stderr: ''
             });
-            gitService.clone('url');
-            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['clone', 'url'], expect.objectContaining({ cwd: '.' }));
+            await gitService.clone('url');
+            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['clone', 'url'], expect.objectContaining({ cwd: '/test/project' }));
+        });
+
+        it('should inject token into clone url if managed', async () => {
+            const mockIdentityManager = {
+                getGitToken: (jest.fn() as jest.Mock<any>).mockResolvedValue('my-token')
+            };
+            // Create a new instance with identity manager
+            const service = new GitService({
+                config: { projectPath: '/test/project' },
+                identityManager: mockIdentityManager,
+                jobContext: { teamId: 1, projectId: 2, jobId: 3, mode: 'managed' }
+            } as any);
+
+            mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+
+            await service.clone('https://github.com/org/repo.git');
+            expect(mockSpawnSync).toHaveBeenCalledWith(
+                'git',
+                ['clone', 'https://my-token@github.com/org/repo.git'],
+                expect.any(Object)
+            );
+        });
+
+        it('should not inject token if url is not https', async () => {
+            const mockIdentityManager = {
+                getGitToken: (jest.fn() as jest.Mock<any>).mockResolvedValue('my-token')
+            };
+            const service = new GitService({
+                config: { projectPath: '/test/project' },
+                identityManager: mockIdentityManager,
+                jobContext: { teamId: 1, projectId: 2, jobId: 3, mode: 'managed' }
+            } as any);
+
+            mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+
+            await service.clone('git@github.com:org/repo.git');
+            expect(mockSpawnSync).toHaveBeenCalledWith(
+                'git',
+                ['clone', 'git@github.com:org/repo.git'],
+                expect.any(Object)
+            );
+        });
+
+        it('should not inject token if token is null', async () => {
+            const mockIdentityManager = {
+                getGitToken: (jest.fn() as jest.Mock<any>).mockResolvedValue(null)
+            };
+            const service = new GitService({
+                config: { projectPath: '/test/project' },
+                identityManager: mockIdentityManager,
+                jobContext: { teamId: 1, projectId: 2, jobId: 3, mode: 'managed' }
+            } as any);
+
+            mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+
+            await service.clone('https://github.com/org/repo.git');
+            expect(mockSpawnSync).toHaveBeenCalledWith(
+                'git',
+                ['clone', 'https://github.com/org/repo.git'],
+                expect.any(Object)
+            );
+        });
+
+        it('should handle token fetch failure gracefully', async () => {
+            const mockIdentityManager = {
+                getGitToken: (jest.fn() as jest.Mock<any>).mockRejectedValue(new Error('Auth failed'))
+            };
+            const service = new GitService({
+                config: { projectPath: '/test/project' },
+                identityManager: mockIdentityManager,
+                jobContext: { teamId: 1, projectId: 2, jobId: 3, mode: 'managed' }
+            } as any);
+
+            mockSpawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+            const spy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+            await service.clone('https://github.com/org/repo.git');
+
+            expect(mockSpawnSync).toHaveBeenCalledWith(
+                'git',
+                ['clone', 'https://github.com/org/repo.git'],
+                expect.any(Object)
+            );
+            expect(spy).toHaveBeenCalled();
+            spy.mockRestore();
         });
     });
 

@@ -1,20 +1,20 @@
 import { jest, expect, describe, it, beforeEach } from '@jest/globals';
 import { Planner } from '../../../src/workflow/planner.js';
 import { Orchestrator } from '../../../src/orchestrator.js';
-import { AgentRegistry } from '../../../src/plugins/AgentRegistry.js';
+import { SkillRegistry } from '../../../src/services/SkillRegistry.js';
 import { FileSystemService } from '../../../src/services/FileSystemService.js';
-import { AgentPlugin } from '../../../src/models/Plugins.js';
+import { Skill } from '../../../src/models/Skill.js';
 
 // Mock dependencies
-jest.mock('../../../src/plugins/AgentRegistry.js');
+jest.mock('../../../src/services/SkillRegistry.js');
 jest.mock('../../../src/services/FileSystemService.js');
 
 describe('Planner Integration Tests', () => {
     let orchestrator: Orchestrator;
     let planner: Planner;
-    let mockAgentRegistry: jest.Mocked<AgentRegistry>;
+    let mockSkillRegistry: jest.Mocked<SkillRegistry>;
     let mockDisk: jest.Mocked<FileSystemService>;
-    let mockAgentPlugin: jest.Mocked<AgentPlugin>;
+    let mockSkill: jest.Mocked<Skill>;
 
     const mockPlanYaml = `
 plan_name: Mock Plan
@@ -25,22 +25,24 @@ tasks:
 `;
 
     beforeEach(() => {
-        // Setup mock AgentPlugin
-        mockAgentPlugin = {
-            name: 'mock-agent',
-            execute: jest.fn<AgentPlugin['execute']>().mockResolvedValue('') // execute returns void/string but we don't use the result directly anymore
-        } as unknown as jest.Mocked<AgentPlugin>;
+        // Setup mock Skill
+        mockSkill = {
+            name: 'mock-skill',
+            execute: jest.fn<Skill['execute']>().mockResolvedValue(''),
+            isSupported: jest.fn().mockReturnValue(true)
+        } as unknown as jest.Mocked<Skill>;
 
-        // Setup mock AgentRegistry
-        mockAgentRegistry = {
-            getDefault: jest.fn().mockReturnValue(mockAgentPlugin),
+        // Setup mock SkillRegistry
+        mockSkillRegistry = {
+            getDefault: jest.fn().mockReturnValue(mockSkill),
             register: jest.fn(),
             get: jest.fn().mockImplementation((name) => {
-                if (name === 'cli') return mockAgentPlugin;
+                if (name === 'cli') return mockSkill;
                 return undefined;
             }),
             getAll: jest.fn(),
-        } as unknown as jest.Mocked<AgentRegistry>;
+            load: jest.fn()
+        } as unknown as jest.Mocked<SkillRegistry>;
 
         // Setup mock FileSystemService
         mockDisk = {
@@ -52,18 +54,30 @@ tasks:
                 return 'Mock Prompt Template';
             }) as any),
             writeFile: jest.fn(),
+            writeFileAtomic: jest.fn(),
+            appendFile: jest.fn(),
         } as unknown as jest.Mocked<FileSystemService>;
 
         // Setup partial Orchestrator mock
         orchestrator = {
             config: {
-                projectPath: '/mock/project', // Updated property name
+                projectPath: '/mock/project',
                 appPath: '/mock/app',
-                agentsPath: '/mock/agents',
+                agentsPath: '/mock/skills',
                 historyPath: '/mock/history',
+                capabilitiesPath: '/mock/capabilities.json',
+                architecturePath: '/mock/architecture.md',
+                agentsDefinitionPath: '/mock/agents.md',
+                logPath: '/mock/evolution.log',
+                planPath: '/mock/plan.yml',
+                personasPath: '/mock/personas',
+                nexicalPath: '/mock/.nexical'
             },
             disk: mockDisk,
-            agentRegistry: mockAgentRegistry,
+            skillRegistry: mockSkillRegistry,
+            promptEngine: {
+                render: jest.fn().mockReturnValue('Mock Prompt')
+            }
         } as unknown as Orchestrator;
 
         // Instantiate Planner
@@ -82,14 +96,14 @@ tasks:
 
         const plan = await planner.generatePlan(prompt);
 
-        // Verify AgentPlugin was called
-        expect(mockAgentPlugin.execute).toHaveBeenCalledWith(
+        // Verify Skill was called
+        expect(mockSkill.execute).toHaveBeenCalledWith(
             expect.objectContaining({ name: 'planner' }),
             '',
             expect.objectContaining({
                 userPrompt: prompt,
                 params: expect.objectContaining({
-                    prompt: expect.stringContaining('Mock Prompt Template')
+                    prompt: 'Mock Prompt'
                 })
             })
         );
@@ -99,22 +113,17 @@ tasks:
         expect(plan.plan_name).toBe('Mock Plan');
         expect(plan.tasks).toHaveLength(1);
         expect(plan.tasks[0].id).toBe('task-1');
-
-        // Note: History saving logic inside generatePlan might have changed or been removed in favor of direct file writing by agent.
-        // The current implementation reads from file and returns plan. 
-        // If savePlanToHistory is still called, we can verify it. 
-        // But based on previous steps, generatePlan returns the plan object.
     });
 
-    it('should throw error if CLI plugin is not registered', async () => {
-        mockAgentRegistry.get.mockReturnValue(undefined);
+    it('should throw error if CLI skill is not registered', async () => {
+        mockSkillRegistry.get.mockReturnValue(undefined);
 
-        await expect(planner.generatePlan('test')).rejects.toThrow('CLI plugin not found for planner.');
+        await expect(planner.generatePlan('test')).rejects.toThrow('CLI skill not found for planner.');
     });
 
-    it('should handle agent execution failure', async () => {
-        mockAgentPlugin.execute.mockRejectedValue(new Error('Agent failed'));
+    it('should handle skill execution failure', async () => {
+        mockSkill.execute.mockRejectedValue(new Error('Skill failed'));
 
-        await expect(planner.generatePlan('test')).rejects.toThrow('Agent failed');
+        await expect(planner.generatePlan('test')).rejects.toThrow('Skill failed');
     });
 });

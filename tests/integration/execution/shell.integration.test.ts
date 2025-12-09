@@ -1,19 +1,19 @@
 import { jest, describe, it, beforeEach, afterEach, expect } from '@jest/globals';
-import { CLIAgentPlugin } from '../../../src/plugins/agents/CLIAgentPlugin.js';
+import { CLISkill } from '../../../src/skills/CLISkill.js';
 import { Orchestrator } from '../../../src/orchestrator.js';
 
 describe('Shell Execution Integration Tests', () => {
     let orchestrator: Orchestrator;
-    let cliPlugin: CLIAgentPlugin;
+    let cliSkill: CLISkill;
 
     beforeEach(() => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         // We need to initialize orchestrator to setup shell executor if needed, 
-        // but CLIAgentPlugin might use a shared one or create its own.
-        // Looking at CLIAgentPlugin, it uses this.core.shellExecutor or similar?
+        // but CLISkill might use a shared one or create its own.
+        // Looking at CLISkill, it uses this.core.shellExecutor or similar?
         // Let's assume standard instantiation.
 
-        cliPlugin = new CLIAgentPlugin(orchestrator);
+        cliSkill = new CLISkill(orchestrator);
 
         // Suppress console.error
         jest.spyOn(console, 'error').mockImplementation(() => { });
@@ -36,12 +36,12 @@ describe('Shell Execution Integration Tests', () => {
 
         // execute(agent, prompt, context)
         // context.params usually contains arguments if needed, or prompt is passed.
-        // CLIAgentPlugin logic:
+        // CLISkill logic:
         // if agent.command is set, it runs that.
         // if prompt is passed, it might be appended?
         // Let's assume simple echo.
 
-        const result = await cliPlugin.execute(agentDef, 'hello world', { params: {} });
+        const result = await cliSkill.execute(agentDef, 'hello world', { params: {} });
 
         // The output of echo "hello world" should be "hello world"
         expect(result.trim()).toBe('hello world');
@@ -56,6 +56,6 @@ describe('Shell Execution Integration Tests', () => {
             args: []
         };
 
-        await expect(cliPlugin.execute(agentDef, '', { params: {} })).rejects.toThrow();
+        await expect(cliSkill.execute(agentDef, '', { params: {} })).rejects.toThrow();
     });
 });

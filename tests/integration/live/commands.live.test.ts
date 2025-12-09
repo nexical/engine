@@ -20,7 +20,7 @@ describe('Commands Live Integration Tests', () => {
     });
 
     beforeEach(async () => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         await orchestrator.init();
         // Suppress console logs but keep mocks to inspect calls
         jest.spyOn(console, 'log').mockImplementation(() => { });

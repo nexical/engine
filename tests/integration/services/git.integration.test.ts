@@ -31,7 +31,7 @@ describe('GitService Integration Tests', () => {
     });
 
     beforeEach(() => {
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: process.cwd() });
         // Force project path to temp dir
         orchestrator.config.projectPath = tempDir;
         gitService = new GitService(orchestrator);
@@ -41,6 +41,7 @@ describe('GitService Integration Tests', () => {
         const testFile = path.join(tempDir, 'test.txt');
         await fs.writeFile(testFile, 'hello world');
 
+        gitService.add('test.txt');
         gitService.commit('Initial commit');
 
         const result = spawnSync('git', ['log', '-1', '--pretty=%B'], { cwd: tempDir, encoding: 'utf-8' });

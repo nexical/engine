@@ -55,18 +55,19 @@ export class AgentRunner {
         // Future: profile.plugin could specify the plugin name.
 
         // Determine which plugin to use. 
-        let plugin;
+        // Determine which skill to use. 
+        let skill;
         if (profile.provider) {
-            plugin = this.core.agentRegistry.get(profile.provider);
-            if (!plugin) {
-                throw new Error(`Plugin '${profile.provider}' not found.`);
+            skill = this.core.skillRegistry.get(profile.provider);
+            if (!skill) {
+                throw new Error(`Skill '${profile.provider}' not found.`);
             }
         } else {
-            plugin = this.core.agentRegistry.getDefault();
+            skill = this.core.skillRegistry.getDefault();
         }
 
-        if (!plugin) {
-            throw new Error("No agent plugin found for execution.");
+        if (!skill) {
+            throw new Error("No skill found for execution.");
         }
 
         let userPromptWithPersona = userPrompt;
@@ -87,7 +88,7 @@ export class AgentRunner {
         });
 
         try {
-            await plugin.execute(profile, task.description, {
+            await skill.execute(profile, task.description, {
                 userPrompt: userPromptWithPersona,
                 taskId: task.id,
                 params: task.params

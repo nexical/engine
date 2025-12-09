@@ -20,7 +20,7 @@ const mockPlanner = jest.fn();
 const mockArchitect = jest.fn();
 const mockExecutor = jest.fn();
 const mockCommandRegistry = jest.fn();
-const mockAgentRegistry = jest.fn();
+const mockSkillRegistry = jest.fn();
 const mockGitService = jest.fn();
 const mockFileSystemService = {
     readFile: jest.fn(),
@@ -42,8 +42,8 @@ jest.unstable_mockModule('fs-extra', () => ({ default: mockFs }));
 jest.unstable_mockModule('../../src/workflow/planner.js', () => ({ Planner: mockPlanner }));
 jest.unstable_mockModule('../../src/workflow/architect.js', () => ({ Architect: mockArchitect }));
 jest.unstable_mockModule('../../src/workflow/executor.js', () => ({ Executor: mockExecutor }));
-jest.unstable_mockModule('../../src/plugins/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
-jest.unstable_mockModule('../../src/plugins/AgentRegistry.js', () => ({ AgentRegistry: mockAgentRegistry }));
+jest.unstable_mockModule('../../src/services/CommandRegistry.js', () => ({ CommandRegistry: mockCommandRegistry }));
+jest.unstable_mockModule('../../src/services/SkillRegistry.js', () => ({ SkillRegistry: mockSkillRegistry }));
 jest.unstable_mockModule('../../src/services/GitService.js', () => ({ GitService: mockGitService }));
 jest.unstable_mockModule('../../src/services/FileSystemService.js', () => ({ FileSystemService: MockFileSystemServiceConstructor }));
 
@@ -75,12 +75,12 @@ describe('Orchestrator Loop', () => {
         (mockArchitect as any).mockImplementation(() => mockArchitectInstance);
         (mockExecutor as any).mockImplementation(() => mockExecutorInstance);
         (mockCommandRegistry as any).mockImplementation(() => ({ load: jest.fn() }));
-        (mockAgentRegistry as any).mockImplementation(() => ({ load: jest.fn() }));
+        (mockSkillRegistry as any).mockImplementation(() => ({ load: jest.fn() }));
         (mockGitService as any).mockImplementation(() => ({}));
         // FileSystemService mock is already set up via the constructor mock
 
         const { Orchestrator } = await import('../../src/orchestrator.js');
-        orchestrator = new Orchestrator([]);
+        orchestrator = new Orchestrator({ workingDirectory: '/test/project' });
     });
 
     it('should run full successful workflow', async () => {

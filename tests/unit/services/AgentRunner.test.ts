@@ -28,7 +28,7 @@ describe('AgentRunner', () => {
                 readFile: jest.fn().mockReturnValue('name: test-agent\nprovider: test-provider'),
                 exists: jest.fn().mockReturnValue(true)
             },
-            agentRegistry: {
+            skillRegistry: {
                 get: jest.fn().mockReturnValue(mockPlugin),
                 getDefault: jest.fn().mockReturnValue(mockPlugin)
             },
@@ -107,7 +107,7 @@ describe('AgentRunner', () => {
 
             await agentRunner.runAgent(task, 'user prompt');
 
-            expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('test-provider');
+            expect(mockOrchestrator.skillRegistry.get).toHaveBeenCalledWith('test-provider');
 
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('agent.md', {
                 user_prompt: 'user prompt',
@@ -211,14 +211,14 @@ describe('AgentRunner', () => {
                 agent: 'unknown-provider-agent'
             };
 
-            mockOrchestrator.agentRegistry.get.mockReturnValue(undefined);
+            mockOrchestrator.skillRegistry.get.mockReturnValue(undefined);
 
-            await expect(agentRunner.runAgent(task, 'user prompt')).rejects.toThrow("Plugin 'unknown-plugin' not found");
+            await expect(agentRunner.runAgent(task, 'user prompt')).rejects.toThrow("Skill 'unknown-plugin' not found.");
         });
 
         it('should throw if no plugin found', async () => {
-            mockOrchestrator.agentRegistry.get.mockReturnValue(undefined);
-            mockOrchestrator.agentRegistry.getDefault.mockReturnValue(undefined);
+            mockOrchestrator.skillRegistry.get.mockReturnValue(undefined);
+            mockOrchestrator.skillRegistry.getDefault.mockReturnValue(undefined);
 
             // Mock an agent without provider
             (agentRunner as any).agents['no-provider-agent'] = { name: 'no-provider-agent' };
@@ -230,7 +230,7 @@ describe('AgentRunner', () => {
                 agent: 'no-provider-agent'
             };
 
-            await expect(agentRunner.runAgent(task, 'user prompt')).rejects.toThrow('No agent plugin found');
+            await expect(agentRunner.runAgent(task, 'user prompt')).rejects.toThrow('No skill found for execution.');
         });
 
         it('should propagate execution errors', async () => {
@@ -258,7 +258,7 @@ describe('AgentRunner', () => {
 
             await agentRunner.runAgent(task, 'user prompt');
 
-            expect(mockOrchestrator.agentRegistry.getDefault).toHaveBeenCalled();
+            expect(mockOrchestrator.skillRegistry.getDefault).toHaveBeenCalled();
             expect(mockPlugin.execute).toHaveBeenCalled();
         });
     });

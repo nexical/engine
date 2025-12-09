@@ -17,6 +17,7 @@ describe('ProjectUtils', () => {
 
     beforeEach(() => {
         mockApp = {
+            workingDirectory: '/project',
             appPath: '/app',
             projectPath: '/project',
             nexicalPath: '/project/.nexical',

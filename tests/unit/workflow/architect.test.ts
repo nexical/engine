@@ -32,7 +32,7 @@ describe('Architect', () => {
                 }),
                 writeFile: jest.fn()
             },
-            agentRegistry: {
+            skillRegistry: {
                 get: jest.fn<any>().mockImplementation((name: any) => {
                     if (name === 'cli') return mockPlugin;
                     return undefined;
@@ -57,7 +57,7 @@ describe('Architect', () => {
             await architect.generateArchitecture('user prompt');
 
             expect(mockOrchestrator.disk.readFile).toHaveBeenCalledWith('/project/AGENTS.md');
-            expect(mockOrchestrator.agentRegistry.get).toHaveBeenCalledWith('cli');
+            expect(mockOrchestrator.skillRegistry.get).toHaveBeenCalledWith('cli');
 
             expect(mockOrchestrator.promptEngine.render).toHaveBeenCalledWith('architect.md', {
                 user_request: 'user prompt',
@@ -102,8 +102,8 @@ describe('Architect', () => {
         });
 
         it('should throw if CLI plugin not found', async () => {
-            mockOrchestrator.agentRegistry.get.mockReturnValue(undefined);
-            await expect(architect.generateArchitecture('user prompt')).rejects.toThrow('CLI plugin not found for architect.');
+            mockOrchestrator.skillRegistry.get.mockReturnValue(undefined);
+            await expect(architect.generateArchitecture('user prompt')).rejects.toThrow('CLI skill not found for architect.');
         });
 
         it('should handle execution errors', async () => {
@@ -127,8 +127,45 @@ describe('Architect', () => {
                 expect.anything()
             );
 
-            delete process.env.ARCHITECT_CLI_COMMAND;
             delete process.env.ARCHITECT_CLI_ARGS;
+        });
+
+        it('should inject agent token from identity manager', async () => {
+            mockOrchestrator.identityManager = {
+                getAgentToken: (jest.fn() as jest.Mock<any>).mockResolvedValue('agent-token')
+            };
+            mockOrchestrator.jobContext = { teamId: 1, projectId: 2, jobId: 3 };
+
+            await architect.generateArchitecture('prompt');
+
+            expect(mockOrchestrator.identityManager.getAgentToken).toHaveBeenCalledWith(1, 2, 3);
+            expect(process.env.NEXICAL_AGENT_TOKEN).toBe('agent-token');
+
+            delete process.env.NEXICAL_AGENT_TOKEN;
+        });
+
+        it('should handle agent token failure', async () => {
+            mockOrchestrator.identityManager = {
+                getAgentToken: (jest.fn() as jest.Mock<any>).mockRejectedValue(new Error('fail'))
+            };
+            mockOrchestrator.jobContext = { teamId: 1, projectId: 2, jobId: 3 };
+            const spy = jest.spyOn(console, 'error');
+
+            await architect.generateArchitecture('prompt');
+
+            expect(spy).toHaveBeenCalledWith(expect.stringContaining('Failed to get agent token'), expect.any(Error));
+        });
+
+        it('should handle missing agent token (null)', async () => {
+            mockOrchestrator.identityManager = {
+                getAgentToken: (jest.fn() as jest.Mock<any>).mockResolvedValue(null)
+            };
+            mockOrchestrator.jobContext = { teamId: 1, projectId: 2, jobId: 3 };
+
+            await architect.generateArchitecture('prompt');
+
+            expect(mockOrchestrator.identityManager.getAgentToken).toHaveBeenCalled();
+            // NEXICAL_AGENT_TOKEN should not be set (or remain unset if we didn't set it)
         });
     });
 });

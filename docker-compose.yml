@@ -1,0 +1,18 @@
+services:
+  worker:
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID:-1000}
+        HOST_GID: ${HOST_GID:-1000}
+    image: nexical-factory-worker
+    user: worker
+    volumes:
+      - ./.nexical:/app/.nexical
+      - ./custom:/app/custom
+      # Mount socket or other requirements if needed?
+      # For now, isolated.
+    env_file:
+      - .env
+    restart: unless-stopped
+    # Healthcheck could be added

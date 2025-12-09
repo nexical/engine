@@ -114,18 +114,34 @@ ${activeSignal.reason}
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
+        if (this.core.identityManager && this.core.jobContext) {
+            try {
+                const { teamId, projectId, jobId } = this.core.jobContext;
+                const token = await this.core.identityManager.getAgentToken(teamId, projectId, jobId);
+                if (token) {
+                    process.env.NEXICAL_AGENT_TOKEN = token;
+                }
+            } catch (e) {
+                console.error("Failed to get agent token for planner:", e);
+            }
+        }
+
         try {
-            const plugin = this.core.agentRegistry.get('cli');
-            if (!plugin) {
-                throw new Error("CLI plugin not found for planner.");
+            const skill = this.core.skillRegistry.get('cli');
+            if (!skill) {
+                throw new Error("CLI skill not found for planner.");
             }
 
             // Execute the planner agent. It should write the plan to planFile.
-            await plugin.execute(plannerAgent, '', {
+            await skill.execute(plannerAgent, '', {
                 userPrompt: prompt,
                 params: {
                     prompt: fullPrompt
-                }
+                },
+                // We could pass env here if we modify calling code, but for now 
+                // modifying process.env or CLIAgentPlugin modification is better.
+                // We modified CLIAgentPlugin to use context.env via ShellExecutor.
+                env: process.env.NEXICAL_AGENT_TOKEN ? { NEXICAL_AGENT_TOKEN: process.env.NEXICAL_AGENT_TOKEN } : {}
             });
 
             // Read the plan from the file
