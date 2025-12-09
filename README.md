@@ -1,195 +1,209 @@
-# Nexical CLI (TypeScript)
+# Nexical Factory Worker
 
-Nexical is a sophisticated, TypeScript-based CLI application designed to orchestrate AI agents for complex software development tasks, specifically focusing on website modification and deployment. It leverages a modular architecture to manage workflows, execute deterministic commands, and coordinate AI-driven planning and execution.
+The **Nexical Factory Worker** is the execution engine of the Nexical Cloud ecosystem. Unlike a traditional CLI tool that you run manually for each task, the Worker is a long-running service that polls the Nexical Cloud for jobs, executes them in isolated workspaces, and pushes the results back to the repository.
+
+This service is designed to be run **autonomously**, either on your local machine for development/debugging or on a fleet of servers for production scale.
 
 ## Architecture
 
-The application follows a modular architecture centered around an **Orchestrator** that manages the workflow, initializes services, and routes commands.
+The Factory Worker follows a "pull" model:
+
+1.  **Acquisition**: The Worker polls the Nexical API (or listens to a queue) for pending `Jobs`.
+2.  **Isolation**: For each job, it creates a temporary, isolated workspace on the file system.
+3.  **Initialization**:
+    - It uses the `NEXICAL_ENROLLMENT_TOKEN` to authenticate itself.
+    - It fetches a **Git Token** (either managed by Nexical or your self-hosted token) to clone the target repository.
+4.  **Execution**:
+    - It initializes the **Orchestrator** in the workspace.
+    - Depending on the job type, it triggers the **AI Workflow** (Architect -> Planner -> Executor) or a deterministic **Command**.
+5.  **Publishing**:
+    - Upon completion, the Worker commits changes to a new branch (e.g., `job-123`).
+    - It pushes the branch to the remote repository.
+    - (Optional) It triggers downstream effects like Cloudflare deployments.
 
 ### Core Components
 
-- **Orchestrator** (`src/orchestrator.ts`): The central controller. It implements a **State Machine Loop** (`ARCHITECTING` -> `PLANNING` -> `EXECUTING`) to manage the lifecycle of a request. It handles state persistence using **Atomic Writes**, signal processing, and error recovery.
-- **Architect** (`src/workflow/architect.ts`): The high-level designer. It analyzes the user request and global constraints to generate a technical architecture (`.nexical/architecture.md`) and defines the required team personas (`.nexical/personas/*.md`).
-- **Planner** (`src/workflow/planner.ts`): Responsible for generating execution plans. It uses the architecture, personas, and an **Evolution Log** (history of failures/signals) to create a detailed task list (`.nexical/plan.yml`), assigning specific personas to each task. It supports **Delta Planning**, allowing it to update plans based on new signals or completed tasks.
-- **Executor** (`src/workflow/executor.ts`): The engine that executes generated plans. It builds a dependency graph of tasks and schedules them for execution. It actively monitors for **Signals** (interrupts) from agents and supports **Resumption** by skipping completed tasks (enforced by strict Task IDs).
-- **AgentRunner** (`src/services/AgentRunner.ts`): A service responsible for executing agents. It injects the specific **Persona** context into the agent's prompt during execution, ensuring the agent adopts the correct role, tone, and standards.
-- **PromptEngine** (`src/services/PromptEngine.ts`): A centralized template engine using **Nunjucks**. It manages all system prompts, allowing for project-level overrides and dynamic context injection.
+-   **Worker Service** (`src/worker.ts`): The entry point. Handles the lifecycle of the application, continuous polling, and graceful shutdown.
+-   **Orchestrator** (`src/orchestrator.ts`): The "brain" inside the executing workspace. It manages the state machine (Architecting, Planning, Executing) and handles "Signals" (like `REPLAN` or `REARCHITECT`) from the AI.
+-   **Skills** (formerly Agents): Distinct capabilities (like `Coding`, `Researching`) that the Worker can execute. These are defined as "Skills" to better reflect their modular nature.
 
-### Services
-
-Shared services provide core functionality across the application:
-
-- **FileSystemService** (`src/services/FileSystemService.ts`): Provides safe, consistent file I/O operations.
-- **GitService** (`src/services/GitService.ts`): Manages local git operations (status, commit, branch management).
-- **GitHubService** (`src/services/GitHubService.ts`): Handles interactions with the GitHub API (PR creation, repository management).
-- **CloudflareService** (`src/services/CloudflareService.ts`): Manages deployments to Cloudflare Pages.
-
-### Plugins
-
-The application is highly extensible through a plugin system:
-
-#### Command Plugins (`src/plugins/commands/`)
-These plugins extend the CLI with deterministic commands (prefixed with `/`).
-- **StartCommandPlugin** (`/start`): Starts the development server.
-- **OpenRouterCommandPlugin** (`/openrouter`): Configures OpenRouter settings.
-
-#### Agent Plugins (`src/plugins/agents/`)
-These plugins define how different types of agents are executed.
-- **CLIAgentPlugin**: The default plugin. It executes agents that are defined as CLI tools (wrapping external binaries or scripts).
-- **ImageGenAgentPlugin**: A specialized plugin for generating images using AI APIs.
-
-### Workflow & Persona System
-
-The system uses a multi-stage workflow to ensure high-quality output:
-
-1.  **Architect Phase**: The **Architect** analyzes the request and generates a solution architecture. Crucially, it also defines **Personas** (e.g., `frontend`, `backend`, `qa`).
-    -   Personas are stored as markdown files in `.nexical/personas/`.
-    -   They define the **Role**, **Tone**, and **Standards** (e.g., "Use React functional components", "Write unit tests").
-2.  **Planning Phase**: The **Planner** reads the architecture and available personas. It creates a plan where each task is explicitly assigned a `persona`.
-3.  **Execution Phase**: The **Executor** runs the tasks. When the **AgentRunner** executes a task, it reads the assigned persona file and injects it into the agent's context. This ensures that a generic "Coder" agent acts as a "Senior Frontend Engineer" when working on UI tasks, adhering to the specific standards defined for that role.
-
-### Signal System
-
-The Orchestrator implements a robust **Signal System** to handle dynamic changes and interruptions during execution. Agents can emit signals to request changes to the plan or architecture.
-
-- **REPLAN**: Indicates that the current plan is insufficient or blocked. The Orchestrator pauses execution and triggers the **Planner** to generate a delta plan.
-- **REARCHITECT**: Indicates a fundamental flaw in the design. The Orchestrator pauses execution and triggers the **Architect** to revise the architecture. If the `invalidates_previous_work` flag is set, completed tasks are discarded.
-
-Signals are detected by the **Executor** and bubbled up to the **Orchestrator** loop. The system prioritizes `REARCHITECT` signals over `REPLAN` signals, and processes them in chronological order to ensure the most critical issues are addressed first.
-
-### State Management
-
-The Orchestrator maintains a persistent state in `.nexical/state.yml`. This allows the workflow to be paused, resumed, or recovered after a crash.
-
-- **Session ID**: Unique identifier for the current run.
-- **Status**: Current state (`ARCHITECTING`, `PLANNING`, `EXECUTING`, `INTERRUPTED`, `COMPLETED`, `FAILED`).
-- **Loop Count**: Tracks the number of iterations to prevent infinite loops.
-- **Tasks**: Tracks `completed`, `failed`, and `pending` tasks.
-
-## Template Engine
-
-Nexical uses **Nunjucks** for prompt templating, managed by the `PromptEngine`.
-
-- **Templates**: Stored in `src/prompts/` (default) or `.nexical/prompts/` (project overrides).
-- **Context Injection**: Templates have access to dynamic context variables (e.g., `user_request`, `architecture`, `plan`, `personas`).
-- **Extensibility**: Users can override default system prompts by placing files with the same name in their project's `.nexical/prompts/` directory.
-
-## Usage
+## Setup & Usage
 
 ### Prerequisites
 
-- Node.js (v18+)
-- `gemini` CLI tool (required for the default Planner and CLI agents).
-- Cloudflare account (for deployment).
-- GitHub account (for repository management).
+-   **Node.js**: v18 or higher.
+-   **Nexical Enrollment Token**: A token obtained from the Nexical Cloud dashboard to authenticate this worker.
 
-### Installation
+### Environment Variables
 
-1.  Install dependencies:
+Configure the worker using the following environment variables (in `.env` or system env):
+
+```bash
+# === Core Configuration ===
+# Required: The URL of the Nexical Cloud API
+NEXICAL_API_URL=https://api.nexical.cloud
+
+# Required: Your unique worker enrollment token
+NEXICAL_ENROLLMENT_TOKEN=nk_worker_...
+
+# Optional: Number of concurrent jobs this worker should handle (Default: 1)
+WORKER_CONCURRENCY=1
+
+# === Skill Configuration ===
+# Required for 'image-gen' skill
+OPENROUTER_API_KEY=sk-or-...
+
+# === Deployment Configuration ===
+# Required for Cloudflare Pages auto-deployment
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...
+
+# === Debugging ===
+# Enable verbose logs for specific components
+DEBUG=worker*,orchestrator*,skill*
+```
+
+### Running Locally (Development)
+
+To run the worker on your local machine for development or debugging:
+
+1.  **Install Dependencies**:
     ```bash
     npm install
     ```
-2.  Build the project:
+
+2.  **Build the Project**:
     ```bash
     npm run build
     ```
 
-### Running the CLI
+3.  **Start the Worker**:
+    ```bash
+    npm start
+    ```
+    *or for development with hot-reload:*
+    ```bash
+    npm run dev
+    ```
 
-Use the `cli` script defined in `package.json`:
+The worker will start polling for jobs assigned to the teams/projects your token has access to.
 
-```bash
-npm run cli -- [options] [command/prompt]
-```
+### Running in Production
 
-#### Options
-
-- `--prompt <text>`: Run an AI-driven workflow with the specified prompt.
-- `--help`: Show help information.
-
-#### Interactive Mode
-
-If no arguments are provided, the CLI enters an interactive chat mode:
+For production, we recommend running the worker as a Docker container.
 
 ```bash
-npm run cli
+docker run -d \
+  -e NEXICAL_API_URL=https://api.nexical.cloud \
+  -e NEXICAL_ENROLLMENT_TOKEN=your_token \
+  -e OPENROUTER_API_KEY=your_key \
+  nexical/factory-worker:latest
 ```
 
-#### Commands
+## Authentication & Security
 
-You can run deterministic commands directly:
+Security is handled through a tiered token system:
 
-```bash
-npm run cli -- start master
-```
+1.  **Worker Authentication**: The `NEXICAL_ENROLLMENT_TOKEN` identifies the machine. It allows the worker to ask for assignments but **not** to access your code directly.
+2.  **Job-Scoped Access**: When a job is assigned, the worker requests short-lived, scoped tokens for that specific job:
+    -   **Git Token**: Unlocks access to the specific GitHub repository for the duration of the job.
+    -   **Skill Token** (formerly Agent Token): Allows the AI agents running within the job to access specific cloud resources (like Knowledge Bases or LLM APIs).
 
-## Agent Definition Patterns
+This ensures that even if a worker is compromised, the blast radius is limited.
 
-Agents are defined as YAML files located in `.nexical/agents/` (or `dev_project/.nexical/agents/` during development). This data-driven approach allows for easy creation and modification of agents without changing code.
+## Testing
 
-### Agent Profile Format (`.agent.yml`)
+The project maintains a comprehensive test suite:
 
-```yaml
-name: "ResearcherAgent"
-description: "Performs research and answers questions."
-provider: "cli" # Uses the CLIAgentPlugin
-command: "gemini" # The underlying CLI tool to call
-args: # Arguments passed to the command
-  - "prompt"
-  - "{prompt}"
-  - "--yolo"
+-   **Unit Tests**: Test individual components in isolation.
+    ```bash
+    npm run test:unit
+    ```
+-   **Integration Tests**: Test the interaction between components (e.g., Worker <-> Orchestrator).
+    ```bash
+    npm run test:integration
+    ```
+-   **Live Tests**: Run end-to-end tests against the real Nexical Cloud API. **Requires valid credentials.**
+    ```bash
+    npm run test:live
+    ```
 
-prompt_template: |
-  You are an expert researcher.
-  The user's request is: "{user_request}"
-  The specific task is: "{task_prompt}"
-```
-
-### Variable Interpolation
-
-The `AgentRunner` supports dynamic variable interpolation in `prompt_template` and `args`:
-- `{user_request}`: The original user prompt.
-- `{task_prompt}`: The specific prompt for the current task.
-- `{file_path}`: Path to a file (if specified in task params).
-- `{prompt}`: The fully processed prompt (after `prompt_template` interpolation).
-
-## Development Strategy
+## Developer Guide
 
 ### Directory Structure
 
-- `src/`: Source code.
-    - `models/`: Core data models (Application, Agent, Plan, Task).
-    - `plugins/`: Plugin implementations.
-        - `agents/`: Agent execution logic.
-        - `commands/`: CLI command implementations.
-    - `services/`: Shared infrastructure services.
-    - `utils/`: Helper utilities (Shell execution, Interpolation).
-- `dist/`: Compiled JavaScript output.
-- `tests/`: Unit and integration tests.
+-   **`src/`**
+    -   `worker.ts`: Main entry point. Initializes services and starts the polling loop.
+    -   `orchestrator.ts`: Manages the execution of a single job within a workspace.
+    -   **`commands/`**: Built-in CLI commands.
+        -   `HelpCommand.ts`
+        -   `OpenRouterCommand.ts`
+        -   `StartCommand.ts`
+    -   **`errors/`**: Custom error classes.
+        -   `SignalDetectedError.ts`: Thrown when a REPLAN or REARCHITECT signal is detected.
+    -   **`models/`**: TypeScript interfaces and types.
+        -   `Agent.ts`, `Application.ts`, `Command.ts`, `Plan.ts`, `Registry.ts`, `Skill.ts`, `State.ts`, `Task.ts`
+    -   **`plugins/`**: Directory for plugin implementations (currently unused/legacy).
+    -   **`prompts/`**: System prompts for AI agents.
+        -   `agent.md`, `architect.md`, `planner.md`
+    -   **`services/`**: Shared infrastructure components.
+        -   `AgentRunner.ts`: Executes agents/skills with the correct context.
+        -   `CapabilityService.ts`: Manages detected capabilities.
+        -   `CloudflareService.ts`: Cloudflare API integration.
+        -   `CommandRegistry.ts`: Registry for CLI commands.
+        -   `FileSystemService.ts`: Safe file system operations.
+        -   `GitHubService.ts`: GitHub API integration.
+        -   `GitService.ts`: Local Git operations.
+        -   `IdentityManager.ts`: Manages auth tokens (enrollment, git, agent).
+        -   `JobService.ts`: Updates job status and logs.
+        -   `PromptEngine.ts`: Handles prompt templating (Nunjucks).
+        -   `SkillRegistry.ts`: Loads and manages available skills.
+        -   `WorkspaceManager.ts`: Creates and cleans up temporary workspaces.
+    -   **`skills/`**: Capability implementations.
+        -   `CLISkill.ts`: Executes shell commands.
+        -   `ImageGenSkill.ts`: Generates images via AI.
+    -   **`utils/`**: Helper functions.
+        -   `interpolation.ts`: String variable interpolation.
+        -   `shell.ts`: Wrapper for child_process execution.
+        -   `validation.ts`: Input validation helpers.
+    -   **`workflow/`**: Core logic for the AI Orchestration loop.
+        -   `architect.ts`: Logic for the Architect phase.
+        -   `planner.ts`: Logic for the Planner phase.
+        -   `executor.ts`: Logic for the Executor phase.
 
-### Adding a New Command
+### Extensibility: Skills
 
-1.  Create a new class in `src/plugins/commands/` implementing `CommandPlugin`.
-2.  The `Orchestrator` will automatically discover and register it if it exports a class implementing the interface.
+The Factory Worker is extensible through **Skills**. A Skill defines a specific capability that the AI Planner can utilize.
 
-### Adding a New Agent
+#### Available Skills
 
-1.  Create a new `.agent.yml` file in `.nexical/agents/`.
-2.  Specify the `provider` (usually `cli`) and the `command` to run.
-3.  No TypeScript code changes are needed for standard CLI-based agents.
+| Skill Name | Description | Configuration Required |
+| :--- | :--- | :--- |
+| **`cli`** | Executes external CLI commands (e.g., `gemini`, `npm`). | None (relies on system PATH) |
+| **`image-gen`** | Generates images via OpenRouter API. | `OPENROUTER_API_KEY` |
 
-## Configuration
+#### Creating a New Skill
 
-Project configuration is managed in `.nexical/config.yml`.
+1.  Create a new file in `src/skills/` (e.g., `MySkill.ts`).
+2.  Implement the `Skill` interface.
+3.  Ensure it has a unique `name` and implements `execute()` and `isSupported()`.
+4.  The `SkillRegistry` will automatically discover and load it on startup.
 
-### Environment Variables
+## Troubleshooting
 
-Secrets are stored in `.nexical/.env` or `.env`:
+### Common Issues
 
-```env
-CLOUDFLARE_API_TOKEN=your_token
-CLOUDFLARE_ACCOUNT_ID=your_account_id
-GITHUB_ORG=your_github_org
-GITHUB_TOKEN=your_github_token
-OPENROUTER_API_KEY=your_openrouter_key
-```
+-   **Worker fails to start**:
+    -   Check `NEXICAL_ENROLLMENT_TOKEN`. It might be invalid or expired.
+    -   Ensure `NEXICAL_API_URL` is reachable from your network.
+
+-   **Job fails with "Git Authentication Failed"**:
+    -   The managed Git Token might have expired or lacks permissions.
+    -   If using Self-Hosted mode, check your `GITHUB_TOKEN` environment variable.
+
+-   **Image Generation fails**:
+    -   Ensure `OPENROUTER_API_KEY` is set.
+    -   Check quota/credits on your OpenRouter account.
+
+-   **"Signal Detected" Error**:
+    -   This is **normal behavior**. It means the AI requested a change in plan (REPLAN) or architecture (REARCHITECT). The Orchestrator catches this error to pivot its strategy. It is not a system crash.
