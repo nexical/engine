@@ -9,6 +9,7 @@ coverage
 .env
 
 # Test project
+.nexical
 dev_project
 test_project*
 
