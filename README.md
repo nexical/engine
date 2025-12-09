@@ -59,7 +59,7 @@ Configure the worker using the following environment variables (in `.env` or sys
 ```bash
 # === Core Configuration ===
 # Required: The URL of the Nexical Cloud API
-NEXICAL_API_URL=https://api.nexical.cloud
+NEXICAL_API_URL=https://api.nexical.ai
 
 # Required: Your unique worker enrollment token
 NEXICAL_ENROLLMENT_TOKEN=nk_worker_...
@@ -112,7 +112,7 @@ For production, we recommend running the worker as a Docker container.
 
 ```bash
 docker run -d \
-  -e NEXICAL_API_URL=https://api.nexical.cloud \
+  -e NEXICAL_API_URL=https://api.nexical.ai \
   -e NEXICAL_ENROLLMENT_TOKEN=your_token \
   -e OPENROUTER_API_KEY=your_key \
   nexical/factory-worker:latest
