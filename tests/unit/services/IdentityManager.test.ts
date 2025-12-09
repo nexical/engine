@@ -21,6 +21,12 @@ describe('IdentityManager', () => {
         identityManager = new IdentityManager(mockClient);
     });
 
+    describe('getClient', () => {
+        it('should return the client instance', () => {
+            expect(identityManager.getClient()).toBe(mockClient);
+        });
+    });
+
     describe('getGitToken', () => {
         it('should return env var for self_hosted mode', async () => {
             process.env.GIT_TOKEN = 'env-git-token';

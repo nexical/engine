@@ -92,4 +92,13 @@ export class GitService {
     getCurrentBranch(): string {
         return this.runCommand(['rev-parse', '--abbrev-ref', 'HEAD']);
     }
+
+    deleteBranch(branch: string, force: boolean = false): void {
+        const args = ['branch', force ? '-D' : '-d', branch];
+        this.runCommand(args);
+    }
+
+    pushDelete(remote: string, branch: string): void {
+        this.runCommand(['push', remote, '--delete', branch]);
+    }
 }

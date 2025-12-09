@@ -6,6 +6,10 @@ const log = debug('identity-manager');
 export class IdentityManager {
     constructor(private client: NexicalClient) { }
 
+    getClient(): NexicalClient {
+        return this.client;
+    }
+
     async getGitToken(teamId: number, projectId: number, jobId: number, mode: 'managed' | 'self_hosted'): Promise<string> {
         if (mode === 'self_hosted') {
             log('Using self-hosted git token from environment');

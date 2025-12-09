@@ -325,4 +325,37 @@ describe('GitService', () => {
             expect(mockSpawnSync).toHaveBeenCalledWith('git', ['rev-parse', '--abbrev-ref', 'HEAD'], expect.any(Object));
         });
     });
+    describe('deleteBranch', () => {
+        it('should run git branch -d', () => {
+            mockSpawnSync.mockReturnValue({
+                status: 0,
+                stdout: '',
+                stderr: ''
+            });
+            gitService.deleteBranch('branch');
+            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['branch', '-d', 'branch'], expect.any(Object));
+        });
+
+        it('should run git branch -D if forced', () => {
+            mockSpawnSync.mockReturnValue({
+                status: 0,
+                stdout: '',
+                stderr: ''
+            });
+            gitService.deleteBranch('branch', true);
+            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['branch', '-D', 'branch'], expect.any(Object));
+        });
+    });
+
+    describe('pushDelete', () => {
+        it('should run git push --delete', () => {
+            mockSpawnSync.mockReturnValue({
+                status: 0,
+                stdout: '',
+                stderr: ''
+            });
+            gitService.pushDelete('origin', 'branch');
+            expect(mockSpawnSync).toHaveBeenCalledWith('git', ['push', 'origin', '--delete', 'branch'], expect.any(Object));
+        });
+    });
 });

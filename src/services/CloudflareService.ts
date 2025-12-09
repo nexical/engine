@@ -122,4 +122,70 @@ export class CloudflareService {
             return false;
         }
     }
+    async deleteProject(projectName: string): Promise<boolean> {
+        if (!this.accountId || !this.apiToken) {
+            log('Cloudflare credentials missing. Cannot delete project.');
+            return false;
+        }
+
+        const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects/${projectName}`;
+
+        try {
+            log(`Deleting Cloudflare project '${projectName}'...`);
+            const response = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.apiToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                log(`Successfully deleted project '${projectName}'.`);
+                return true;
+            } else {
+                const body = await response.text();
+                log(`Failed to delete project '${projectName}': ${response.status} ${response.statusText}`, body);
+                return false;
+            }
+        } catch (error) {
+            log(`Error deleting project '${projectName}':`, error);
+            return false;
+        }
+    }
+
+    async addDomain(projectName: string, domain: string): Promise<boolean> {
+        if (!this.accountId || !this.apiToken) {
+            log('Cloudflare credentials missing. Cannot add domain.');
+            return false;
+        }
+
+        const url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/pages/projects/${projectName}/domains`;
+
+        try {
+            log(`Adding domain '${domain}' to project '${projectName}'...`);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: domain
+                })
+            });
+
+            if (response.ok) {
+                log(`Successfully added domain '${domain}'.`);
+                return true;
+            } else {
+                const body = await response.text();
+                log(`Failed to add domain '${domain}': ${response.status} ${response.statusText}`, body);
+                return false;
+            }
+        } catch (error) {
+            log(`Error adding domain '${domain}':`, error);
+            return false;
+        }
+    }
 }

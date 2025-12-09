@@ -165,6 +165,90 @@ describe('CloudflareService', () => {
             const result = await cloudflareService.ensureProjectExists('test', 'repo');
             expect(result).toBe(false);
         });
+        describe('deleteProject', () => {
+            it('should return true if deletion succeeds (200 OK)', async () => {
+                mockFetch.mockResolvedValueOnce({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({ success: true })
+                });
+
+                const result = await cloudflareService.deleteProject('test-project');
+
+                expect(result).toBe(true);
+                const [url, options] = mockFetch.mock.calls[0];
+                expect(url).toContain('/pages/projects/test-project');
+                expect(options.method).toBe('DELETE');
+            });
+
+            it('should return false if credentials are missing', async () => {
+                delete process.env.CLOUDFLARE_API_TOKEN;
+                cloudflareService = new CloudflareService();
+                const result = await cloudflareService.deleteProject('test-project');
+                expect(result).toBe(false);
+            });
+
+            it('should return false if API returns non-OK status', async () => {
+                mockFetch.mockResolvedValueOnce({
+                    ok: false,
+                    status: 500,
+                    statusText: 'Server Error',
+                    text: async () => 'Internal Error'
+                });
+
+                const result = await cloudflareService.deleteProject('test-project');
+                expect(result).toBe(false);
+            });
+
+            it('should return false if fetch throws exception', async () => {
+                mockFetch.mockRejectedValueOnce(new Error('Network Error'));
+                const result = await cloudflareService.deleteProject('test-project');
+                expect(result).toBe(false);
+            });
+        });
+
+        describe('addDomain', () => {
+            it('should return true if adding domain succeeds (200 OK)', async () => {
+                mockFetch.mockResolvedValueOnce({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({ success: true })
+                });
+
+                const result = await cloudflareService.addDomain('test-project', 'test.com');
+
+                expect(result).toBe(true);
+                const [url, options] = mockFetch.mock.calls[0];
+                expect(url).toContain('/pages/projects/test-project/domains');
+                expect(options.method).toBe('POST');
+                const body = JSON.parse(options.body);
+                expect(body.name).toBe('test.com');
+            });
+
+            it('should return false if credentials are missing', async () => {
+                delete process.env.CLOUDFLARE_API_TOKEN;
+                cloudflareService = new CloudflareService();
+                const result = await cloudflareService.addDomain('test-project', 'test.com');
+                expect(result).toBe(false);
+            });
+
+            it('should return false if API returns non-OK status', async () => {
+                mockFetch.mockResolvedValueOnce({
+                    ok: false,
+                    status: 400,
+                    statusText: 'Bad Request',
+                    text: async () => 'Invalid Domain'
+                });
+
+                const result = await cloudflareService.addDomain('test-project', 'test.com');
+                expect(result).toBe(false);
+            });
+
+            it('should return false if fetch throws exception', async () => {
+                mockFetch.mockRejectedValueOnce(new Error('Network Error'));
+                const result = await cloudflareService.addDomain('test-project', 'test.com');
+                expect(result).toBe(false);
+            });
+        });
     });
 });
-

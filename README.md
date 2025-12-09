@@ -27,6 +27,24 @@ The Factory Worker follows a "pull" model:
 -   **Orchestrator** (`src/orchestrator.ts`): The "brain" inside the executing workspace. It manages the state machine (Architecting, Planning, Executing) and handles "Signals" (like `REPLAN` or `REARCHITECT`) from the AI.
 -   **Skills** (formerly Agents): Distinct capabilities (like `Coding`, `Researching`) that the Worker can execute. These are defined as "Skills" to better reflect their modular nature.
 
+### CLI Commands & Orchestration
+
+The Factory Worker exposes a set of deterministic **CLI Commands** that bridge the gap between abstract resource management and concrete infrastructure operations. These commands are typically invoked by the Orchestrator or manually for maintenance.
+
+| Command | Usage | Description | Orchestration Role |
+| :--- | :--- | :--- | :--- |
+| **`/create`** | `/create <projectId>` | Provisions a **GitHub repository** (if missing) and a **Cloudflare Pages project**. Links the production domain if specified in the Project entity. | **Initialization**: Called when a new Project is first spun up to ensure all infrastructure exists before work begins. |
+| **`/destroy`** | `/destroy <projectId>` | Deletes the **Cloudflare Pages project** and the **Project entity** in the Orchestrator. **CRITICAL: The GitHub repository is preserved.** | **Teardown**: Called when a project is archived or deleted from the Cloud dashboard, ensuring clean resource release without losing code. |
+| **`/publish`** | `/publish <projectId> <branch>` | Merges the specified job branch into `main`, pushes the changes, and triggers a production deployment via Cloudflare. | **Completion**: step in the workflow where a job's output is promoted to production. |
+| **`/close`** | `/close <projectId> <branch>` | Deletes the local and remote job branch. | **Cleanup**: Called after a successful `/publish` or when a job is cancelled, keeping the repository clean. |
+| **`/help`** | `/help` | Lists all available commands. | **Discovery**: Useful for manual debugging. |
+
+#### Service Integration
+These commands rely on tight integration with core services:
+- **`GitHubService`**: Handles repository creation, idempotent checks, and merging.
+- **`CloudflareService`**: Manages the lifecycle of Pages projects and domain mapping.
+
+
 ## Setup & Usage
 
 ### Prerequisites
@@ -115,9 +133,13 @@ This ensures that even if a worker is compromised, the blast radius is limited.
 
 The project maintains a comprehensive test suite:
 
--   **Unit Tests**: Test individual components in isolation.
+-   **Unit Tests**: Test individual components in isolation. We maintain **100% test coverage** for the Factory project.
     ```bash
     npm run test:unit
+    ```
+    To verify coverage:
+    ```bash
+    NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit --collectCoverage=true
     ```
 -   **Integration Tests**: Test the interaction between components (e.g., Worker <-> Orchestrator).
     ```bash
@@ -135,10 +157,12 @@ The project maintains a comprehensive test suite:
 -   **`src/`**
     -   `worker.ts`: Main entry point. Initializes services and starts the polling loop.
     -   `orchestrator.ts`: Manages the execution of a single job within a workspace.
-    -   **`commands/`**: Built-in CLI commands.
-        -   `HelpCommand.ts`
-        -   `OpenRouterCommand.ts`
-        -   `StartCommand.ts`
+        -   **`commands/`**: Built-in CLI commands.
+            -   `CloseCommand.ts`: Closes a job branch (local & remote).
+            -   `CreateCommand.ts`: Provisions GitHub repo and Cloudflare project.
+            -   `DestroyCommand.ts`: Deletes Cloudflare project and Orchestrator entity (preserves GitHub).
+            -   `HelpCommand.ts`: Lists available commands.
+            -   `PublishCommand.ts`: Merges job branch to main and triggers deployment.
     -   **`errors/`**: Custom error classes.
         -   `SignalDetectedError.ts`: Thrown when a REPLAN or REARCHITECT signal is detected.
     -   **`models/`**: TypeScript interfaces and types.

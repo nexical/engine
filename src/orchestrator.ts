@@ -12,6 +12,7 @@ import { CommandRegistry } from './services/CommandRegistry.js';
 import { SkillRegistry } from './services/SkillRegistry.js';
 import { GitService } from './services/GitService.js';
 import { GitHubService } from './services/GitHubService.js';
+import { CloudflareService } from './services/CloudflareService.js';
 import { FileSystemService } from './services/FileSystemService.js';
 import { PromptEngine } from './services/PromptEngine.js';
 import { ExecutionState, OrchestratorState, Signal } from './models/State.js';
@@ -25,6 +26,7 @@ export class Orchestrator {
     public disk: FileSystemService;
     public git: GitService;
     public github: GitHubService;
+    public cloudflare: CloudflareService;
     public commandRegistry: CommandRegistry;
     public skillRegistry: SkillRegistry;
     public promptEngine: PromptEngine;
@@ -73,6 +75,7 @@ export class Orchestrator {
         // Initialize shared services
         this.git = new GitService(this);
         this.github = new GitHubService(this);
+        this.cloudflare = new CloudflareService();
         this.promptEngine = new PromptEngine(this);
 
         // Ensure directories exist
