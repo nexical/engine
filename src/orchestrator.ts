@@ -1,113 +1,72 @@
-import path from 'path';
-import fs from 'fs-extra';
-import debug from 'debug';
-import { fileURLToPath } from 'url';
+import { SignalDetectedError } from './errors/SignalDetectedError.js';
+import { RuntimeHost } from './interfaces/RuntimeHost.js';
+import { ProjectProfile } from './interfaces/ProjectProfile.js';
 import { Application } from './models/Application.js';
+import { EngineState, Signal } from './models/State.js';
+import { AgentSession } from './models/AgentSession.js';
 import { Planner } from './workflow/planner.js';
 import { Architect } from './workflow/architect.js';
 import { Executor } from './workflow/executor.js';
-
-import { DriverRegistry } from './services/DriverRegistry.js';
 import { GitService } from './services/GitService.js';
-import { GitHubService } from './services/GitHubService.js';
-import { CloudflareService } from './services/CloudflareService.js';
 import { FileSystemService } from './services/FileSystemService.js';
 import { PromptEngine } from './services/PromptEngine.js';
-import { ExecutionState, Signal } from './models/State.js';
-import { SignalDetectedError } from './errors/SignalDetectedError.js';
-import { RuntimeHost } from './interfaces/RuntimeHost.js';
-import { AgentSession } from './interfaces/AgentSession.js';
+import { DriverRegistry } from './drivers/Registry.js';
 import yaml from 'js-yaml';
+import path from 'path';
+import debug from 'debug';
 
 const log = debug('orchestrator');
 
 export class Orchestrator {
     public config: Application;
+    public state!: EngineState;
+
     public disk: FileSystemService;
     public git: GitService;
-    public github: GitHubService;
-    public cloudflare: CloudflareService;
 
     public driverRegistry: DriverRegistry;
     public promptEngine: PromptEngine;
 
     public host: RuntimeHost;
     public session: AgentSession;
+    public profile!: ProjectProfile;
 
     private planner: Planner;
     private architect: Architect;
     private executor: Executor;
 
-    private state!: ExecutionState;
-
-    constructor(host: RuntimeHost, workingDirectory: string) {
+    constructor(rootDirectory: string, host: RuntimeHost) {
         this.host = host;
-        this.config = {} as Application;
         this.disk = new FileSystemService();
+        this.config = new Application(rootDirectory, this.disk);
 
-        this.config.workingDirectory = workingDirectory;
-        // this.config.projectPath = this.config.workingDirectory; // Removed
-
-        this.host.log('info', `Project path: ${this.config.workingDirectory}`);
-
-        this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
-        this.config.nexicalPath = path.join(this.config.workingDirectory, '.nexical');
-        this.config.skillsDir = path.join(this.config.nexicalPath, 'skills');
-        this.config.historyPath = path.join(this.config.nexicalPath, 'history')
-        this.config.configPath = path.join(this.config.nexicalPath, 'config.yml');
-
-        this.config.statePath = path.join(this.config.nexicalPath, 'state.yml');
-        this.config.signalsPath = path.join(this.config.nexicalPath, 'signals');
-        this.config.archivePath = path.join(this.config.nexicalPath, 'archive');
-        this.config.logPath = path.join(this.config.workingDirectory, 'log.md');
-        this.config.skillsDefinitionPath = path.join(this.config.workingDirectory, 'SKILLS.md');
-        this.config.architecturePath = path.join(this.config.nexicalPath, 'architecture.md');
-        this.config.personasPath = path.join(this.config.nexicalPath, 'personas/');
-        this.config.planPath = path.join(this.config.nexicalPath, 'plan.yml');
-        this.config.skillsPath = path.join(this.config.skillsDir, 'skills.yml');
-        this.config.driversDir = path.join(this.config.nexicalPath, 'drivers');
+        this.host.log('info', `Project path: ${this.config.rootDirectory}`);
 
         // Initialize session
-        this.session = {
-            id: new Date().toISOString().replace(/[:.]/g, '-'),
-            profile: { name: 'default' }, // Minimal profile stub since we removed Profile interface
-            workspacePath: workingDirectory,
-            history: [],
-            memory: {}
-        };
+        this.session = new AgentSession(this.config);
+        this.loadConfig();
 
         // Initialize shared services
         this.git = new GitService(this);
-        this.github = new GitHubService(this);
-        this.cloudflare = new CloudflareService();
         this.promptEngine = new PromptEngine(this);
 
-        // Ensure directories exist
-        this.disk.ensureDir(this.config.nexicalPath);
-        this.disk.ensureDir(this.config.signalsPath);
-        this.disk.ensureDir(this.config.archivePath);
-
         // Initialize Registries
-
         this.driverRegistry = new DriverRegistry(this);
 
         // Initialize orchestrator components
         this.planner = new Planner(this);
         this.architect = new Architect(this);
         this.executor = new Executor(this);
-
-        this.loadConfig();
     }
 
     private loadConfig(): void {
-        // Placeholder for config loading logic.
-        // In future this will read .nexical/config.yml
+        this.profile = {} as ProjectProfile;
+
         if (this.disk.exists(this.config.configPath)) {
             try {
                 const content = this.disk.readFile(this.config.configPath);
-                const projectConfig = yaml.load(content);
+                this.profile = yaml.load(content) as ProjectProfile;
                 this.host.log('info', `Loaded project config from ${this.config.configPath}`);
-                // Apply config to this.config or other services if needed
             } catch (e) {
                 this.host.log('error', `Failed to load config: ${e}`);
             }
@@ -117,26 +76,17 @@ export class Orchestrator {
     private loadState(): void {
         if (this.disk.exists(this.config.statePath)) {
             const content = this.disk.readFile(this.config.statePath);
-            this.state = yaml.load(content) as ExecutionState;
+            this.state = EngineState.fromYaml(content);
             this.session.id = this.state.session_id; // Sync session ID
             this.host.log('info', `Loaded state: ${this.state.session_id} (${this.state.status})`);
         } else {
-            this.state = {
-                session_id: this.session.id,
-                status: 'IDLE',
-                loop_count: 0,
-                tasks: {
-                    completed: [],
-                    failed: [],
-                    pending: []
-                }
-            };
+            this.state = new EngineState(this.session.id);
             this.host.log('debug', `Initialized new state: ${this.state.session_id}`);
         }
     }
 
     private saveState(): void {
-        const content = yaml.dump(this.state);
+        const content = this.state.toYaml();
         this.disk.writeFileAtomic(this.config.statePath, content);
         this.host.status(this.state.status);
     }
@@ -181,9 +131,9 @@ export class Orchestrator {
         // If resuming, check if we need to reset loop count or handle previous interruption
         if (this.state.status === 'INTERRUPTED') {
             this.host.log('info', "Resuming interrupted session...");
-            this.state.status = 'PLANNING'; // Default resume state
+            this.state.updateStatus('PLANNING'); // Default resume state
         } else {
-            this.state.status = 'ARCHITECTING';
+            this.state.updateStatus('ARCHITECTING');
             // TODO: Store prompt in session/state so Architect can access it without passing it around?
             // For now, we will pass it.
         }
@@ -203,7 +153,7 @@ export class Orchestrator {
         while (this.state.status !== 'COMPLETED' && this.state.status !== 'FAILED') {
             if (this.state.loop_count > MAX_LOOPS) {
                 this.host.log('error', "Max loops reached. Stopping.");
-                this.state.status = 'FAILED';
+                this.state.updateStatus('FAILED');
                 this.saveState();
                 break;
             }
@@ -224,7 +174,7 @@ export class Orchestrator {
                 case 'ARCHITECTING':
                     this.host.log('info', "State: ARCHITECTING");
                     await this.architect.generateArchitecture(prompt);
-                    this.state.status = 'PLANNING';
+                    this.state.updateStatus('PLANNING');
                     this.saveState();
                     break;
 
@@ -232,7 +182,7 @@ export class Orchestrator {
                     this.host.log('info', "State: PLANNING");
                     const plan = await this.planner.generatePlan(prompt, this.state.last_signal, this.state.tasks.completed);
                     this.state.current_plan = plan.plan_name;
-                    this.state.status = 'EXECUTING';
+                    this.state.updateStatus('EXECUTING');
                     this.saveState();
                     break;
                 }
@@ -241,17 +191,36 @@ export class Orchestrator {
                     this.host.log('info', "State: EXECUTING");
                     const planPath = this.config.planPath;
                     const planContent = this.disk.readFile(planPath);
+                    // Updated to use Plan.fromYaml
+                    // But wait, Executor expects Plan object or json?
+                    // Executor.executePlan signature is likely specific.
+                    // Let's assume for now we load it as any or Plan.
+                    // But `planContent` is string.
+                    // Check Executor signature later. 
+                    // However, we imported Plan, so let's use it if Executor supports it.
+                    // The old code was `yaml.load(planContent)`.
+                    // We need to verify `executor.ts`.
+                    // For now, let's keep it as `yaml.load` BUT cast to any to be safe OR refactor usage if I fix executor.
+                    // But I AM refactoring executor. So I should use the proper class here if I can.
+
+                    // Actually, let's look at `executor.ts` in the next step.
+                    // Here I will use `yaml.load` compatible with old way OR better, use `Plan.fromYaml(planContent)`.
+                    // I will change it to `import { Plan } from './models/Plan.js'` (already imported?)
+                    // It is NOT imported in replacement content above. I should add `import { Plan } from './models/Plan.js';`
+                    // Ah, I missed adding `Plan` to imports.
+
+                    // Let's defer strict typing of this call until I verify Executor.
                     const plan = yaml.load(planContent) as any;
 
                     await this.executor.executePlan(plan, prompt, this.state.tasks.completed);
 
-                    this.state.status = 'COMPLETED';
+                    this.state.updateStatus('COMPLETED');
                     this.saveState();
                     break;
                 }
                 case 'INTERRUPTED':
                     this.host.log('warn', "State: INTERRUPTED - Resuming to PLANNING");
-                    this.state.status = 'PLANNING';
+                    this.state.updateStatus('PLANNING');
                     this.saveState();
                     break;
 
@@ -266,19 +235,19 @@ export class Orchestrator {
         } catch (e) {
             if (e instanceof SignalDetectedError) {
                 this.host.log('warn', `Signal detected: ${e.signal.type}`);
-                this.state.last_signal = e.signal;
-                this.state.status = 'INTERRUPTED';
-                this.state.loop_count++;
+                this.state.recordSignal(e.signal);
+                this.state.updateStatus('INTERRUPTED');
+                this.state.incrementLoop();
 
                 this.appendEvolutionLog(e.signal);
 
                 if (e.signal.type === 'REARCHITECT') {
-                    this.state.status = 'ARCHITECTING';
+                    this.state.updateStatus('ARCHITECTING');
                     if (e.signal.invalidates_previous_work) {
                         this.state.tasks.completed = [];
                     }
                 } else if (e.signal.type === 'REPLAN') {
-                    this.state.status = 'PLANNING';
+                    this.state.updateStatus('PLANNING');
                 }
 
                 this.saveState();
@@ -290,7 +259,7 @@ export class Orchestrator {
 
             } else {
                 this.host.log('error', `Unexpected error: ${(e as Error).message}`);
-                this.state.status = 'FAILED';
+                this.state.updateStatus('FAILED');
                 this.saveState();
                 throw e;
             }

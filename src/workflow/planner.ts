@@ -2,7 +2,7 @@ import path from 'path';
 import debug from 'debug';
 import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
-import { Plan, PlanUtils } from '../models/Plan.js';
+import { Plan } from '../models/Plan.js';
 import { Skill } from '../models/Skill.js';
 import { Signal } from '../models/State.js';
 
@@ -55,7 +55,7 @@ export class Planner {
         const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yml`;
         const filePath = path.join(this.core.config.historyPath, filename);
 
-        const yamlContent = PlanUtils.toYaml(plan);
+        const yamlContent = plan.toYaml();
         this.core.disk.writeFileAtomic(filePath, yamlContent);
         log(`Saved plan history to: ${filePath}`);
     }
@@ -129,7 +129,7 @@ ${activeSignal.reason}
 
             // Read the plan from the file
             const planContent = this.core.disk.readFile(this.core.config.planPath);
-            const plan = PlanUtils.fromYaml(planContent);
+            const plan = Plan.fromYaml(planContent);
 
             this.savePlanToHistory(plan);
             return plan;

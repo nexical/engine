@@ -1,53 +1,72 @@
-import fs from 'fs-extra';
-import yaml from 'js-yaml';
+import { FileSystemService } from '../services/FileSystemService.js';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-export interface Application {
-    workingDirectory: string;
-    appPath: string;
-    nexicalPath: string;
-    skillsDir: string;
-    historyPath: string;
-    configPath: string;
-    statePath: string;
-    signalsPath: string;
-    archivePath: string;
-    logPath: string;
-    skillsDefinitionPath: string;
-    architecturePath: string;
-    personasPath: string;
-    planPath: string;
-    skillsPath: string;
-    driversDir: string;
-}
+export class Application {
+    private disk: FileSystemService;
 
-export interface JobContext {
-    jobId: number;
-    projectId: number;
-    teamId: number;
-    mode: 'managed' | 'self_hosted';
-}
+    public rootDirectory: string;
+    public appDirectory: string;
+    public aiDirectory: string;
 
-export interface RuntimeConfig {
-    workingDirectory: string;
-    jobContext?: JobContext;
-    env?: Record<string, string>;
-}
+    public configPath: string;
+    public statePath: string;
+    public logPath: string;
 
-export interface Project {
-    project_name: string;
-    production_domain?: string;
-    preview_domain?: string;
-}
+    public promptDirectory: string;
+    public architecturePromptFile: string;
+    public plannerPromptFile: string;
+    public skillPromptFile: string;
 
-export class ProjectUtils {
-    static loadConfig(app: Application): Project {
-        if (fs.existsSync(app.configPath)) {
-            const content = fs.readFileSync(app.configPath, 'utf-8');
-            const projectConfig = yaml.load(content) as Project;
-            if (projectConfig && projectConfig.project_name) {
-                return projectConfig;
-            }
-        }
-        throw new Error(`${app.configPath} not found`);
+    public planDirectory: string;
+    public planPath: string;
+
+    public personasDirectory: string;
+    public driversDirectory: string;
+    public skillsDirectory: string;
+    public skillsPath: string;
+
+    public signalsDirectory: string;
+    public archiveDirectory: string;
+
+    constructor(rootDirectory: string, disk: FileSystemService) {
+        this.disk = disk;
+
+        this.rootDirectory = rootDirectory;
+        this.appDirectory = path.dirname(fileURLToPath(import.meta.url));
+        this.aiDirectory = path.join(this.rootDirectory, '.ai');
+
+        this.configPath = path.join(this.aiDirectory, 'config.yml');
+        this.statePath = path.join(this.aiDirectory, 'state.yml');
+        this.logPath = path.join(this.aiDirectory, 'log.yml');
+
+        this.promptDirectory = path.join(this.aiDirectory, 'prompts');
+        this.architecturePromptFile = 'architecture.md';
+        this.plannerPromptFile = 'planner.md';
+        this.skillPromptFile = 'skill.md';
+
+        this.planDirectory = path.join(this.aiDirectory, 'plan');
+        this.planPath = path.join(this.planDirectory, 'current.yml');
+
+        this.personasDirectory = path.join(this.aiDirectory, 'personas');
+        this.driversDirectory = path.join(this.aiDirectory, 'drivers');
+        this.skillsDirectory = path.join(this.aiDirectory, 'skills');
+        this.skillsPath = path.join(this.skillsDirectory, 'skills.yml');
+
+        this.signalsDirectory = path.join(this.aiDirectory, 'signals');
+        this.archiveDirectory = path.join(this.aiDirectory, 'archive');
+
+        this.ensureDirectories();
+    }
+
+    public ensureDirectories(): void {
+        this.disk.ensureDir(this.aiDirectory);
+        this.disk.ensureDir(this.promptDirectory);
+        this.disk.ensureDir(this.planDirectory);
+        this.disk.ensureDir(this.personasDirectory);
+        this.disk.ensureDir(this.driversDirectory);
+        this.disk.ensureDir(this.skillsDirectory);
+        this.disk.ensureDir(this.signalsDirectory);
+        this.disk.ensureDir(this.archiveDirectory);
     }
 }

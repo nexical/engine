@@ -1,21 +1,30 @@
 import { Task } from './Task.js';
 import yaml from 'js-yaml';
 
-export interface Plan {
-    plan_name: string;
-    tasks: Task[];
-}
+export class Plan {
+    public plan_name: string;
+    public tasks: Task[];
 
-export class PlanUtils {
-    static toYaml(plan: Plan): string {
-        return yaml.dump(plan);
+    constructor(plan_name: string, tasks: Task[] = []) {
+        this.plan_name = plan_name;
+        this.tasks = tasks;
+    }
+
+    addTask(task: Task): void {
+        this.tasks.push(task);
+    }
+
+    getTask(id: string): Task | undefined {
+        return this.tasks.find(t => t.id === id);
+    }
+
+    toYaml(): string {
+        return yaml.dump(this);
     }
 
     static fromYaml(yamlString: string): Plan {
         const data = yaml.load(yamlString) as any;
-        return {
-            plan_name: data.plan_name,
-            tasks: data.tasks || [],
-        };
+        const tasks = (data.tasks || []).map((t: any) => Task.fromData(t));
+        return new Plan(data.plan_name, tasks);
     }
 }

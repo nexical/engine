@@ -1,34 +1,21 @@
+import { Driver } from '../interfaces/Driver.js';
+import { Registry } from '../models/Registry.js';
+import { SkillService } from '../services/SkillService.js';
 import path from 'path';
 import fs from 'fs-extra';
-import { readdir } from 'fs/promises';
 import debug from 'debug';
-import { Driver, Skills } from '../models/Driver.js';
-import { Registry, BaseRegistry } from '../models/Registry.js';
-import { SkillService } from './SkillService.js';
 
 const log = debug('driver-registry');
 
-export class DriverRegistry extends BaseRegistry implements Registry<Driver> {
-    private plugins: Map<string, Driver> = new Map();
+export class DriverRegistry extends Registry<Driver> {
     private defaultPlugin: Driver | undefined;
     private skillService = new SkillService();
 
     register(plugin: Driver, isDefault: boolean = false): void {
-        if (this.plugins.has(plugin.name)) {
-            console.warn(`Driver '${plugin.name}' is already registered. Overwriting.`);
-        }
-        this.plugins.set(plugin.name, plugin);
+        super.register(plugin);
         if (isDefault) {
             this.defaultPlugin = plugin;
         }
-    }
-
-    get(name: string): Driver | undefined {
-        return this.plugins.get(name);
-    }
-
-    getAll(): Driver[] {
-        return Array.from(this.plugins.values());
     }
 
     getDefault(): Driver | undefined {
