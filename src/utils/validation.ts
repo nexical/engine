@@ -13,7 +13,7 @@ export const TaskSchema = z.object({
     id: z.string().optional(),
     description: z.string(),
     message: z.string(),
-    agent: z.string(),
+    skill: z.string(),
     dependencies: z.array(z.string()).optional(),
     params: z.record(z.string(), z.any()).optional(),
 });

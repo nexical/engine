@@ -49,7 +49,7 @@ Responsible for high-level design.
 
 ### 3. The Planner (`src/workflow/planner.ts`)
 Responsible for tactical execution steps.
-- **Input**: Architecture, agent capabilities, active signals, completed tasks, and the **Evolution Log**.
+- **Input**: Architecture, agent skills, active signals, completed tasks, and the **Evolution Log**.
 - **Output**: `plan.yml`.
 - **Role**: Breaks the architecture into a dependency graph of `Task`s. It assigns each task to a specific Agent. The Evolution Log provides historical context to prevent repetitive failures.
 
@@ -145,7 +145,7 @@ When all tasks are done, the system exits successfully.
 ## Agent Integration
 
 ### Agent Definitions (`AGENTS.md` / `agents/*.yml`)
-Agents are defined by their capabilities and configuration.
+Agents are defined by their skills and configuration.
 - **Profile**: A YAML file (e.g., `coder.agent.yml`) defining the agent's name, description, and the command to run it.
 
 ### The CLI Bridge

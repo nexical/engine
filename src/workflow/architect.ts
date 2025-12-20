@@ -2,7 +2,7 @@ import path from 'path';
 import debug from 'debug';
 import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
-import { Agent } from '../models/Agent.js';
+import { Skill } from '../models/Skill.js';
 
 const log = debug('architect');
 
@@ -10,13 +10,12 @@ export class Architect {
     constructor(private core: Orchestrator) { }
 
     private getGlobalConstraints(): string {
-        const agentsMdPath = this.core.config.agentsDefinitionPath;
-        if (this.core.disk.exists(agentsMdPath)) {
-            return this.core.disk.readFile(agentsMdPath);
+        const skillsMdPath = this.core.config.skillsDefinitionPath;
+        if (this.core.disk.exists(skillsMdPath)) {
+            return this.core.disk.readFile(skillsMdPath);
         }
         return "There are no global constraints defined.";
     }
-
     private getEvolutionLog(): string {
         const logPath = this.core.config.logPath;
         if (this.core.disk.exists(logPath)) {
@@ -49,38 +48,25 @@ export class Architect {
             evolution_log: evolutionLog
         });
 
-        const architectAgent: Agent = {
+        const architectSkill: Skill = {
             name: 'architect',
             command: architectCliCommand,
             args: architectCliArgs,
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
-        if (this.core.identityManager && this.core.jobContext) {
-            try {
-                const { teamId, projectId, jobId } = this.core.jobContext;
-                const token = await this.core.identityManager.getAgentToken(teamId, projectId, jobId);
-                if (token) {
-                    process.env.NEXICAL_AGENT_TOKEN = token;
-                }
-            } catch (e) {
-                console.error("Failed to get agent token for architect:", e);
-            }
-        }
-
         try {
-            const skill = this.core.skillRegistry.get('cli');
-            if (!skill) {
-                throw new Error("CLI skill not found for architect.");
+            const driver = this.core.driverRegistry.get('cli');
+            if (!driver) {
+                throw new Error("CLI driver not found for architect.");
             }
 
-            // Execute the architect agent. It should write the architectur to architectureFile.
-            await skill.execute(architectAgent, '', {
+            // Execute the architect skill. It should write the architectur to architectureFile.
+            await driver.execute(architectSkill, '', {
                 userPrompt: prompt,
                 params: {
                     prompt: fullPrompt
-                },
-                env: process.env.NEXICAL_AGENT_TOKEN ? { NEXICAL_AGENT_TOKEN: process.env.NEXICAL_AGENT_TOKEN } : {}
+                }
             });
 
         } catch (e) {

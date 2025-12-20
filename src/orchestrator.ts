@@ -1,22 +1,22 @@
 import path from 'path';
 import fs from 'fs-extra';
 import debug from 'debug';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
-import { Application, RuntimeConfig, JobContext } from './models/Application.js';
-import { IdentityManager } from './services/IdentityManager.js';
+import { Application } from './models/Application.js';
 import { Planner } from './workflow/planner.js';
 import { Architect } from './workflow/architect.js';
 import { Executor } from './workflow/executor.js';
-import { CommandRegistry } from './services/CommandRegistry.js';
-import { SkillRegistry } from './services/SkillRegistry.js';
+
+import { DriverRegistry } from './services/DriverRegistry.js';
 import { GitService } from './services/GitService.js';
 import { GitHubService } from './services/GitHubService.js';
 import { CloudflareService } from './services/CloudflareService.js';
 import { FileSystemService } from './services/FileSystemService.js';
 import { PromptEngine } from './services/PromptEngine.js';
-import { ExecutionState, OrchestratorState, Signal } from './models/State.js';
+import { ExecutionState, Signal } from './models/State.js';
 import { SignalDetectedError } from './errors/SignalDetectedError.js';
+import { RuntimeHost } from './interfaces/RuntimeHost.js';
+import { AgentSession } from './interfaces/AgentSession.js';
 import yaml from 'js-yaml';
 
 const log = debug('orchestrator');
@@ -27,12 +27,12 @@ export class Orchestrator {
     public git: GitService;
     public github: GitHubService;
     public cloudflare: CloudflareService;
-    public commandRegistry: CommandRegistry;
-    public skillRegistry: SkillRegistry;
-    public promptEngine: PromptEngine;
-    public identityManager?: IdentityManager;
 
-    public jobContext?: JobContext;
+    public driverRegistry: DriverRegistry;
+    public promptEngine: PromptEngine;
+
+    public host: RuntimeHost;
+    public session: AgentSession;
 
     private planner: Planner;
     private architect: Architect;
@@ -40,37 +40,41 @@ export class Orchestrator {
 
     private state!: ExecutionState;
 
-    constructor(runtimeConfig: RuntimeConfig) {
+    constructor(host: RuntimeHost, workingDirectory: string) {
+        this.host = host;
         this.config = {} as Application;
         this.disk = new FileSystemService();
-        this.identityManager = runtimeConfig.identityManager;
-        this.jobContext = runtimeConfig.jobContext;
 
-        this.config.workingDirectory = runtimeConfig.workingDirectory;
-        // Legacy support or specific logic for project path can be adjusted here.
-        // For now, we assume the working directory IS the project path or contains it.
-        // The original code used a 'dev_project' subdir if present, or cwd.
-        // We will adhere to the directive: "Orchestrator must be strictly sandboxed within dynamically generated paths."
-        // So projectPath = workingDirectory.
-        this.config.projectPath = this.config.workingDirectory;
+        this.config.workingDirectory = workingDirectory;
+        // this.config.projectPath = this.config.workingDirectory; // Removed
 
-        log(`Project path: ${this.config.projectPath}`);
+        this.host.log('info', `Project path: ${this.config.workingDirectory}`);
 
         this.config.appPath = path.dirname(fileURLToPath(import.meta.url));
-        this.config.nexicalPath = path.join(this.config.projectPath, '.nexical');
-        this.config.agentsPath = path.join(this.config.nexicalPath, 'agents')
+        this.config.nexicalPath = path.join(this.config.workingDirectory, '.nexical');
+        this.config.skillsDir = path.join(this.config.nexicalPath, 'skills');
         this.config.historyPath = path.join(this.config.nexicalPath, 'history')
         this.config.configPath = path.join(this.config.nexicalPath, 'config.yml');
 
         this.config.statePath = path.join(this.config.nexicalPath, 'state.yml');
         this.config.signalsPath = path.join(this.config.nexicalPath, 'signals');
         this.config.archivePath = path.join(this.config.nexicalPath, 'archive');
-        this.config.logPath = path.join(this.config.projectPath, 'log.md');
-        this.config.agentsDefinitionPath = path.join(this.config.projectPath, 'AGENTS.md');
+        this.config.logPath = path.join(this.config.workingDirectory, 'log.md');
+        this.config.skillsDefinitionPath = path.join(this.config.workingDirectory, 'SKILLS.md');
         this.config.architecturePath = path.join(this.config.nexicalPath, 'architecture.md');
         this.config.personasPath = path.join(this.config.nexicalPath, 'personas/');
         this.config.planPath = path.join(this.config.nexicalPath, 'plan.yml');
-        this.config.capabilitiesPath = path.join(this.config.agentsPath, 'capabilities.yml');
+        this.config.skillsPath = path.join(this.config.skillsDir, 'skills.yml');
+        this.config.driversDir = path.join(this.config.nexicalPath, 'drivers');
+
+        // Initialize session
+        this.session = {
+            id: new Date().toISOString().replace(/[:.]/g, '-'),
+            profile: { name: 'default' }, // Minimal profile stub since we removed Profile interface
+            workspacePath: workingDirectory,
+            history: [],
+            memory: {}
+        };
 
         // Initialize shared services
         this.git = new GitService(this);
@@ -83,27 +87,42 @@ export class Orchestrator {
         this.disk.ensureDir(this.config.signalsPath);
         this.disk.ensureDir(this.config.archivePath);
 
-        // Env vars are now expected to be injected by the worker/runtime, 
-        // removing internal dotenv loading as per directives.
-
         // Initialize Registries
-        this.commandRegistry = new CommandRegistry(this);
-        this.skillRegistry = new SkillRegistry(this);
+
+        this.driverRegistry = new DriverRegistry(this);
 
         // Initialize orchestrator components
         this.planner = new Planner(this);
         this.architect = new Architect(this);
         this.executor = new Executor(this);
+
+        this.loadConfig();
+    }
+
+    private loadConfig(): void {
+        // Placeholder for config loading logic.
+        // In future this will read .nexical/config.yml
+        if (this.disk.exists(this.config.configPath)) {
+            try {
+                const content = this.disk.readFile(this.config.configPath);
+                const projectConfig = yaml.load(content);
+                this.host.log('info', `Loaded project config from ${this.config.configPath}`);
+                // Apply config to this.config or other services if needed
+            } catch (e) {
+                this.host.log('error', `Failed to load config: ${e}`);
+            }
+        }
     }
 
     private loadState(): void {
         if (this.disk.exists(this.config.statePath)) {
             const content = this.disk.readFile(this.config.statePath);
             this.state = yaml.load(content) as ExecutionState;
-            log(`Loaded state: ${this.state.session_id} (${this.state.status})`);
+            this.session.id = this.state.session_id; // Sync session ID
+            this.host.log('info', `Loaded state: ${this.state.session_id} (${this.state.status})`);
         } else {
             this.state = {
-                session_id: new Date().toISOString().replace(/[:.]/g, '-'),
+                session_id: this.session.id,
                 status: 'IDLE',
                 loop_count: 0,
                 tasks: {
@@ -112,13 +131,14 @@ export class Orchestrator {
                     pending: []
                 }
             };
-            log(`Initialized new state: ${this.state.session_id}`);
+            this.host.log('debug', `Initialized new state: ${this.state.session_id}`);
         }
     }
 
     private saveState(): void {
         const content = yaml.dump(this.state);
         this.disk.writeFileAtomic(this.config.statePath, content);
+        this.host.status(this.state.status);
     }
 
     private appendEvolutionLog(signal: Signal): void {
@@ -140,160 +160,145 @@ export class Orchestrator {
     }
 
     async init(): Promise<void> {
-        const commandsDir = path.join(this.config.appPath, 'commands');
-        const skillsDir = path.join(this.config.appPath, 'skills');
+        const driversDir = path.join(this.config.appPath, 'drivers');
 
-        await this.commandRegistry.load(commandsDir);
-        await this.skillRegistry.load(skillsDir);
+        await this.driverRegistry.load(driversDir);
+
+        // Load project-specific drivers
+        if (this.disk.exists(this.config.driversDir)) {
+            await this.driverRegistry.load(this.config.driversDir);
+        }
+
+        this.loadState();
     }
 
-    async runAIWorkflow(prompt: string): Promise<void> {
-        log("Starting AI-driven workflow...");
-        this.loadState();
+    /**
+     * Start the workflow with a user prompt.
+     */
+    async start(prompt: string): Promise<void> {
+        this.host.log('info', "Starting AI-driven workflow...");
 
         // If resuming, check if we need to reset loop count or handle previous interruption
         if (this.state.status === 'INTERRUPTED') {
-            log("Resuming interrupted session...");
+            this.host.log('info', "Resuming interrupted session...");
             this.state.status = 'PLANNING'; // Default resume state
         } else {
             this.state.status = 'ARCHITECTING';
-            this.saveState();
+            // TODO: Store prompt in session/state so Architect can access it without passing it around?
+            // For now, we will pass it.
         }
+        this.saveState();
 
-        try {
-            await this.runLoop(prompt);
-        } catch (e) {
-            console.error("AI workflow failed:", e);
-        }
+        // You can run the loop here or let the caller drive it via step()
+        // For backward compatibility / ease of use, we can have a run() method.
+        await this.run(prompt);
     }
 
-    private async runLoop(prompt: string): Promise<void> {
+    /**
+     * Run the workflow loop until completion or failure.
+     */
+    async run(prompt: string): Promise<void> {
         const MAX_LOOPS = 5;
 
         while (this.state.status !== 'COMPLETED' && this.state.status !== 'FAILED') {
             if (this.state.loop_count > MAX_LOOPS) {
-                log("Max loops reached. Stopping.");
+                this.host.log('error', "Max loops reached. Stopping.");
                 this.state.status = 'FAILED';
                 this.saveState();
                 break;
             }
+            await this.step(prompt);
+        }
 
-            try {
-                switch (this.state.status) {
-                    case 'ARCHITECTING':
-                        log("State: ARCHITECTING");
-                        await this.architect.generateArchitecture(prompt);
-                        this.state.status = 'PLANNING';
-                        this.saveState();
-                        break;
-
-                    case 'PLANNING': {
-                        log("State: PLANNING");
-                        // Pass active signal if exists (logic to be added in Planner)
-                        const plan = await this.planner.generatePlan(prompt, this.state.last_signal, this.state.tasks.completed);
-                        this.state.current_plan = plan.plan_name; // Assuming plan has a name or we use filename
-                        this.state.status = 'EXECUTING';
-                        this.saveState();
-                        break;
-                    }
-
-                    case 'EXECUTING': {
-                        log("State: EXECUTING");
-                        // We need to load the plan. For now, assuming Planner saved it to .nexical/plan.yml
-                        // In a real scenario, we might need to pass the plan object or ID.
-                        // But Executor reads from file or we pass it? 
-                        // The original code passed 'plan' object. 
-                        // Let's re-read the plan from file to be safe/consistent with state.
-                        const planPath = this.config.planPath;
-                        // We need to import PlanUtils to read it, or just let Executor handle it if we pass the object.
-                        // But wait, Planner returns the plan object.
-                        // If we are resuming, we might not have the plan object in memory.
-                        // So we should read it.
-                        // For now, let's assume we can get it from Planner or read it.
-                        // To avoid circular dependency or extra imports, let's just use what Planner returned if available, 
-                        // or read it if we are resuming.
-                        // Actually, let's just call planner.generatePlan again if we are in PLANNING.
-                        // If we are in EXECUTING, we assume plan.yml is valid.
-
-                        // We need to read the plan file.
-                        // Let's import PlanUtils? No, let's just read it as JSON/YAML.
-                        // Actually, Executor.executePlan takes a Plan object.
-                        // Let's read it using fs and yaml.
-                        const planContent = this.disk.readFile(planPath);
-                        const plan = yaml.load(planContent) as any; // Cast to any or Plan interface if available
-
-                        await this.executor.executePlan(plan, prompt, this.state.tasks.completed);
-
-                        // If execution finishes without error, we are done
-                        this.state.status = 'COMPLETED';
-                        this.saveState();
-                        break;
-                    }
-                    case 'INTERRUPTED':
-                        log("State: INTERRUPTED - Resuming to PLANNING");
-                        this.state.status = 'PLANNING';
-                        this.saveState();
-                        break;
-                }
-            } catch (e) {
-                if (e instanceof SignalDetectedError) {
-                    log(`Signal detected: ${e.signal.type}`);
-                    this.state.last_signal = e.signal;
-                    this.state.status = 'INTERRUPTED'; // Or back to PLANNING/ARCHITECTING based on signal
-                    this.state.loop_count++;
-
-                    this.appendEvolutionLog(e.signal);
-
-                    if (e.signal.type === 'REARCHITECT') {
-                        this.state.status = 'ARCHITECTING';
-                        if (e.signal.invalidates_previous_work) {
-                            this.state.tasks.completed = [];
-                        }
-                    } else if (e.signal.type === 'REPLAN') {
-                        this.state.status = 'PLANNING';
-                    }
-
-                    this.saveState();
-
-                    // Archive the signal file
-                    // We need to find the file name. The signal object doesn't have the filename.
-                    // But we know it's in the signals directory.
-                    // We should probably pass the filename in the error or search for it.
-                    // For now, let's assume we clean up all signals in the directory.
-                    const files = this.disk.listFiles(this.config.signalsPath);
-                    for (const file of files) {
-                        this.archiveSignal(file);
-                    }
-
-                } else {
-                    log("Unexpected error:", e);
-                    this.state.status = 'FAILED';
-                    this.saveState();
-                    throw e;
-                }
-            }
+        if (this.state.status === 'COMPLETED') {
+            this.host.log('info', "Workflow Completed.");
         }
     }
 
-    async runCommand(commandName: string, args: string[]): Promise<void> {
-        const command = this.commandRegistry.get(commandName);
-        if (command) {
-            log(`Executing command: ${commandName}`);
-            await command.execute(args);
-        } else {
-            console.error(`Unknown command: /${commandName}`);
+    /**
+     * Execute a single step of the state machine.
+     */
+    async step(prompt: string): Promise<void> {
+        try {
+            switch (this.state.status) {
+                case 'ARCHITECTING':
+                    this.host.log('info', "State: ARCHITECTING");
+                    await this.architect.generateArchitecture(prompt);
+                    this.state.status = 'PLANNING';
+                    this.saveState();
+                    break;
+
+                case 'PLANNING': {
+                    this.host.log('info', "State: PLANNING");
+                    const plan = await this.planner.generatePlan(prompt, this.state.last_signal, this.state.tasks.completed);
+                    this.state.current_plan = plan.plan_name;
+                    this.state.status = 'EXECUTING';
+                    this.saveState();
+                    break;
+                }
+
+                case 'EXECUTING': {
+                    this.host.log('info', "State: EXECUTING");
+                    const planPath = this.config.planPath;
+                    const planContent = this.disk.readFile(planPath);
+                    const plan = yaml.load(planContent) as any;
+
+                    await this.executor.executePlan(plan, prompt, this.state.tasks.completed);
+
+                    this.state.status = 'COMPLETED';
+                    this.saveState();
+                    break;
+                }
+                case 'INTERRUPTED':
+                    this.host.log('warn', "State: INTERRUPTED - Resuming to PLANNING");
+                    this.state.status = 'PLANNING';
+                    this.saveState();
+                    break;
+
+                case 'IDLE':
+                    this.host.log('debug', "State: IDLE - No active task.");
+                    break;
+
+                case 'COMPLETED':
+                    this.host.log('info', "Workflow Completed.");
+                    break;
+            }
+        } catch (e) {
+            if (e instanceof SignalDetectedError) {
+                this.host.log('warn', `Signal detected: ${e.signal.type}`);
+                this.state.last_signal = e.signal;
+                this.state.status = 'INTERRUPTED';
+                this.state.loop_count++;
+
+                this.appendEvolutionLog(e.signal);
+
+                if (e.signal.type === 'REARCHITECT') {
+                    this.state.status = 'ARCHITECTING';
+                    if (e.signal.invalidates_previous_work) {
+                        this.state.tasks.completed = [];
+                    }
+                } else if (e.signal.type === 'REPLAN') {
+                    this.state.status = 'PLANNING';
+                }
+
+                this.saveState();
+
+                const files = this.disk.listFiles(this.config.signalsPath);
+                for (const file of files) {
+                    this.archiveSignal(file);
+                }
+
+            } else {
+                this.host.log('error', `Unexpected error: ${(e as Error).message}`);
+                this.state.status = 'FAILED';
+                this.saveState();
+                throw e;
+            }
         }
     }
 
     async execute(input: string): Promise<void> {
         input = input.trim();
-        if (input.startsWith('/')) {
-            // Command execution
-            const parts = input.slice(1).split(' ');
-            await this.runCommand(parts[0], parts.slice(1));
-        } else {
-            // AI Workflow
-            await this.runAIWorkflow(input);
-        }
+        await this.start(input);
     }
 }

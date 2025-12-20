@@ -24,11 +24,11 @@ This log contains the history of signals and reasons for previous replans. Use t
 {{ evolution_log }}
 ---
 
-**Available Agents:**
-The following agents are available to execute tasks. Each agent has a specific purpose and may have dependencies on other agents.
+**Available Skills:**
+The following skills are available to execute tasks. Each skill has a specific purpose and may have dependencies on other skills.
 
 ---
-{{ agent_capabilities }}
+{{ agent_skills }}
 ---
 
 **Architecture:**
@@ -53,7 +53,7 @@ Review the design above if there is information provided. Your plan must impleme
 
 Instructions:
 1. Analyze the user's request and break it down into a series of dependent tasks.
-2. Assign each task to the most appropriate agent based on their capabilities.
+2. Assign each task to the most appropriate skill based on their skills.
 3. **CRITICAL**: You must assign a `persona` to each task. This must match a filename from the personas directory without the md file extension (e.g., `frontend` for `@{{ personas_dir }}frontend.md`).
 4. Ensure tasks are logically ordered and dependencies are correctly defined.
 5. **CRITICAL**: If an Active Signal is present, your new plan MUST fix the issue described. You should generate a "Delta Plan" that only includes the remaining work + the fixes.
@@ -69,7 +69,7 @@ tasks:
   - id: "task-1"
     message: "Description of task 1"
     description: "Detailed description including file paths (e.g. Write to @path/to/file)"
-    agent: "AgentName"
+    skill: "SkillName"
     persona: "frontend"
     dependencies: []
 

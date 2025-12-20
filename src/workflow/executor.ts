@@ -2,7 +2,7 @@ import debug from 'debug';
 import { Plan } from '../models/Plan.js';
 import { Task } from '../models/Task.js';
 import type { Orchestrator } from '../orchestrator.js';
-import { AgentRunner } from '../services/AgentRunner.js';
+import { SkillRunner } from '../services/SkillRunner.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { Signal } from '../models/State.js';
@@ -10,13 +10,13 @@ import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 const log = debug('executor');
 
 export class Executor {
-    private agentRunner: AgentRunner;
+    private skillRunner: SkillRunner;
     private taskPromises: Map<string, Promise<void>> = new Map();
 
     constructor(
         private core: Orchestrator
     ) {
-        this.agentRunner = new AgentRunner(this.core);
+        this.skillRunner = new SkillRunner(this.core);
     }
 
     private checkForSignals(): void {
@@ -101,17 +101,8 @@ export class Executor {
 
                 log(`Starting task: ${task.message} (${task.id})`);
                 try {
-                    await this.agentRunner.runAgent(task, userPrompt);
+                    await this.skillRunner.runSkill(task, userPrompt);
                     log(`Completed task: ${task.message} (${task.id})`);
-
-                    // We should update the completed list in the orchestrator state, 
-                    // but Executor doesn't have direct access to write state.
-                    // The Orchestrator loop should handle state updates, but here we are deep in recursion.
-                    // Ideally, AgentRunner or Executor should emit an event or callback.
-                    // For now, we rely on the fact that if this succeeds, we continue.
-                    // But if we crash *after* this but before Orchestrator saves state, we might re-run.
-                    // This is a known trade-off without finer-grained state persistence.
-
                     this.checkForSignals();
                 } catch (e) {
                     log(`Failed task: ${task.message} (${task.id})`, e);

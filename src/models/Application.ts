@@ -4,23 +4,21 @@ import yaml from 'js-yaml';
 export interface Application {
     workingDirectory: string;
     appPath: string;
-    projectPath: string;
     nexicalPath: string;
-    agentsPath: string;
+    skillsDir: string;
     historyPath: string;
     configPath: string;
     statePath: string;
     signalsPath: string;
     archivePath: string;
     logPath: string;
-    agentsDefinitionPath: string;
+    skillsDefinitionPath: string;
     architecturePath: string;
     personasPath: string;
     planPath: string;
-    capabilitiesPath: string;
+    skillsPath: string;
+    driversDir: string;
 }
-
-import { IdentityManager } from '../services/IdentityManager.js';
 
 export interface JobContext {
     jobId: number;
@@ -31,7 +29,6 @@ export interface JobContext {
 
 export interface RuntimeConfig {
     workingDirectory: string;
-    identityManager?: IdentityManager;
     jobContext?: JobContext;
     env?: Record<string, string>;
 }

@@ -6,7 +6,7 @@ export class GitService {
 
     runCommand(args: string[], cwd?: string): string {
         const result = spawnSync('git', args, {
-            cwd: cwd || this.core.config.projectPath,
+            cwd: cwd || this.core.config.workingDirectory,
             encoding: 'utf-8',
         });
 
@@ -23,22 +23,7 @@ export class GitService {
 
     async clone(url: string, dir?: string): Promise<void> {
         let authUrl = url;
-        if (this.core.identityManager && this.core.jobContext) {
-            try {
-                const { teamId, projectId, jobId, mode } = this.core.jobContext;
-                const token = await this.core.identityManager.getGitToken(teamId, projectId, jobId, mode);
-                if (token) {
-                    // Inject token into URL: https://<token>@github.com/...
-                    // Assuming URL is https. If ssh, we need different handling.
-                    if (url.startsWith('https://')) {
-                        authUrl = url.replace('https://', `https://${token}@`);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to get git token:', error);
-                // Proceed with original URL (public repo?) or fail later
-            }
-        }
+        // Token injection removed - rely on system git credentials or environment variables
 
         const args = ['clone', authUrl];
         if (dir) {
@@ -47,8 +32,8 @@ export class GitService {
         // Clone runs in the parent directory of the project path usually, or current cwd
         // But here we probably want to run it in the current working directory of the process
         // if we are initializing a new project.
-        // use projectPath which is the sandbox root or the project root.
-        this.runCommand(args, this.core.config.projectPath);
+        // use workingDirectory which is the sandbox root or the project root.
+        this.runCommand(args, this.core.config.workingDirectory);
     }
 
     addRemote(name: string, url: string): void {
