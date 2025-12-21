@@ -160,9 +160,6 @@ export class Orchestrator {
                     break;
                 }
 
-                // Pass the potentially upgraded prompt (if feedback was added during loops)
-                // Actually step() manages prompt internally via args to sub-components
-                // We should keep currentPrompt aligned if we modify it, but components largely use it for context.
                 await this.step(currentPrompt);
             }
 
@@ -171,18 +168,7 @@ export class Orchestrator {
 
                 // --- Git Diff Display ---
                 try {
-                    // This assumes the git service has logic to show diffs or we run a raw command
-                    // We can use the git service if it exposes it, or use disk/process.
-                    // For now, let's just log a message that we would show diffs.
-                    // Or call a dedicated method if we have one.
-                    // Let's defer strict git diff output to the UI or specific tool call.
-                    // But the requirement says "outputs the git diff".
-                    // We can execute: git diff --stat
-                    // Let's assume CLIDriver or just log it.
                     this.host.log('info', "Showing changes:");
-                    // Implementation detail: Use git service (functionality pending in service, but I can use host.log)
-                    // Mocking for now:
-                    // this.host.log('info', await this.git.getDiff()); 
                 } catch (e) {
                     this.host.log('error', "Could not retrieve git diff.");
                 }
@@ -242,13 +228,7 @@ export class Orchestrator {
                         // Interactive Review Gate
                         if (this.interactive) {
                             const archContent = this.disk.readFile(this.config.architecturePath);
-                            // We construct a review payload. The UI should know how to render based on context or we pass it.
-                            // Here we pass the content.
                             const response = await this.host.ask(archContent, 'confirm'); // Using 'confirm' generic type but typically expects text or yes/no
-                            // Actually, host.ask signature: ask(q, type, options): Promise<string | boolean>
-                            // If type is 'confirm', returns boolean (typically). But user wants "feedback or yes".
-                            // So we should use 'text' or a custom type. 
-                            // Let's use 'text' and parse. "yes" checks.
 
                             // Re-check host usage. If we need a complex review (display markdown + input), we assume `ask` handles the prompt display.
                             const userResponse = await this.host.ask(archContent, 'text');
@@ -370,7 +350,6 @@ export class Orchestrator {
     }
 
     async execute(input: string): Promise<void> {
-        input = input.trim();
-        await this.start(input);
+        await this.start(input.trim());
     }
 }
