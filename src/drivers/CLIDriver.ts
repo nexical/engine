@@ -40,7 +40,7 @@ export class CLIDriver extends BaseDriver implements Driver {
 
         try {
             const result = await ShellExecutor.execute(commandBin, finalArgs, {
-                cwd: this.core.config.workingDirectory,
+                cwd: this.core.config.rootDirectory,
                 // Merge context.env with process.env to preserve standard vars
                 env: { ...process.env, ...(context.env || {}) }
             });

@@ -107,9 +107,9 @@ export class ImageGenDriver extends BaseDriver implements Driver {
             let outputPath = params.output_path;
             if (!outputPath) {
                 const fileName = `image-${Date.now()}.png`;
-                outputPath = path.join(this.core.config.workingDirectory, fileName);
-            } else if (!path.isAbsolute(outputPath)) {
-                outputPath = path.join(this.core.config.workingDirectory, outputPath);
+                outputPath = path.join(this.core.config.rootDirectory, fileName);
+            } else {
+                outputPath = path.join(this.core.config.rootDirectory, outputPath);
             }
 
             // Ensure directory exists

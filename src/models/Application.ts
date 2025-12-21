@@ -18,6 +18,9 @@ export class Application {
     public plannerPromptFile: string;
     public skillPromptFile: string;
 
+    public constraintsPath: string;
+    public architectureDirectory: string;
+    public architecturePath: string;
     public planDirectory: string;
     public planPath: string;
 
@@ -45,6 +48,9 @@ export class Application {
         this.plannerPromptFile = 'planner.md';
         this.skillPromptFile = 'skill.md';
 
+        this.constraintsPath = path.join(this.rootDirectory, 'AGENTS.md');
+        this.architectureDirectory = path.join(this.aiDirectory, 'architecture');
+        this.architecturePath = path.join(this.architectureDirectory, 'current.md');
         this.planDirectory = path.join(this.aiDirectory, 'plan');
         this.planPath = path.join(this.planDirectory, 'current.yml');
 
@@ -62,6 +68,7 @@ export class Application {
     public ensureDirectories(): void {
         this.disk.ensureDir(this.aiDirectory);
         this.disk.ensureDir(this.promptDirectory);
+        this.disk.ensureDir(this.architectureDirectory);
         this.disk.ensureDir(this.planDirectory);
         this.disk.ensureDir(this.personasDirectory);
         this.disk.ensureDir(this.driversDirectory);

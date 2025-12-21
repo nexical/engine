@@ -11,6 +11,14 @@ const log = debug('planner');
 export class Planner {
     constructor(private core: Orchestrator) { }
 
+    private getGlobalConstraints(): string {
+        const constraintsPath = this.core.config.constraintsPath;
+        if (this.core.disk.exists(constraintsPath)) {
+            return this.core.disk.readFile(constraintsPath);
+        }
+        return "There are no global constraints defined.";
+    }
+
     private getAgentSkills(): string {
         const skillsPath = this.core.config.skillsPath;
         if (this.core.disk.exists(skillsPath)) {
@@ -25,14 +33,6 @@ export class Planner {
             return this.core.disk.readFile(architecturePath);
         }
         return "There is no architecture defined.";
-    }
-
-    private getGlobalConstraints(): string {
-        const skillsPath = this.core.config.skillsDefinitionPath;
-        if (this.core.disk.exists(skillsPath)) {
-            return this.core.disk.readFile(skillsPath);
-        }
-        return "There are no global constraints defined.";
     }
 
     private getEvolutionLog(): string {
@@ -53,7 +53,7 @@ export class Planner {
         const seconds = String(now.getSeconds()).padStart(2, '0');
 
         const filename = `plan-${year}-${month}-${day}.${hours}-${minutes}-${seconds}.yml`;
-        const filePath = path.join(this.core.config.historyPath, filename);
+        const filePath = path.join(this.core.config.planDirectory, filename);
 
         const yamlContent = plan.toYaml();
         this.core.disk.writeFileAtomic(filePath, yamlContent);
@@ -93,9 +93,9 @@ ${activeSignal.reason}
         }
 
         const planFile = this.core.config.planPath;
-        const personasDir = this.core.config.personasPath;
+        const personasDir = this.core.config.personasDirectory;
 
-        const fullPrompt = this.core.promptEngine.render('planner.md', {
+        const fullPrompt = this.core.promptEngine.render(this.core.config.plannerPromptFile, {
             user_prompt: prompt,
             agent_skills: agentSkills,
             plan_file: planFile,

@@ -42,6 +42,10 @@ export class EngineState {
         this.loop_count++;
     }
 
+    resetLoop(): void {
+        this.loop_count = 0;
+    }
+
     recordSignal(signal: Signal): void {
         this.last_signal = signal;
     }

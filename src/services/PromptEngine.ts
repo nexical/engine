@@ -11,11 +11,11 @@ export class PromptEngine {
     constructor(private core: Orchestrator) {
         // Define search paths for templates
         // Priority:
-        // 1. Project overrides: <projectPath>/.nexical/prompts
-        // 2. Default prompts: <appPath>/prompts
+        // 1. Project overrides: <projectPath>/.ai/prompts (Use config.promptDirectory)
+        // 2. Default prompts: <appPath>/../prompts (Relative to models dir)
         const searchPaths = [
-            path.join(this.core.config.nexicalPath, 'prompts'),
-            path.join(this.core.config.appPath, 'prompts')
+            this.core.config.promptDirectory,
+            path.join(this.core.config.appDirectory, '../prompts')
         ];
 
         log(`Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);

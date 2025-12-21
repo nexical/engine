@@ -17,14 +17,14 @@ export class SkillRunner {
     }
 
     private loadYamlSkills(): void {
-        if (!this.core.disk.isDirectory(this.core.config.skillsDir)) {
+        if (!this.core.disk.isDirectory(this.core.config.skillsDirectory)) {
             return;
         }
 
-        const files = this.core.disk.listFiles(this.core.config.skillsDir);
+        const files = this.core.disk.listFiles(this.core.config.skillsDirectory);
         for (const filename of files) {
             if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml')) {
-                const filePath = path.join(this.core.config.skillsDir, filename);
+                const filePath = path.join(this.core.config.skillsDirectory, filename);
                 const content = this.core.disk.readFile(filePath);
                 try {
                     const profile = yaml.load(content) as Skill;
@@ -75,7 +75,7 @@ export class SkillRunner {
         let personaContext = '';
 
         if (task.persona) {
-            const personaFile = path.join(this.core.config.workingDirectory, '.nexical/personas', `${task.persona}.md`);
+            const personaFile = path.join(this.core.config.personasDirectory, `${task.persona}.md`);
             if (this.core.disk.exists(personaFile)) {
                 personaContext = this.core.disk.readFile(personaFile);
             } else {
@@ -83,7 +83,7 @@ export class SkillRunner {
             }
         }
 
-        userPromptWithPersona = this.core.promptEngine.render('agent.md', {
+        userPromptWithPersona = this.core.promptEngine.render(this.core.config.skillPromptFile, {
             user_prompt: userPrompt,
             persona_context: personaContext
         });
