@@ -12,7 +12,12 @@ export interface EvolutionEntry {
     tasks_at_failure?: string[];
 }
 
-export class EvolutionService {
+export interface IEvolutionService {
+    recordFailure(stateName: string, signal: Signal, completedTasks?: string[]): Promise<void>;
+    getLogSummary(): string;
+}
+
+export class EvolutionService implements IEvolutionService {
     private disk: FileSystemService;
 
     constructor(private project: Project) {

@@ -1,10 +1,9 @@
 import yaml from 'js-yaml';
-import { SkillRunner } from '../services/SkillRunner.js';
+import { ISkillRunner } from '../services/SkillRunner.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
-import { Project } from '../domain/Project.js';
-import { Workspace } from '../domain/Workspace.js';
+import { IProject } from '../domain/Project.js';
+import { IWorkspace } from '../domain/Workspace.js';
 import { EngineState } from '../domain/State.js';
-import { Plan } from '../domain/Plan.js';
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 
 export class DeveloperAgent {
@@ -12,9 +11,9 @@ export class DeveloperAgent {
     public readonly description = 'Executes the implementation plan by running skills.';
 
     constructor(
-        private project: Project,
-        private workspace: Workspace,
-        private skillRunner: SkillRunner,
+        private project: IProject,
+        private workspace: IWorkspace,
+        private skillRunner: ISkillRunner,
         private host: RuntimeHost
     ) { }
 

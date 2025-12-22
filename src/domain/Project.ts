@@ -2,7 +2,14 @@ import path from 'path';
 import { FileSystemService } from '../services/FileSystemService.js';
 import yaml from 'js-yaml';
 
-export class Project {
+export interface IProject {
+    readonly rootDirectory: string;
+    readonly paths: ProjectPaths;
+    getConstraints(): string;
+    getConfig(): ProjectProfile;
+}
+
+export class Project implements IProject {
     public readonly rootDirectory: string;
     public readonly paths: ProjectPaths;
     private disk: FileSystemService;

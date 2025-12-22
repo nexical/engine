@@ -4,7 +4,13 @@ import { RuntimeHost } from '../domain/RuntimeHost.js';
 import path from 'path';
 import fs from 'fs-extra';
 
-export class DriverRegistry extends Registry<Driver> {
+export interface IDriverRegistry extends Registry<Driver> {
+    register(plugin: Driver, isDefault?: boolean): void;
+    getDefault(): Driver | undefined;
+    load(dir: string): Promise<void>;
+}
+
+export class DriverRegistry extends Registry<Driver> implements IDriverRegistry {
     private defaultPlugin: Driver | undefined;
 
     constructor(protected host: RuntimeHost, protected config: any) {

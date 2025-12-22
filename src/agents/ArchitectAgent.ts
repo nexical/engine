@@ -1,23 +1,23 @@
-import { Project } from '../domain/Project.js';
-import { Workspace } from '../domain/Workspace.js';
+import { IProject } from '../domain/Project.js';
+import { IWorkspace } from '../domain/Workspace.js';
 import { Architecture } from '../domain/Architecture.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
-import { PromptEngine } from '../services/PromptEngine.js';
-import { DriverRegistry } from '../drivers/Registry.js';
-import { EvolutionService } from '../services/EvolutionService.js';
+import { IPromptEngine } from '../services/PromptEngine.js';
+import { IDriverRegistry } from '../drivers/Registry.js';
+import { IEvolutionService } from '../services/EvolutionService.js';
 
 export class ArchitectAgent {
     constructor(
-        private project: Project,
-        private workspace: Workspace,
-        private promptEngine: PromptEngine,
-        private driverRegistry: DriverRegistry,
-        private evolutionService: EvolutionService
+        private project: IProject,
+        private workspace: IWorkspace,
+        private promptEngine: IPromptEngine,
+        private driverRegistry: IDriverRegistry,
+        private evolution: IEvolutionService
     ) { }
 
     public async design(userRequest: string): Promise<Architecture> {
         const constraints = this.project.getConstraints();
-        const evolutionLog = this.evolutionService.getLogSummary();
+        const evolutionLog = this.evolution.getLogSummary();
 
         const fullPrompt = this.promptEngine.render(this.project.paths.architecturePrompt, {
             user_request: userRequest,

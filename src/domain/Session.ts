@@ -1,6 +1,6 @@
 import { EngineState } from './State.js';
-import { Project } from './Project.js';
-import { Workspace } from './Workspace.js';
+import { IProject } from './Project.js';
+import { IWorkspace } from './Workspace.js';
 import { RuntimeHost } from './RuntimeHost.js';
 import { Brain } from '../agents/Brain.js';
 import { Workflow } from '../workflow/Workflow.js';
@@ -11,8 +11,8 @@ export class Session {
     public workflow: Workflow | null = null;
 
     constructor(
-        private project: Project,
-        private workspace: Workspace,
+        private project: IProject,
+        private workspace: IWorkspace,
         private brain: Brain,
         private host: RuntimeHost
     ) {

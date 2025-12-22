@@ -8,6 +8,7 @@ export interface Transition {
 export interface StateDefinition {
     name: string;
     transitions: Transition[];
+    onError?: string; // Target state in case of unhandled error
 }
 
 export interface WorkflowConfig {
@@ -42,7 +43,41 @@ export class WorkflowGraph {
         return stateTransitions.get(signal.type);
     }
 
+    public getErrorTarget(currentStateName: string): string | undefined {
+        const stateDef = this.config.states.find(s => s.name === currentStateName);
+        return stateDef?.onError;
+    }
+
     public getInitialState(): string {
         return this.config.initialState;
     }
 }
+
+export const DefaultWorkflowConfig: WorkflowConfig = {
+    initialState: 'ARCHITECTING',
+    states: [
+        {
+            name: 'ARCHITECTING',
+            transitions: [
+                { trigger: SignalType.NEXT, target: 'PLANNING' },
+                { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
+            ]
+        },
+        {
+            name: 'PLANNING',
+            transitions: [
+                { trigger: SignalType.NEXT, target: 'EXECUTING' },
+                { trigger: SignalType.REPLAN, target: 'PLANNING' },
+                { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
+            ]
+        },
+        {
+            name: 'EXECUTING',
+            transitions: [
+                { trigger: SignalType.COMPLETE, target: 'COMPLETED' },
+                { trigger: SignalType.REPLAN, target: 'PLANNING' },
+                { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
+            ]
+        }
+    ]
+};

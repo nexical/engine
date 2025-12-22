@@ -1,15 +1,15 @@
 import { Signal } from '../Signal.js';
 import { Brain } from '../../agents/Brain.js';
-import { Project } from '../../domain/Project.js';
-import { Workspace } from '../../domain/Workspace.js';
+import { IProject } from '../../domain/Project.js';
+import { IWorkspace } from '../../domain/Workspace.js';
 import { EngineState } from '../../domain/State.js';
 import { RuntimeHost } from '../../domain/RuntimeHost.js';
 
 export abstract class State {
     constructor(
         protected brain: Brain,
-        protected project: Project,
-        protected workspace: Workspace,
+        protected project: IProject,
+        protected workspace: IWorkspace,
         protected host: RuntimeHost
     ) { }
 

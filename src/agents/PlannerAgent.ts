@@ -1,21 +1,21 @@
-import { Project } from '../domain/Project.js';
-import { Workspace } from '../domain/Workspace.js';
+import { IProject } from '../domain/Project.js';
+import { IWorkspace } from '../domain/Workspace.js';
 import { Plan } from '../domain/Plan.js';
 import { Architecture } from '../domain/Architecture.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
-import { PromptEngine } from '../services/PromptEngine.js';
-import { DriverRegistry } from '../drivers/Registry.js';
-import { SkillRunner } from '../services/SkillRunner.js';
-import { EvolutionService } from '../services/EvolutionService.js';
+import { IPromptEngine } from '../services/PromptEngine.js';
+import { IDriverRegistry } from '../drivers/Registry.js';
+import { ISkillRunner } from '../services/SkillRunner.js';
+import { IEvolutionService } from '../services/EvolutionService.js';
 
 export class PlannerAgent {
     constructor(
-        private project: Project,
-        private workspace: Workspace,
-        private promptEngine: PromptEngine,
-        private driverRegistry: DriverRegistry,
-        private skillRunner: SkillRunner,
-        private evolutionService: EvolutionService
+        private project: IProject,
+        private workspace: IWorkspace,
+        private promptEngine: IPromptEngine,
+        private driverRegistry: IDriverRegistry,
+        private skillRunner: ISkillRunner,
+        private evolutionService: IEvolutionService
     ) { }
 
     public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {

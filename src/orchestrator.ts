@@ -3,8 +3,9 @@ import { Project } from './domain/Project.js';
 import { Workspace } from './domain/Workspace.js';
 import { Session } from './domain/Session.js';
 import { Brain } from './agents/Brain.js';
+import { EventEmitter } from 'events';
 
-export class Orchestrator {
+export class Orchestrator extends EventEmitter {
     private _project?: Project;
     private _brain?: Brain;
     private _workspace?: Workspace;
@@ -30,10 +31,22 @@ export class Orchestrator {
         return this._session;
     }
 
+    public readonly host: RuntimeHost;
+
     constructor(
         public readonly rootDirectory: string,
-        public readonly host: RuntimeHost
-    ) { }
+        host: RuntimeHost
+    ) {
+        super();
+        // Wrap host to bubble events to Orchestrator
+        this.host = {
+            ...host,
+            emit: (event: string, data: any) => {
+                host.emit(event, data);
+                this.emit(event, data);
+            }
+        };
+    }
 
     async init(): Promise<void> {
         // 1. Initialize Project (Configuration & Paths)

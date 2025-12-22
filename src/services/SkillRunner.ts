@@ -8,7 +8,13 @@ import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { PromptEngine } from './PromptEngine.js';
 import { FileSystemService } from './FileSystemService.js';
 
-export class SkillRunner {
+export interface ISkillRunner {
+    validateAvailableSkills(): Promise<void>;
+    getSkills(): Skill[];
+    runSkill(task: Task, userPrompt: string): Promise<void>;
+}
+
+export class SkillRunner implements ISkillRunner {
     private skills: Record<string, Skill> = {};
     private disk: FileSystemService;
 

@@ -4,12 +4,12 @@ import { ArchitectingState } from './states/ArchitectingState.js';
 import { PlanningState } from './states/PlanningState.js';
 import { ExecutingState } from './states/ExecutingState.js';
 import { CompletedState } from './states/CompletedState.js';
-import { Project } from '../domain/Project.js';
+import { IProject } from '../domain/Project.js';
 import { Brain } from '../agents/Brain.js';
-import { Workspace } from '../domain/Workspace.js';
+import { IWorkspace } from '../domain/Workspace.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { EngineState, OrchestratorStatus } from '../domain/State.js';
-import { WorkflowGraph, WorkflowConfig } from './WorkflowGraph.js';
+import { WorkflowGraph, WorkflowConfig, DefaultWorkflowConfig } from './WorkflowGraph.js';
 
 export class Workflow {
     private currentState: State;
@@ -18,9 +18,10 @@ export class Workflow {
 
     constructor(
         private brain: Brain,
-        private project: Project,
-        private workspace: Workspace,
-        private host: RuntimeHost
+        private project: IProject,
+        private workspace: IWorkspace,
+        private host: RuntimeHost,
+        config: WorkflowConfig = DefaultWorkflowConfig
     ) {
         // Initialize States
         this.states = new Map();
@@ -29,36 +30,7 @@ export class Workflow {
         this.states.set('EXECUTING', new ExecutingState(brain, project, workspace, host));
         this.states.set('COMPLETED', new CompletedState(brain, project, workspace, host));
 
-        // Define Default Graph (Can become config later)
-        const defaultConfig: WorkflowConfig = {
-            initialState: 'ARCHITECTING',
-            states: [
-                {
-                    name: 'ARCHITECTING',
-                    transitions: [
-                        { trigger: SignalType.NEXT, target: 'PLANNING' },
-                        { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
-                    ]
-                },
-                {
-                    name: 'PLANNING',
-                    transitions: [
-                        { trigger: SignalType.NEXT, target: 'EXECUTING' },
-                        { trigger: SignalType.REPLAN, target: 'PLANNING' },
-                        { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
-                    ]
-                },
-                {
-                    name: 'EXECUTING',
-                    transitions: [
-                        { trigger: SignalType.COMPLETE, target: 'COMPLETED' },
-                        { trigger: SignalType.REPLAN, target: 'PLANNING' },
-                        { trigger: SignalType.REARCHITECT, target: 'ARCHITECTING' }
-                    ]
-                }
-            ]
-        };
-        this.graph = new WorkflowGraph(defaultConfig);
+        this.graph = new WorkflowGraph(config);
 
         // Default start state (will be overridden by resume or start args)
         this.currentState = this.states.get(this.graph.getInitialState())!;
@@ -88,13 +60,32 @@ export class Workflow {
             }
 
             this.host.log('info', `[Workflow] Enter State: ${this.currentState.name} (Loop: ${state.loop_count})`);
+            this.host.emit('state:enter', { state: this.currentState.name, loop: state.loop_count });
             state.updateStatus(this.currentState.name as OrchestratorStatus);
             await this.workspace.saveState(state);
 
             if (onStateChange) await onStateChange();
 
-            const signal = await this.currentState.run(state);
+            let signal: Signal;
+            try {
+                signal = await this.currentState.run(state);
+            } catch (error) {
+                this.host.emit('error', { state: this.currentState.name, error: (error as Error).message });
+                const errorTarget = this.graph.getErrorTarget(this.currentState.name);
+                if (errorTarget) {
+                    this.host.log('warn', `Error in ${this.currentState.name}. Recovering to ${errorTarget}.`);
+                    const nextState = this.states.get(errorTarget);
+                    if (nextState) {
+                        this.currentState = nextState;
+                        continue;
+                    }
+                }
+                // No recovery found, bubble up as failure signal
+                signal = Signal.fail(`Unhandled error in ${this.currentState.name}: ${(error as Error).message}`);
+            }
+
             this.host.log('debug', `[Workflow] Signal Received: ${signal.type}`);
+            this.host.emit('signal', { type: signal.type, reason: signal.reason, state: this.currentState.name });
             state.recordSignal(signal);
             await this.workspace.saveState(state);
 
@@ -115,6 +106,7 @@ export class Workflow {
             if (signal.type === SignalType.COMPLETE && this.currentState.name === 'COMPLETED') {
                 this.host.log('info', "Workflow Finished Successfully.");
                 state.resetLoop();
+                this.host.emit('workflow:complete', {});
                 await this.workspace.saveState(state);
                 break;
             }

@@ -10,12 +10,12 @@ export interface Skill {
 
 import { Result } from './Result.js';
 
-export interface Driver {
+export interface Driver<TContext = any, TResult = string> {
     name: string;
     description: string;
     isSupported(): Promise<boolean>;
     validateSkill(skill: Skill): Promise<boolean>;
-    execute(skill: Skill, context?: any): Promise<Result<string, Error>>;
+    execute(skill: Skill, context?: TContext): Promise<Result<TResult, Error>>;
 }
 
 export const SkillSchema = z.object({
@@ -24,7 +24,7 @@ export const SkillSchema = z.object({
     dependencies: z.array(z.string()).optional()
 }).loose();
 
-export abstract class BaseDriver implements Driver {
+export abstract class BaseDriver<TContext = any, TResult = string> implements Driver<TContext, TResult> {
     abstract name: string;
     abstract description: string;
 
@@ -48,9 +48,9 @@ export abstract class BaseDriver implements Driver {
         return result.success;
     }
 
-    abstract run(skill: Skill, context?: any): Promise<string>;
+    abstract run(skill: Skill, context?: TContext): Promise<TResult>;
 
-    async execute(skill: Skill, context: any = {}): Promise<Result<string, Error>> {
+    async execute(skill: Skill, context?: TContext): Promise<Result<TResult, Error>> {
         if (!await this.validateSkill(skill)) {
             return Result.fail(new Error(`Invalid skill for ${this.name} driver: ${skill.name}`));
         }

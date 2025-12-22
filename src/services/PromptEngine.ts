@@ -8,7 +8,11 @@ export interface PromptEngineConfig {
     appDirectory: string;
 }
 
-export class PromptEngine {
+export interface IPromptEngine {
+    render(templateName: string, context: any): string;
+}
+
+export class PromptEngine implements IPromptEngine {
     private env: nunjucks.Environment;
 
     constructor(private config: PromptEngineConfig, private host: RuntimeHost) {

@@ -6,13 +6,28 @@ import { Signal, SignalType } from '../workflow/Signal.js';
 import yaml from 'js-yaml';
 import path from 'path';
 import { EngineState } from './State.js';
+import { IProject } from './Project.js';
 
-export class Workspace {
+
+export interface IWorkspace {
+    getArchitecture(name: string): Promise<Architecture>;
+    saveArchitecture(doc: Architecture): Promise<void>;
+    loadPlan(): Promise<Plan>;
+    savePlan(doc: Plan): Promise<void>;
+    archiveArtifacts(): void;
+    detectSignal(): Promise<Signal | null>;
+    clearSignals(): Promise<void>;
+    saveState(state: EngineState): Promise<void>;
+    loadState(): Promise<EngineState | undefined>;
+    flush(): Promise<void>;
+}
+
+export class Workspace implements IWorkspace {
     private disk: FileSystemService;
     private cache: Map<string, any> = new Map();
     private pendingWrites: Set<Promise<void>> = new Set();
 
-    constructor(private project: Project) {
+    constructor(private project: IProject) {
         this.disk = new FileSystemService();
     }
 

@@ -22,7 +22,8 @@ describe('Workflow Engine', () => {
         host = {
             log: jest.fn(),
             ask: jest.fn(),
-            status: jest.fn()
+            status: jest.fn(),
+            emit: jest.fn()
         } as any;
 
         project = {
