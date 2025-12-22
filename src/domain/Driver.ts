@@ -1,6 +1,6 @@
 import { z, ZodSafeParseResult } from 'zod';
 import { RuntimeHost } from './RuntimeHost.js';
-import { ShellExecutor } from '../common/utils/shell.js';
+import { ShellExecutor } from '../utils/shell.js';
 
 export interface Skill {
     name: string;

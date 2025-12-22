@@ -1,5 +1,5 @@
 import { PromptEngine, PromptEngineConfig } from '../services/PromptEngine.js';
-import { DriverRegistry } from '../services/drivers/Registry.js';
+import { DriverRegistry } from '../drivers/Registry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
 import { Skill } from '../domain/Driver.js';

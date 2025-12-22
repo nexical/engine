@@ -1,4 +1,4 @@
-import { Signal } from '../../workflow/Signal.js';
+import { Signal } from '../workflow/Signal.js';
 
 export class SignalDetectedError extends Error {
     constructor(public signal: Signal) {

@@ -2,8 +2,8 @@ import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
 import { Architecture } from '../domain/Architecture.js';
-import { AISkill } from '../services/drivers/base/AICLIDriver.js';
-import { GeminiDriver } from '../services/drivers/GeminiDriver.js';
+import { AISkill } from '../drivers/base/AICLIDriver.js';
+import { GeminiDriver } from '../drivers/GeminiDriver.js';
 import yaml from 'js-yaml'; // For history log parsing if needed, though Project should handle it.
 
 export class ArchitectAgent {

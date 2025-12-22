@@ -3,7 +3,7 @@ import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
 import { Plan } from '../domain/Plan.js';
 import { Architecture } from '../domain/Architecture.js';
-import { AISkill } from '../services/drivers/base/AICLIDriver.js';
+import { AISkill } from '../drivers/base/AICLIDriver.js';
 
 export class PlannerAgent {
     constructor(

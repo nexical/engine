@@ -1,7 +1,7 @@
 import { RuntimeHost } from './RuntimeHost.js';
 import { FileSystemService } from '../services/FileSystemService.js';
 import { Application } from './Application.js';
-import { DriverRegistry } from '../services/drivers/Registry.js';
+import { DriverRegistry } from '../drivers/Registry.js';
 import { PromptEngine } from '../services/PromptEngine.js';
 import { SkillRunner } from '../services/SkillRunner.js';
 
