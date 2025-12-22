@@ -13,4 +13,9 @@ export interface RuntimeHost {
      * Ask the user (or system) a question.
      */
     ask(question: string, type?: 'text' | 'confirm' | 'select', options?: string[]): Promise<string | boolean>;
+
+    /**
+     * Emit a structured event for observability.
+     */
+    emit(event: string, data: any): void;
 }

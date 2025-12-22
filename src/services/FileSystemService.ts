@@ -107,4 +107,32 @@ export class FileSystemService {
             console.error(`Error deleting file ${filePath}:`, error);
         }
     }
+
+    async acquireLock(filePath: string, retries = 10, delay = 100): Promise<() => void> {
+        const lockPath = `${filePath}.lock`;
+        for (let i = 0; i < retries; i++) {
+            try {
+                // exclusive flag 'wx' ensures we fail if file exists
+                fs.closeSync(fs.openSync(lockPath, 'wx'));
+                return () => this.releaseLock(filePath);
+            } catch (e) {
+                if (i === retries - 1) {
+                    throw new Error(`Could not acquire lock for ${filePath} after ${retries} attempts.`);
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        throw new Error(`Could not acquire lock for ${filePath}`);
+    }
+
+    releaseLock(filePath: string): void {
+        const lockPath = `${filePath}.lock`;
+        try {
+            if (fs.existsSync(lockPath)) {
+                fs.unlinkSync(lockPath);
+            }
+        } catch (e) {
+            console.error(`Error releasing lock for ${filePath}:`, e);
+        }
+    }
 }

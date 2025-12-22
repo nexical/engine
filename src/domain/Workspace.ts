@@ -9,37 +9,75 @@ import { EngineState } from './State.js';
 
 export class Workspace {
     private disk: FileSystemService;
+    private cache: Map<string, any> = new Map();
+    private pendingWrites: Set<Promise<void>> = new Set();
 
     constructor(private project: Project) {
         this.disk = new FileSystemService();
     }
 
+    private async scheduleWrite(filePath: string, content: string): Promise<void> {
+        const promise = (async () => {
+            const release = await this.disk.acquireLock(filePath);
+            try {
+                this.disk.writeFileAtomic(filePath, content);
+            } finally {
+                release();
+            }
+        })();
+
+        this.pendingWrites.add(promise);
+        try {
+            await promise;
+        } catch (e) {
+            console.error(`Async write failed for ${filePath}:`, e);
+        } finally {
+            this.pendingWrites.delete(promise);
+        }
+    }
+
+    public async flush(): Promise<void> {
+        await Promise.all(Array.from(this.pendingWrites));
+    }
+
     public async getArchitecture(name: string): Promise<Architecture> {
-        // 'name' param ignored for now as we only support 'current', 
-        // but kept for future history support
+        if (this.cache.has('architecture')) {
+            return this.cache.get('architecture') as Architecture;
+        }
+
         const path = this.project.paths.architectureCurrent;
         if (this.disk.exists(path)) {
             const content = this.disk.readFile(path);
-            return new Architecture(content);
+            const doc = new Architecture(content);
+            this.cache.set('architecture', doc);
+            return doc;
         }
         return new Architecture("");
     }
 
     public async saveArchitecture(doc: Architecture): Promise<void> {
-        this.disk.writeFileAtomic(this.project.paths.architectureCurrent, doc.content);
+        this.cache.set('architecture', doc);
+        this.scheduleWrite(this.project.paths.architectureCurrent, doc.content);
     }
 
     public async loadPlan(): Promise<Plan> {
+        if (this.cache.has('plan')) {
+            return this.cache.get('plan') as Plan;
+        }
+
         const path = this.project.paths.planCurrent;
         if (this.disk.exists(path)) {
             const content = this.disk.readFile(path);
-            return Plan.fromYaml(content);
+            const plan = Plan.fromYaml(content);
+            this.cache.set('plan', plan);
+            return plan;
         }
         return new Plan("New Plan", []);
     }
 
     public async savePlan(doc: Plan): Promise<void> {
-        this.disk.writeFileAtomic(this.project.paths.planCurrent, doc.toYaml());
+        this.cache.set('plan', doc);
+        this.scheduleWrite(this.project.paths.planCurrent, doc.toYaml());
     }
 
     public archiveArtifacts(): void {
