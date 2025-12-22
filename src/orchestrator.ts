@@ -5,7 +5,7 @@ import { Session } from './domain/Session.js';
 import { Brain } from './agents/Brain.js';
 import { EventEmitter } from 'events';
 
-import { ServiceFactory } from './ServiceFactory.js';
+import { ServiceFactory } from './services/ServiceFactory.js';
 
 export class Orchestrator extends EventEmitter {
     private _project?: Project;

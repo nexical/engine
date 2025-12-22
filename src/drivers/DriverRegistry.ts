@@ -3,6 +3,7 @@ import { Registry } from '../domain/Registry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { IFileSystem } from '../domain/IFileSystem.js';
 import { FileSystemService } from '../services/FileSystemService.js';
+import { SystemError } from '../errors/SystemError.js';
 import path from 'path';
 
 export interface IDriverRegistry extends Registry<Driver> {
@@ -32,39 +33,16 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
     }
 
     async load(dir: string): Promise<void> {
-        if (!this.fileSystem.isDirectory(dir)) return;
-
-        function getFiles(fileSystem: IFileSystem, dir: string): string[] {
-            // Note: IFileSystem.listFiles is currently shallow.
-            // But DriverRegistry needs recursive?
-            // The original code was recursive.
-            // IFileSystem.listFiles might not be recursive.
-            // Let's implement recursive logic here using IFileSystem or check if listFiles is sufficient.
-            // Wait, IFileSystem does NOT have listFilesRecursive.
-            // Let's check FileSystemService implementation.
-            // FileSystemService.listFiles uses fs.readdirSync(dirPath).map(...) -> shallow.
-            // So we need to implement recursion here using IFileSystem methods.
-
-            const result: string[] = [];
-            if (!fileSystem.isDirectory(dir)) return result;
-
-            const items = fileSystem.listFiles(dir);
-            for (const item of items) {
-                const fullPath = path.join(dir, item);
-                if (fileSystem.isDirectory(fullPath)) {
-                    result.push(...getFiles(fileSystem, fullPath));
-                } else {
-                    result.push(fullPath);
-                }
-            }
-            return result;
+        if (!this.fileSystem.isDirectory(dir)) {
+            // Not an error if the directory doesn't exist, just nothing to load
+            return;
         }
 
-        const files = getFiles(this.fileSystem, dir);
+        const files = this.findDriversRecursive(dir);
 
         for (const file of files) {
-            // Skip non-code files and definition files
-            if ((!file.endsWith('.ts') && !file.endsWith('.js')) || file.endsWith('.d.ts') || file.endsWith('.map')) {
+            // Skip definition files and maps
+            if (file.endsWith('.d.ts') || file.endsWith('.map')) {
                 continue;
             }
 
@@ -75,14 +53,10 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                     const ExportedClass = module[key];
                     if (typeof ExportedClass === 'function') {
                         try {
-                            // Attempt instantiation
-                            // Note: we can't easily check 'implements Driver' at runtime before instantiation 
-                            // without checking prototype, but instantiation is safer if constructor is simple.
-                            // We assume drivers have a constructor compatible with (host, config)
                             const instance = new ExportedClass(this.host, this.config);
                             if (this.isDriver(instance)) {
                                 if (await instance.isSupported()) {
-                                    const isDefault = instance.name === 'gemini';
+                                    const isDefault = instance.name === 'gemini'; // Simple default logic for now
                                     this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
                                     this.register(instance, isDefault);
                                     loaded = true;
@@ -91,26 +65,43 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                                 }
                             }
                         } catch (e) {
-                            // Instantiate failed, likely not a driver class or missing dependencies
-                            // We don't log this as error because we might be trying to instantiate helper classes
+                            // Helper classes or non-driver classes might fail instantiation
                         }
                     }
                 }
 
-                if (!loaded) {
-                    // Verify if we should have loaded something (e.g. if file name ends in Driver.ts)
-                    if (file.match(/Driver\.(ts|js)$/)) {
-                        this.host.log('warn', `No valid driver found in ${file}`);
-                    }
+                if (!loaded && file.match(/Driver\.(ts|js)$/)) {
+                    this.host.log('warn', `No valid driver found in ${file}`);
                 }
 
             } catch (e) {
-                this.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
+                // Wrap in SystemError but log it instead of throwing to prevent stopping other drivers from loading
+                const error = SystemError.io(`Failed to load driver from ${file}: ${(e as Error).message}`, file);
+                this.host.log('error', error.message);
             }
         }
+    }
+
+    private findDriversRecursive(dir: string): string[] {
+        const result: string[] = [];
+        if (!this.fileSystem.isDirectory(dir)) return result;
+
+        const items = this.fileSystem.listFiles(dir);
+        for (const item of items) {
+            // IFileSystem.listFiles returns filenames, we need to join them
+            const fullPath = path.join(dir, item);
+
+            if (this.fileSystem.isDirectory(fullPath)) {
+                result.push(...this.findDriversRecursive(fullPath));
+            } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
+                result.push(fullPath);
+            }
+        }
+        return result;
     }
 
     private isDriver(obj: any): obj is Driver {
         return obj && typeof obj.name === 'string' && typeof obj.execute === 'function' && typeof obj.isSupported === 'function';
     }
 }
+

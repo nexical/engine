@@ -6,9 +6,9 @@ import { IWorkspace } from '../domain/Workspace.js';
 import { Driver } from '../domain/Driver.js';
 import { SkillRunner, ISkillRunner } from '../services/SkillRunner.js';
 import { EvolutionService, IEvolutionService } from '../services/EvolutionService.js';
-import { ArchitectAgent } from './ArchitectAgent.js';
-import { PlannerAgent } from './PlannerAgent.js';
-import { DeveloperAgent } from './DeveloperAgent.js';
+import type { ArchitectAgent } from './ArchitectAgent.js';
+import type { PlannerAgent } from './PlannerAgent.js';
+import type { DeveloperAgent } from './DeveloperAgent.js';
 
 export class Brain {
     private promptEngine: IPromptEngine;
@@ -59,14 +59,6 @@ export class Brain {
         } else {
             this.evolution = new EvolutionService(project as Project);
         }
-
-        this.registerDefaultAgents();
-    }
-
-    private registerDefaultAgents(): void {
-        this.registerAgent('architect', (workspace) => new ArchitectAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.evolution));
-        this.registerAgent('planner', (workspace) => new PlannerAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.skillRunner, this.evolution));
-        this.registerAgent('developer', (workspace) => new DeveloperAgent(this.project, workspace, this.skillRunner, this.host));
     }
 
     public registerAgent<T>(name: string, factory: (workspace: IWorkspace) => T): void {
