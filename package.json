@@ -1,13 +1,12 @@
 {
-  "name": "@nexical/engine",
+  "name": "@astrical/engine",
   "version": "0.1.0",
   "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
   "scripts": {
     "build": "tsc --build --force && cp -fr src/prompts dist/",
-    "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
+    "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit --collectCoverage=true",
     "test:integration": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
-    "test": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit && jest tests/integration --collectCoverage=false",
-    "cli": "npm run build && node dist/src/cli.js"
+    "test": "npm run build && npm run test:unit && npm run test:integration"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,27 +16,20 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "nexical": "./dist/src/cli.js"
-  },
   "keywords": [],
-  "author": "Adrian Webb <adrian@cellebris.com>",
+  "author": "Adrian Webb <adrian@fractalsynapse.com>",
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/nunjucks": "^3.2.6",
+    "@types/uuid": "^10.0.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.72",
-    "@nexical/sdk": "^0.3.0",
-    "@types/uuid": "^10.0.0",
-    "ai": "^5.0.101",
-    "commander": "^14.0.2",
     "dotenv": "^17.2.3",
     "fs-extra": "^11.3.2",
     "js-yaml": "^4.1.1",
