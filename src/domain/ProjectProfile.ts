@@ -1,16 +1,17 @@
 import yaml from 'js-yaml';
-import fs from 'fs';
+import { FileSystemService } from '../services/FileSystemService.js';
 
 export class ProjectProfile {
     [key: string]: any;
 
     static load(path: string): ProjectProfile {
-        if (!fs.existsSync(path)) {
+        const disk = new FileSystemService();
+        if (!disk.exists(path)) {
             return new ProjectProfile();
         }
 
         try {
-            const content = fs.readFileSync(path, 'utf8');
+            const content = disk.readFile(path);
             return ProjectProfile.fromYaml(content);
         } catch (e) {
             console.error(`Failed to load project profile from ${path}:`, e);

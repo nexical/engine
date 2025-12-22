@@ -2,20 +2,15 @@ import { PromptEngine, PromptEngineConfig } from '../services/PromptEngine.js';
 import { DriverRegistry } from '../drivers/Registry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
-import { Skill } from '../domain/Driver.js';
 import { Driver } from '../domain/Driver.js';
-import { FileSystemService } from '../services/FileSystemService.js';
-import { SkillRunner } from '../services/SkillRunner.js'; // Statically import SkillRunner
-import { EvolutionService } from '../services/EvolutionService.js'; // Import EvolutionService
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
+import { SkillRunner } from '../services/SkillRunner.js';
+import { EvolutionService } from '../services/EvolutionService.js';
 
 export class Brain {
     private promptEngine: PromptEngine;
     private driverRegistry: DriverRegistry;
-    private skillRunner: SkillRunner; // Type as SkillRunner
-    private evolution: EvolutionService; // Add evolution service property
+    private skillRunner: SkillRunner;
+    private evolution: EvolutionService;
 
     constructor(
         private project: Project,
@@ -37,9 +32,6 @@ export class Brain {
 
         // 3. Initialize SkillRunner
         this.skillRunner = new SkillRunner(project, this.driverRegistry, this.promptEngine, host);
-
-        // 4. Initialize EvolutionService
-        this.evolution = new EvolutionService(project);
 
         // 4. Initialize EvolutionService
         this.evolution = new EvolutionService(project);

@@ -2,7 +2,7 @@ import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
 import { BaseDriver, SkillSchema, Skill } from '../domain/Driver.js';
 import { interpolate } from '../utils/interpolation.js';
-import fs from 'fs-extra';
+import { FileSystemService } from '../services/FileSystemService.js';
 
 export const ImageGenSkillSchema = SkillSchema.extend({
     prompt_template: z.string(),
@@ -102,12 +102,8 @@ export class ImageGenDriver extends BaseDriver {
                 outputPath = path.join(this.config.rootDirectory, outputPath);
             }
 
-            // Ensure directory exists
-            fs.ensureDirSync(path.dirname(outputPath));
-
-            // Write file
-            const buffer = Buffer.from(base64Data, 'base64');
-            fs.writeFileSync(outputPath, buffer);
+            const disk = new FileSystemService();
+            disk.writeFile(outputPath, Buffer.from(base64Data, 'base64'));
 
             this.host.log('info', `Image saved to: ${outputPath}`);
             return `Image generated and saved to: ${outputPath}`;
