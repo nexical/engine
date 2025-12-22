@@ -3,8 +3,8 @@ import debug from 'debug';
 import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
 import { Plan } from '../models/Plan.js';
-import { Skill } from '../models/Skill.js';
-import { Signal } from '../models/State.js';
+import { Skill } from '../interfaces/Skill.js';
+import { Signal } from '../interfaces/Signal.js';
 
 const log = debug('planner');
 
@@ -120,7 +120,7 @@ ${activeSignal.reason}
                 throw new Error("CLI driver not found for planner.");
             }
 
-            await driver.execute(plannerAgent, '', {
+            await driver.execute(plannerAgent, {
                 userPrompt: prompt,
                 params: {
                     prompt: fullPrompt

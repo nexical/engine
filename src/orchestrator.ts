@@ -1,7 +1,8 @@
 import { SignalDetectedError } from './errors/SignalDetectedError.js';
 import { RuntimeHost } from './interfaces/RuntimeHost.js';
+import { Signal } from './interfaces/Signal.js';
 import { Application } from './models/Application.js';
-import { EngineState, Signal } from './models/State.js';
+import { EngineState } from './models/State.js';
 import { AgentSession } from './models/AgentSession.js';
 import { ProjectProfile } from './models/ProjectProfile.js';
 import { Planner } from './workflow/planner.js';

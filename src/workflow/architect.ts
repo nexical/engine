@@ -2,7 +2,7 @@ import path from 'path';
 import debug from 'debug';
 import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
-import { Skill } from '../models/Skill.js';
+import { Skill } from '../interfaces/Skill.js';
 
 const log = debug('architect');
 
@@ -62,7 +62,7 @@ export class Architect {
             }
 
             // Execute the architect skill. It should write the architectur to architectureFile.
-            await driver.execute(architectSkill, '', {
+            await driver.execute(architectSkill, {
                 userPrompt: prompt,
                 params: {
                     prompt: fullPrompt

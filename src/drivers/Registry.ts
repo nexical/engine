@@ -1,6 +1,5 @@
-import { Driver } from '../interfaces/Driver.js';
+import { Driver } from '../models/Driver.js';
 import { Registry } from '../models/Registry.js';
-import { SkillService } from '../services/SkillService.js';
 import path from 'path';
 import fs from 'fs-extra';
 import debug from 'debug';
@@ -9,7 +8,6 @@ const log = debug('driver-registry');
 
 export class DriverRegistry extends Registry<Driver> {
     private defaultPlugin: Driver | undefined;
-    private skillService = new SkillService();
 
     register(plugin: Driver, isDefault: boolean = false): void {
         super.register(plugin);
@@ -24,8 +22,6 @@ export class DriverRegistry extends Registry<Driver> {
 
     async load(dir: string): Promise<void> {
         if (!fs.existsSync(dir)) return;
-
-        const skills = await this.skillService.getSkills();
 
         async function getFiles(dir: string): Promise<string[]> {
             const dirents = await fs.readdir(dir, { withFileTypes: true });
@@ -51,8 +47,8 @@ export class DriverRegistry extends Registry<Driver> {
                             try {
                                 const instance = new ExportedClass(this.core);
                                 if (this.isDriver(instance)) {
-                                    if (instance.isSupported(skills)) {
-                                        const isDefault = instance.name === 'cli';
+                                    if (await instance.isSupported()) {
+                                        const isDefault = instance.name === 'gemini';
                                         log(`Registering driver: ${instance.name} (Default: ${isDefault})`);
                                         this.register(instance, isDefault);
                                     } else {

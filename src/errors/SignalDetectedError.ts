@@ -1,4 +1,4 @@
-import { Signal } from '../models/State.js';
+import { Signal } from '../interfaces/Signal.js';
 
 export class SignalDetectedError extends Error {
     constructor(public signal: Signal) {

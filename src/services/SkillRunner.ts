@@ -2,7 +2,7 @@ import path from 'path';
 import yaml from 'js-yaml';
 import debug from 'debug';
 import { Task } from '../models/Task.js';
-import { Skill } from '../models/Skill.js';
+import { Skill } from '../interfaces/Skill.js';
 import type { Orchestrator } from '../orchestrator.js';
 
 const log = debug('skill-runner');
@@ -89,9 +89,10 @@ export class SkillRunner {
         });
 
         try {
-            await driver.execute(profile, task.description, {
+            await driver.execute(profile, {
                 userPrompt: userPromptWithPersona,
                 taskId: task.id,
+                taskPrompt: task.description,
                 params: task.params
             });
         } catch (err) {

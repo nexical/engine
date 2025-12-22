@@ -1,55 +1,48 @@
 import path from 'path';
 import debug from 'debug';
-import { Driver, BaseDriver, Skills } from '../models/Driver.js';
-import { Skill } from '../models/Skill.js';
-import { ShellExecutor } from '../utils/shell.js';
+import { z, ZodSafeParseResult } from 'zod';
+import { BaseDriver, SkillSchema } from '../models/Driver.js';
+import { Skill } from '../interfaces/Skill.js';
+import { interpolate } from '../utils/interpolation.js';
 
 const log = debug('driver:image-gen');
 
-export class ImageGenDriver extends BaseDriver implements Driver {
+export const ImageGenSkillSchema = SkillSchema.extend({
+    prompt_template: z.string(),
+    model: z.string().optional(),
+    aspect_ratio: z.string().optional(),
+    resolution: z.string().optional(),
+}).loose();
+
+export type ImageGenSkill = z.infer<typeof ImageGenSkillSchema>;
+
+export class ImageGenDriver extends BaseDriver {
     name = 'image-gen';
     description = 'Generates images using AI SDK and saves them to a file.';
 
-    isSupported(skills: Skills): boolean {
-        return true;
+    async isSupported(): Promise<boolean> {
+        return this.checkEnvironment('OPENROUTER_API_KEY');
     }
 
-    async execute(skill: Skill, taskPrompt: string, context: any = {}): Promise<string> {
-        const promptTemplate = skill.prompt_template || '{prompt}';
+    protected parseSchema(skill: Skill): ZodSafeParseResult<ImageGenSkill> {
+        return ImageGenSkillSchema.safeParse(skill);
+    }
+
+    async run(skill: Skill, context: any = {}): Promise<string> {
+        const imageGenSkill = skill as ImageGenSkill;
+        const promptTemplate = imageGenSkill.prompt_template;
         const params = context.params || {};
 
-        // Interpolate prompt
-        let prompt = promptTemplate;
-        const formatArgs = {
+        const formatArgs: Record<string, any> = {
             user_request: context.userPrompt || '',
-            task_prompt: taskPrompt,
+            task_id: context.taskId || '',
+            task_prompt: context.taskPrompt,
             ...params
         };
-
-        for (const [key, value] of Object.entries(formatArgs)) {
-            prompt = prompt.replace(new RegExp(`{${key}}`, 'g'), String(value));
-        }
-
-        const modelName = skill.model || 'google/gemini-3-pro-image-preview'; // Default model
-
-        // Aspect ratio 	1K resolution 	1K Tokens 	2K resolution 	2K Tokens 	4K resolution 	4K Tokens
-        // 1:1 	            1024x1024 	    1210 	    2048x2048 	    1210 	    4096x4096 	    2000
-        // 2:3 	            848x1264 	    1210 	    1696x2528 	    1210 	    3392x5056 	    2000
-        // 3:2 	            1264x848 	    1210 	    2528x1696 	    1210 	    5056x3392 	    2000
-        // 3:4 	            896x1200 	    1210 	    1792x2400 	    1210 	    3584x4800 	    2000
-        // 4:3 	            1200x896 	    1210 	    2400x1792 	    1210 	    4800x3584 	    2000
-        // 4:5 	            928x1152 	    1210 	    1856x2304 	    1210 	    3712x4608 	    2000
-        // 5:4 	            1152x928 	    1210 	    2304x1856 	    1210 	    4608x3712 	    2000
-        // 9:16 	        768x1376 	    1210 	    1536x2752 	    1210 	    3072x5504 	    2000
-        // 16:9 	        1376x768 	    1210 	    2752x1536 	    1210 	    5504x3072 	    2000
-        // 21:9 	        1584x672 	    1210 	    3168x1344 	    1210 	    6336x2688 	    2000
-
-        const aspectRatio = params.aspectRatio || skill.aspectRatio || '1:1';
-        const resolution = params.resolution || skill.resolution || '1K';
-
-        if (!process.env.OPENROUTER_API_KEY) {
-            throw new Error('Missing API Key for image generation (OPENROUTER_API_KEY)');
-        }
+        const prompt = interpolate(promptTemplate, formatArgs);
+        const modelName = imageGenSkill.model || 'google/gemini-3-pro-image-preview';
+        const aspectRatio = params.aspectRatio || imageGenSkill.aspect_ratio || '1:1';
+        const resolution = params.resolution || imageGenSkill.resolution || '1K';
 
         log(`Generating image with model: ${modelName}`);
         log(`Prompt: ${prompt}`);

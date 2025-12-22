@@ -1,15 +1,7 @@
-export type OrchestratorStatus = 'IDLE' | 'ARCHITECTING' | 'PLANNING' | 'EXECUTING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED';
+import { Signal } from '../interfaces/Signal.js';
 import yaml from 'js-yaml';
 
-export type SignalType = 'REPLAN' | 'REARCHITECT';
-
-export interface Signal {
-    type: SignalType;
-    source: string;
-    reason: string;
-    timestamp: string;
-    invalidates_previous_work?: boolean;
-}
+export type OrchestratorStatus = 'IDLE' | 'ARCHITECTING' | 'PLANNING' | 'EXECUTING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED';
 
 export class EngineState {
     public session_id: string;

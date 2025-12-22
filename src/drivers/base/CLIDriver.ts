@@ -1,0 +1,78 @@
+import { SkillSchema, BaseDriver } from '../../models/Driver.js';
+import { Skill } from '../../interfaces/Skill.js';
+import { ShellExecutor } from '../../utils/shell.js';
+import { interpolate } from '../../utils/interpolation.js';
+import debug from 'debug';
+import { z, ZodSafeParseResult } from 'zod';
+
+const log = debug('driver:base-cli');
+
+export const CLISkillSchema = SkillSchema.extend({
+    name: z.string(),
+    description: z.string().optional(),
+    args: z.array(z.string()).optional(),
+}).loose();
+
+export type CLISkill = z.infer<typeof CLISkillSchema>;
+
+export abstract class CLIDriver extends BaseDriver {
+
+    async isSupported(): Promise<boolean> {
+        return false;
+    }
+
+    protected parseSchema(skill: Skill): ZodSafeParseResult<CLISkill> {
+        return CLISkillSchema.safeParse(skill);
+    }
+
+    protected abstract getExecutable(skill: Skill): string;
+
+    protected getArguments(skill: Skill): string[] {
+        return skill.args || [];
+    }
+
+    async run(skill: Skill, context: any = {}): Promise<string> {
+        const cliSkill = skill as CLISkill;
+        const params = context.params || {};
+
+        const formatArgs: Record<string, any> = {
+            user_request: context.userPrompt || '',
+            task_id: context.taskId || '',
+            ...params
+        };
+
+        const argsTemplate = this.getArguments(cliSkill);
+        const finalArgs = argsTemplate.map(arg => interpolate(arg, formatArgs));
+
+        return await this.executeShell(cliSkill, finalArgs, context);
+    }
+
+    protected async executeShell(skill: Skill, args: Array<string>, context: any = {}): Promise<string> {
+        const commandBin = this.getExecutable(skill);
+
+        log(`Running CLI skill: ${skill.name}`);
+        log(`Command: ${commandBin} ${args.join(' ')}`);
+
+        try {
+            const result = await ShellExecutor.execute(commandBin, args, {
+                cwd: this.core.config.rootDirectory,
+                // Merge context.env with process.env to preserve standard vars
+                env: { ...process.env, ...(context.env || {}) }
+            });
+
+            log("--- stdout ---");
+            // log(result.stdout);
+            log("--- stderr ---");
+            // log(result.stderr);
+
+            if (result.code !== 0) {
+                throw new Error(`Command exited with code ${result.code}\nStderr: ${result.stderr}`);
+            }
+
+            return result.stdout;
+        } catch (err) {
+            console.error(`An error occurred while executing the CLI agent: ${err}`);
+            throw err;
+        }
+    }
+}
