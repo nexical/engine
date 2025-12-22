@@ -1,8 +1,8 @@
 import { PromptEngine, PromptEngineConfig } from '../services/PromptEngine.js';
 import { DriverRegistry } from '../services/drivers/Registry.js';
-import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
-import { Skill } from '../common/interfaces/Skill.js';
+import { Skill } from '../domain/Driver.js';
 import { Driver } from '../domain/Driver.js';
 import { FileSystemService } from '../services/FileSystemService.js';
 import { createRequire } from 'module';

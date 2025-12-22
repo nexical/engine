@@ -1,5 +1,5 @@
 import { RuntimeContext } from './RuntimeContext.js';
-import { EngineState } from '../../domain/State.js';
+import { EngineState } from './State.js';
 
 export interface Agent {
     readonly name: string;

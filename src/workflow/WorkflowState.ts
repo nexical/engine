@@ -1,5 +1,5 @@
-import { RuntimeContext } from './RuntimeContext.js';
-import { EngineState } from '../../domain/State.js';
+import { RuntimeContext } from '../domain/RuntimeContext.js';
+import { EngineState } from '../domain/State.js';
 
 export interface WorkflowState {
     name: string;

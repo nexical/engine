@@ -1,5 +1,5 @@
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
-import { Skill } from '../../../common/interfaces/Skill.js';
+import { Skill } from '../../../domain/Driver.js';
 import { interpolate } from '../../../common/utils/interpolation.js';
 import { z, ZodSafeParseResult } from 'zod';
 

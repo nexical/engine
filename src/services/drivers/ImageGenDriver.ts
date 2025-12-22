@@ -1,7 +1,6 @@
 import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
-import { BaseDriver, SkillSchema } from '../../domain/Driver.js';
-import { Skill } from '../../common/interfaces/Skill.js';
+import { BaseDriver, SkillSchema, Skill } from '../../domain/Driver.js';
 import { interpolate } from '../../common/utils/interpolation.js';
 import fs from 'fs-extra';
 

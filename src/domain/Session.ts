@@ -1,7 +1,7 @@
 import { EngineState } from './State.js';
 import { Project } from './Project.js';
 import { Workspace } from './Workspace.js';
-import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { RuntimeHost } from './RuntimeHost.js';
 import { Brain } from '../agents/Brain.js';
 
 export class Session {

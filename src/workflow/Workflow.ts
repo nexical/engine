@@ -7,7 +7,7 @@ import { CompletedState } from './states/CompletedState.js';
 import { Project } from '../domain/Project.js';
 import { Brain } from '../agents/Brain.js';
 import { Workspace } from '../domain/Workspace.js';
-import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { EngineState, OrchestratorStatus } from '../domain/State.js';
 
 export class Workflow {

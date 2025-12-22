@@ -1,4 +1,4 @@
-import { RuntimeHost } from './common/interfaces/RuntimeHost.js';
+import { RuntimeHost } from './domain/RuntimeHost.js';
 import { Project } from './domain/Project.js';
 import { Workspace } from './domain/Workspace.js';
 import { Session } from './domain/Session.js';

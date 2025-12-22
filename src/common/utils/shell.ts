@@ -1,4 +1,4 @@
-import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+import { RuntimeHost } from '../../domain/RuntimeHost.js';
 import { spawn, spawnSync, SpawnOptions } from 'child_process';
 
 export interface ShellResult {

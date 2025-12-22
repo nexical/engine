@@ -1,7 +1,7 @@
 import nunjucks from 'nunjucks';
 import path from 'path';
 import fs from 'fs-extra';
-import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
 
 export interface PromptEngineConfig {
     promptDirectory: string;

@@ -1,7 +1,12 @@
 import { z, ZodSafeParseResult } from 'zod';
-import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
-import { Skill } from '../common/interfaces/Skill.js';
+import { RuntimeHost } from './RuntimeHost.js';
 import { ShellExecutor } from '../common/utils/shell.js';
+
+export interface Skill {
+    name: string;
+    description?: string;
+    [key: string]: any;
+}
 
 export interface Driver {
     name: string;
