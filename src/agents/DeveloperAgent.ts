@@ -1,8 +1,8 @@
 import yaml from 'js-yaml';
-import { Brain } from '../brain/Brain.js';
+import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
-import { EngineState } from '../../models/State.js';
-import { Plan } from '../../models/Plan.js';
+import { EngineState } from '../domain/State.js';
+import { Plan } from '../domain/Plan.js';
 
 export class DeveloperAgent {
     public readonly name = 'Developer';

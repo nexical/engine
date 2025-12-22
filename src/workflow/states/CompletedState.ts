@@ -1,6 +1,6 @@
 import { State } from './State.js';
 import { Signal, SignalType } from '../Signal.js';
-import { EngineState } from '../../models/State.js';
+import { EngineState } from '../../domain/State.js';
 
 export class CompletedState extends State {
     get name(): string {

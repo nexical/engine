@@ -1,10 +1,10 @@
-import { PromptEngine, PromptEngineConfig } from '../../services/PromptEngine.js';
-import { DriverRegistry } from '../../drivers/Registry.js';
-import { RuntimeHost } from '../../interfaces/RuntimeHost.js';
+import { PromptEngine, PromptEngineConfig } from '../services/PromptEngine.js';
+import { DriverRegistry } from '../services/drivers/Registry.js';
+import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
-import { Skill } from '../../interfaces/Skill.js';
-import { Driver } from '../../models/Driver.js';
-import { FileSystemService } from '../../services/FileSystemService.js';
+import { Skill } from '../common/interfaces/Skill.js';
+import { Driver } from '../domain/Driver.js';
+import { FileSystemService } from '../services/FileSystemService.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -34,7 +34,7 @@ export class Brain {
         this.driverRegistry = new DriverRegistry(host, driverConfig);
 
         // 3. Initialize SkillRunner
-        const { SkillRunner } = require('../../services/SkillRunner.js');
+        const { SkillRunner } = require('../services/SkillRunner.js');
         this.skillRunner = new SkillRunner(project, this.driverRegistry, this.promptEngine, host);
 
         // 4. Create Legacy Context Adapter (if needed by getContext())

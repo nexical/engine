@@ -1,4 +1,4 @@
-export class ArchitectureDocument {
+export class Architecture {
     constructor(public content: string) { }
 
     public toString(): string {

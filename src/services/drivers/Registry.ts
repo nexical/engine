@@ -1,6 +1,6 @@
-import { Driver } from '../models/Driver.js';
-import { Registry } from '../models/Registry.js';
-import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+import { Driver } from '../../domain/Driver.js';
+import { Registry } from '../../domain/Registry.js';
+import { RuntimeHost } from '../../common/interfaces/RuntimeHost.js';
 import path from 'path';
 import fs from 'fs-extra';
 

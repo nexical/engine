@@ -1,7 +1,7 @@
 import { State } from './State.js';
 import { Signal, SignalType } from '../Signal.js';
-import { EngineState } from '../../models/State.js'; // Updated path
-import { DeveloperAgent } from '../../core/agents/DeveloperAgent.js'; // Updated path
+import { EngineState } from '../../domain/State.js';
+import { DeveloperAgent } from '../../agents/DeveloperAgent.js';
 
 export class ExecutingState extends State {
     get name(): string {

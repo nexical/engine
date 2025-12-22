@@ -1,9 +1,9 @@
-import { Brain } from '../brain/Brain.js';
+import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
-import { ArchitectureDocument } from '../artifacts/ArchitectureDocument.js';
-import { AISkill } from '../../drivers/base/AICLIDriver.js';
-import { GeminiDriver } from '../../drivers/GeminiDriver.js';
+import { Architecture } from '../domain/Architecture.js';
+import { AISkill } from '../services/drivers/base/AICLIDriver.js';
+import { GeminiDriver } from '../services/drivers/GeminiDriver.js';
 import yaml from 'js-yaml'; // For history log parsing if needed, though Project should handle it.
 
 export class ArchitectAgent {
@@ -13,7 +13,7 @@ export class ArchitectAgent {
         private workspace: Workspace
     ) { }
 
-    public async design(userRequest: string): Promise<ArchitectureDocument> {
+    public async design(userRequest: string): Promise<Architecture> {
         const constraints = this.project.getConstraints();
         // Evolution log logic needs to be moved to Project or kept here?
         // Project.paths.log exists.
@@ -23,7 +23,7 @@ export class ArchitectAgent {
         const fullPrompt = this.brain.getPromptEngine().render(this.project.paths.architecturePrompt, {
             user_request: userRequest,
             global_constraints: constraints,
-            architecture_path: this.project.paths.architectureCurrent,
+            architecture_file: this.project.paths.architectureCurrent,
             personas_dir: this.project.paths.personas,
             evolution_log: evolutionLog
         });
@@ -66,7 +66,7 @@ export class ArchitectAgent {
         return "No historical failures recorded.";
     }
 
-    private async saveHistory(doc: ArchitectureDocument): Promise<void> {
+    private async saveHistory(doc: Architecture): Promise<void> {
         // Save to archive
         // We can implement this on Workspace or Project
         // For now, let's assume Workspace has archiving logic or we do it here.

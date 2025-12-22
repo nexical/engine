@@ -1,4 +1,4 @@
-import { Signal } from '../interfaces/Signal.js';
+import { Signal } from '../workflow/Signal.js';
 import yaml from 'js-yaml';
 
 export type OrchestratorStatus = 'IDLE' | 'ARCHITECTING' | 'PLANNING' | 'EXECUTING' | 'COMPLETED' | 'FAILED' | 'INTERRUPTED';

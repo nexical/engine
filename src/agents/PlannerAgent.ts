@@ -1,9 +1,9 @@
-import { Brain } from '../brain/Brain.js';
+import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
-import { PlanDocument } from '../artifacts/PlanDocument.js';
-import { ArchitectureDocument } from '../artifacts/ArchitectureDocument.js';
-import { AISkill } from '../../drivers/base/AICLIDriver.js';
+import { Plan } from '../domain/Plan.js';
+import { Architecture } from '../domain/Architecture.js';
+import { AISkill } from '../services/drivers/base/AICLIDriver.js';
 
 export class PlannerAgent {
     constructor(
@@ -12,7 +12,7 @@ export class PlannerAgent {
         private workspace: Workspace
     ) { }
 
-    public async plan(architecture: ArchitectureDocument, userRequest: string): Promise<PlanDocument> {
+    public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {
         const constraints = this.project.getConstraints();
         const evolutionLog = "No historical failures recorded."; // Todo: implement
 

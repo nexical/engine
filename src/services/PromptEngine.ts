@@ -1,6 +1,7 @@
 import nunjucks from 'nunjucks';
 import path from 'path';
-import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+import fs from 'fs-extra';
+import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
 
 export interface PromptEngineConfig {
     promptDirectory: string;
@@ -11,19 +12,27 @@ export class PromptEngine {
     private env: nunjucks.Environment;
 
     constructor(private config: PromptEngineConfig, private host: RuntimeHost) {
+
         // Define search paths for templates
-        // Priority:
-        // 1. Project overrides: <projectPath>/.ai/prompts (Use config.promptDirectory)
-        // 2. Default prompts: <appPath>/../prompts (Relative to models dir - legacy, now appDirectory)
-        const searchPaths = [
+        const candidatePaths = [
             this.config.promptDirectory,
-            path.join(this.config.appDirectory, '../prompts')
+            path.join(this.config.appDirectory, 'prompts'),
+            path.join(this.config.appDirectory, '../prompts'),
+            path.join(this.config.appDirectory, 'src/prompts')
         ];
 
-        this.host.log('debug', `Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);
+        const searchPaths = candidatePaths.filter(p => {
+            const exists = fs.existsSync(p);
+            this.host.log('debug', `Prompt search path candidate: ${p} (${exists ? 'EXISTS' : 'NOT FOUND'})`);
+            return exists;
+        });
+
+        if (searchPaths.length === 0) {
+            this.host.log('warn', 'No valid prompt search paths found. Prompt rendering may fail.');
+        }
 
         const loader = new nunjucks.FileSystemLoader(searchPaths, {
-            noCache: true // Useful for development/overrides
+            noCache: true
         });
 
         this.env = new nunjucks.Environment(loader, {

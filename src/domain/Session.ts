@@ -1,8 +1,8 @@
-import { EngineState } from '../../models/State.js';
+import { EngineState } from './State.js';
 import { Project } from './Project.js';
 import { Workspace } from './Workspace.js';
-import { RuntimeHost } from '../../interfaces/RuntimeHost.js';
-import { Brain } from '../brain/Brain.js';
+import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { Brain } from '../agents/Brain.js';
 
 export class Session {
     public readonly id: string;
@@ -24,7 +24,7 @@ export class Session {
         // this.state.updateStatus('STARTING'); // Workflow will update status
         this.host.log('info', `Session ${this.id} started.`);
 
-        const { Workflow } = await import('../../workflow/Workflow.js');
+        const { Workflow } = await import('../workflow/Workflow.js');
         this.workflow = new Workflow(this.brain, this.project, this.workspace, this.host);
 
         await this.workflow.start(this.state);

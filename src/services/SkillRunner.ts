@@ -1,10 +1,10 @@
 import path from 'path';
 import yaml from 'js-yaml';
-import { Task } from '../models/Task.js';
-import { Skill } from '../interfaces/Skill.js';
-import { Project } from '../core/domain/Project.js';
-import { DriverRegistry } from '../drivers/Registry.js';
-import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+import { Task } from '../domain/Task.js';
+import { Skill } from '../common/interfaces/Skill.js';
+import { Project } from '../domain/Project.js';
+import { DriverRegistry } from './drivers/Registry.js';
+import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
 import { PromptEngine } from './PromptEngine.js';
 import { FileSystemService } from './FileSystemService.js';
 

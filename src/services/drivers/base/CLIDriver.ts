@@ -1,6 +1,6 @@
-import { SkillSchema, BaseDriver } from '../../models/Driver.js';
-import { Skill } from '../../interfaces/Skill.js';
-import { interpolate } from '../../utils/interpolation.js';
+import { SkillSchema, BaseDriver } from '../../../domain/Driver.js';
+import { Skill } from '../../../common/interfaces/Skill.js';
+import { interpolate } from '../../../common/utils/interpolation.js';
 import { z, ZodSafeParseResult } from 'zod';
 
 export const CLISkillSchema = SkillSchema.extend({

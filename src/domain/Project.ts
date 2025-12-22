@@ -1,6 +1,6 @@
 import path from 'path';
-import { FileSystemService } from '../../services/FileSystemService.js';
-import { ProjectProfile } from '../../models/ProjectProfile.js';
+import { FileSystemService } from '../services/FileSystemService.js';
+import { ProjectProfile } from './ProjectProfile.js';
 import { fileURLToPath } from 'url';
 
 export class Project {
@@ -75,7 +75,7 @@ class ProjectPaths {
         this.log = path.join(this.ai, 'log.yml');
 
         this.prompts = path.join(this.ai, 'prompts');
-        this.architecturePrompt = 'architecture.md';
+        this.architecturePrompt = 'architect.md';
         this.plannerPrompt = 'planner.md';
         this.skillPrompt = 'skill.md';
 

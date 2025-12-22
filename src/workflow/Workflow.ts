@@ -4,11 +4,11 @@ import { ArchitectingState } from './states/ArchitectingState.js';
 import { PlanningState } from './states/PlanningState.js';
 import { ExecutingState } from './states/ExecutingState.js';
 import { CompletedState } from './states/CompletedState.js';
-import { Project } from '../core/domain/Project.js';
-import { Brain } from '../core/brain/Brain.js';
-import { Workspace } from '../core/domain/Workspace.js';
-import { RuntimeHost } from '../interfaces/RuntimeHost.js';
-import { EngineState, OrchestratorStatus } from '../models/State.js';
+import { Project } from '../domain/Project.js';
+import { Brain } from '../agents/Brain.js';
+import { Workspace } from '../domain/Workspace.js';
+import { RuntimeHost } from '../common/interfaces/RuntimeHost.js';
+import { EngineState, OrchestratorStatus } from '../domain/State.js';
 
 export class Workflow {
     private currentState: State;

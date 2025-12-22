@@ -1,6 +1,6 @@
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
-import { Skill } from '../../interfaces/Skill.js';
-import { interpolate } from '../../utils/interpolation.js';
+import { Skill } from '../../../common/interfaces/Skill.js';
+import { interpolate } from '../../../common/utils/interpolation.js';
 import { z, ZodSafeParseResult } from 'zod';
 
 export const AISkillSchema = CLISkillSchema.extend({

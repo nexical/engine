@@ -1,8 +1,8 @@
 import { Signal } from '../Signal.js';
-import { Brain } from '../../core/brain/Brain.js';
-import { Project } from '../../core/domain/Project.js';
-import { Workspace } from '../../core/domain/Workspace.js';
-import { EngineState } from '../../models/State.js';
+import { Brain } from '../../agents/Brain.js';
+import { Project } from '../../domain/Project.js';
+import { Workspace } from '../../domain/Workspace.js';
+import { EngineState } from '../../domain/State.js';
 
 export abstract class State {
     constructor(

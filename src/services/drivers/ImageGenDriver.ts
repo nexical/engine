@@ -1,8 +1,8 @@
 import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
-import { BaseDriver, SkillSchema } from '../models/Driver.js';
-import { Skill } from '../interfaces/Skill.js';
-import { interpolate } from '../utils/interpolation.js';
+import { BaseDriver, SkillSchema } from '../../domain/Driver.js';
+import { Skill } from '../../common/interfaces/Skill.js';
+import { interpolate } from '../../common/utils/interpolation.js';
 import fs from 'fs-extra';
 
 export const ImageGenSkillSchema = SkillSchema.extend({
