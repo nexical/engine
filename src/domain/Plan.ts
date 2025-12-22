@@ -1,6 +1,11 @@
-import { Task } from './Task.js';
+import { Task, TaskSchema } from './Task.js';
 import yaml from 'js-yaml';
-import { PlanSchema } from '../utils/validation.js';
+import { z } from 'zod';
+
+export const PlanSchema = z.object({
+    plan_name: z.string(),
+    tasks: z.array(TaskSchema),
+});
 
 export class Plan {
     public plan_name: string;

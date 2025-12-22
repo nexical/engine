@@ -1,4 +1,14 @@
-import { TaskSchema } from '../utils/validation.js';
+import { z } from 'zod';
+
+export const TaskSchema = z.object({
+    id: z.string().optional(),
+    description: z.string(),
+    message: z.string(),
+    skill: z.string(),
+    persona: z.string().optional(),
+    dependencies: z.array(z.string()).optional(),
+    params: z.record(z.string(), z.any()).optional(),
+});
 
 export class Task {
     public id: string;
