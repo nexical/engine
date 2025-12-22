@@ -1,10 +1,10 @@
 import path from 'path';
 import debug from 'debug';
-import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
 import { Plan } from '../models/Plan.js';
-import { Skill } from '../interfaces/Skill.js';
 import { Signal } from '../interfaces/Signal.js';
+import { AISkill } from '../drivers/base/AICLIDriver.js';
+import { GeminiDriver } from '../drivers/GeminiDriver.js';
 
 const log = debug('planner');
 
@@ -83,15 +83,6 @@ ${activeSignal.reason}
             completedTasksText = completedTasks.map(t => `- ${t}`).join('\n');
         }
 
-        const plannerCliCommand = process.env.PLANNER_CLI_COMMAND || 'gemini';
-        let plannerCliArgs: string[];
-
-        if (process.env.PLANNER_CLI_ARGS) {
-            plannerCliArgs = yaml.load(process.env.PLANNER_CLI_ARGS) as string[];
-        } else {
-            plannerCliArgs = ['prompt', '{prompt}', '--yolo'];
-        }
-
         const planFile = this.core.config.planPath;
         const personasDir = this.core.config.personasDirectory;
 
@@ -107,19 +98,13 @@ ${activeSignal.reason}
             evolution_log: evolutionLog
         });
 
-        const plannerAgent: Skill = {
+        const plannerAgent: AISkill = {
             name: 'planner',
-            command: plannerCliCommand,
-            args: plannerCliArgs,
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
         try {
-            const driver = this.core.driverRegistry.get('cli');
-            if (!driver) {
-                throw new Error("CLI driver not found for planner.");
-            }
-
+            const driver = this.core.driverRegistry.get('gemini') as GeminiDriver;
             await driver.execute(plannerAgent, {
                 userPrompt: prompt,
                 params: {

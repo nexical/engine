@@ -1,8 +1,8 @@
 import path from 'path';
 import debug from 'debug';
-import yaml from 'js-yaml';
 import type { Orchestrator } from '../orchestrator.js';
-import { Skill } from '../interfaces/Skill.js';
+import { AISkill } from '../drivers/base/AICLIDriver.js';
+import { GeminiDriver } from '../drivers/GeminiDriver.js';
 
 const log = debug('architect');
 
@@ -27,16 +27,6 @@ export class Architect {
     async generateArchitecture(prompt: string): Promise<void> {
         const globalConstraints = this.getGlobalConstraints();
         const evolutionLog = this.getEvolutionLog();
-
-        const architectCliCommand = process.env.ARCHITECT_CLI_COMMAND || 'gemini';
-        let architectCliArgs: string[];
-
-        if (process.env.ARCHITECT_CLI_ARGS) {
-            architectCliArgs = yaml.load(process.env.ARCHITECT_CLI_ARGS) as string[];
-        } else {
-            architectCliArgs = ['prompt', '{prompt}', '--yolo'];
-        }
-
         const architecturePath = this.core.config.architecturePath;
         const personasDir = this.core.config.personasDirectory;
 
@@ -48,20 +38,13 @@ export class Architect {
             evolution_log: evolutionLog
         });
 
-        const architectSkill: Skill = {
+        const architectSkill: AISkill = {
             name: 'architect',
-            command: architectCliCommand,
-            args: architectCliArgs,
             prompt_template: '{prompt}' // The fullPrompt is already constructed
         };
 
         try {
-            const driver = this.core.driverRegistry.get('cli');
-            if (!driver) {
-                throw new Error("CLI driver not found for architect.");
-            }
-
-            // Execute the architect skill. It should write the architectur to architectureFile.
+            const driver = this.core.driverRegistry.get('gemini') as GeminiDriver;
             await driver.execute(architectSkill, {
                 userPrompt: prompt,
                 params: {
