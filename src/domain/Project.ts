@@ -5,7 +5,8 @@ import yaml from 'js-yaml';
 import { z } from 'zod';
 
 export const AgentConfigSchema = z.object({
-    skill: z.string().optional()
+    skill: z.string().optional(),
+    driver: z.string().optional()
 }).loose();
 
 export const ProjectConfigurationSchema = z.object({

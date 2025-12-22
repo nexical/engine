@@ -28,7 +28,7 @@ export class PlannerAgent {
             user_prompt: userRequest,
             agent_skills: agentSkills,
             plan_file: this.project.paths.planCurrent,
-            architecture: architecture.content,
+            architecture: architecture.data, // Pass structured data if prompt supports it, or use .raw
             global_constraints: constraints,
             personas_dir: this.project.paths.personas,
             active_signal: "None",
@@ -36,14 +36,17 @@ export class PlannerAgent {
             evolution_log: evolutionLog
         });
 
-        const skillName = this.project.getConfig().agents?.['planner']?.skill || 'planner';
+        const agentConfig = this.project.getConfig().agents?.['planner'];
+        const skillName = agentConfig?.skill || 'planner';
+        const driverName = agentConfig?.driver || 'gemini';
+
         const plannerSkill: AISkill = {
             name: skillName,
             prompt_template: '{prompt}'
         };
 
-        const driver = this.driverRegistry.get('gemini') || this.driverRegistry.getDefault();
-        if (!driver) throw new Error("No driver available for Planner.");
+        const driver = this.driverRegistry.get(driverName) || this.driverRegistry.getDefault();
+        if (!driver) throw new Error(`No driver available for Planner (requested: ${driverName}).`);
 
         const result = await driver.execute(plannerSkill, {
             userPrompt: userRequest,

@@ -27,14 +27,17 @@ export class ArchitectAgent {
             evolution_log: evolutionLog
         });
 
-        const skillName = this.project.getConfig().agents?.['architect']?.skill || 'architect';
+        const agentConfig = this.project.getConfig().agents?.['architect'];
+        const skillName = agentConfig?.skill || 'architect';
+        const driverName = agentConfig?.driver || 'gemini';
+
         const architectSkill: AISkill = {
             name: skillName,
             prompt_template: '{prompt}'
         };
 
-        const driver = this.driverRegistry.get('gemini') || this.driverRegistry.getDefault();
-        if (!driver) throw new Error("No driver available for Architect.");
+        const driver = this.driverRegistry.get(driverName) || this.driverRegistry.getDefault();
+        if (!driver) throw new Error(`No driver available for Architect (requested: ${driverName}).`);
 
         const result = await driver.execute(architectSkill, {
             userPrompt: userRequest,

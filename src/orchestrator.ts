@@ -1,6 +1,6 @@
 import { RuntimeHost } from './domain/RuntimeHost.js';
-import { Project } from './domain/Project.js';
-import { Workspace } from './domain/Workspace.js';
+import { Project, IProject } from './domain/Project.js';
+import { Workspace, IWorkspace } from './domain/Workspace.js';
 import { Session } from './domain/Session.js';
 import { Brain } from './agents/Brain.js';
 import { EventEmitter } from 'events';
@@ -8,12 +8,12 @@ import { EventEmitter } from 'events';
 import { ServiceFactory } from './services/ServiceFactory.js';
 
 export class Orchestrator extends EventEmitter {
-    private _project?: Project;
+    private _project?: IProject;
     private _brain?: Brain;
-    private _workspace?: Workspace;
+    private _workspace?: IWorkspace;
     private _session?: Session;
 
-    public get project(): Project {
+    public get project(): IProject {
         if (!this._project) throw new Error("Orchestrator not initialized. Call init() first.");
         return this._project;
     }
@@ -23,7 +23,7 @@ export class Orchestrator extends EventEmitter {
         return this._brain;
     }
 
-    public get workspace(): Workspace {
+    public get workspace(): IWorkspace {
         if (!this._workspace) throw new Error("Orchestrator not initialized. Call init() first.");
         return this._workspace;
     }
@@ -54,9 +54,9 @@ export class Orchestrator extends EventEmitter {
         const services = await ServiceFactory.createServices(this.rootDirectory, this.host);
 
         // Wire up services
-        this._project = services.project as Project;
+        this._project = services.project;
         this._brain = services.brain;
-        this._workspace = services.workspace as Workspace;
+        this._workspace = services.workspace;
         this._session = services.session;
     }
 

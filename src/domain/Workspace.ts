@@ -62,11 +62,11 @@ export class Workspace implements IWorkspace {
         const path = this.project.paths.architectureCurrent;
         if (this.disk.exists(path)) {
             const content = this.disk.readFile(path);
-            const doc = new Architecture(content);
+            const doc = Architecture.fromMarkdown(content);
             this.cache.set('architecture', doc);
             return doc;
         }
-        return new Architecture("");
+        return Architecture.fromMarkdown("");
     }
 
     public async saveArchitecture(doc: Architecture): Promise<void> {

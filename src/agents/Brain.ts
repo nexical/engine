@@ -21,45 +21,17 @@ export class Brain {
     constructor(
         private project: IProject,
         public readonly host: RuntimeHost,
-        dependencies?: {
-            promptEngine?: IPromptEngine;
-            driverRegistry?: IDriverRegistry;
-            skillRunner?: ISkillRunner;
-            evolution?: IEvolutionService;
+        dependencies: {
+            promptEngine: IPromptEngine;
+            driverRegistry: IDriverRegistry;
+            skillRunner: ISkillRunner;
+            evolution: IEvolutionService;
         }
     ) {
-        // Initialize dependencies if not provided
-        if (dependencies?.promptEngine) {
-            this.promptEngine = dependencies.promptEngine;
-        } else {
-            const promptConfig: PromptEngineConfig = {
-                promptDirectory: project.paths.prompts,
-                appDirectory: project.rootDirectory
-            };
-            this.promptEngine = new PromptEngine(promptConfig, host);
-        }
-
-        if (dependencies?.driverRegistry) {
-            this.driverRegistry = dependencies.driverRegistry;
-        } else {
-            const driverConfig = {
-                ...project.paths,
-                rootDirectory: project.rootDirectory
-            };
-            this.driverRegistry = new DriverRegistry(host, driverConfig, project.fileSystem);
-        }
-
-        if (dependencies?.skillRunner) {
-            this.skillRunner = dependencies.skillRunner;
-        } else {
-            this.skillRunner = new SkillRunner(project as Project, this.driverRegistry as DriverRegistry, this.promptEngine as PromptEngine, host);
-        }
-
-        if (dependencies?.evolution) {
-            this.evolution = dependencies.evolution;
-        } else {
-            this.evolution = new EvolutionService(project as Project, project.fileSystem as FileSystemService);
-        }
+        this.promptEngine = dependencies.promptEngine;
+        this.driverRegistry = dependencies.driverRegistry;
+        this.skillRunner = dependencies.skillRunner;
+        this.evolution = dependencies.evolution;
     }
 
     public registerAgent<T>(name: string, factory: (workspace: IWorkspace) => T): void {
