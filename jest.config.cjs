@@ -19,9 +19,8 @@ module.exports = {
     collectCoverage: true,
     collectCoverageFrom: [
         'src/**/*.{ts,js}',
-        '!src/**/*.d.ts',
-        '!src/cli.ts',
+        '!src/**/*.d.ts'
     ],
     coverageDirectory: 'coverage',
-    coverageReporters: ['text', 'lcov'],
+    coverageReporters: ['text', 'lcov', 'html'],
 };
