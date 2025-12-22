@@ -1,5 +1,6 @@
-import { Plan } from '../../../src/models/Plan.js';
-import { Task } from '../../../src/models/Task.js';
+import { describe, it, expect } from '@jest/globals';
+import { Plan } from '../../../src/domain/Plan.js';
+import { Task } from '../../../src/domain/Task.js';
 
 describe('Plan Model', () => {
     it('should create a plan with tasks', () => {

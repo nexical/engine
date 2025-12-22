@@ -42,6 +42,15 @@ export class FileSystemService {
         }
     }
 
+    copy(source: string, destination: string, options?: { overwrite?: boolean }): void {
+        try {
+            fs.ensureDirSync(path.dirname(destination));
+            fs.copySync(source, destination, options);
+        } catch (error) {
+            console.error(`Error copying file from ${source} to ${destination}:`, error);
+        }
+    }
+
     ensureDir(dirPath: string): void {
         try {
             fs.ensureDirSync(dirPath);

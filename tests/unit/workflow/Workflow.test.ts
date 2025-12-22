@@ -99,4 +99,17 @@ describe('Workflow Engine', () => {
         expect(executionCount).toBe(2);
         expect(state.status).toBe('COMPLETED');
     });
+
+    it('should fail if maximum retry limit is reached', async () => {
+        jest.spyOn(ArchitectingState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(PlanningState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        // Constantly return REPLAN
+        jest.spyOn(ExecutingState.prototype, 'run').mockResolvedValue(Signal.replan("Infinite failure"));
+
+        await workflow.start(state);
+
+        expect(state.loop_count).toBeGreaterThan(10);
+        expect(state.status).toBe('FAILED');
+        expect(host.log).toHaveBeenCalledWith('error', expect.stringContaining('Maximum retry limit reached'));
+    });
 });

@@ -1,4 +1,5 @@
-import { ProjectProfile } from '../../../src/models/ProjectProfile.js';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { ProjectProfile } from '../../../src/domain/ProjectProfile.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';

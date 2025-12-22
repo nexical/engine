@@ -73,6 +73,7 @@ export class EngineState {
         }
         state.last_signal = data.last_signal;
         state.user_prompt = data.user_prompt || "";
+        state.interactive = data.interactive || false;
         return state;
     }
 

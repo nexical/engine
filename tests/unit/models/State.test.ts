@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { EngineState } from '../../../src/models/State.js';
+import { EngineState } from '../../../src/domain/State.js';
 
 describe('EngineState Model', () => {
     let state: EngineState;
@@ -32,7 +32,8 @@ describe('EngineState Model', () => {
             type: 'USER_INTERVENTION' as any, // Cast if type is restricted
             source: 'user',
             reason: 'test',
-            timestamp: 'now'
+            timestamp: 'now',
+            metadata: {}
         };
         state.recordSignal(signal);
         expect(state.last_signal).toBe(signal);

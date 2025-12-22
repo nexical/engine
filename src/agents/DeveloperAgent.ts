@@ -24,6 +24,9 @@ export class DeveloperAgent {
 
         this.brain.host.log('info', `Executing plan: ${plan.plan_name} with ${plan.tasks.length} tasks.`);
 
+        // Sync pending tasks in state
+        state.tasks.pending = plan.tasks.map(t => t.id).filter(id => !state.tasks.completed.includes(id));
+
         // Filter out completed tasks
         const tasksToExecute = plan.tasks.filter(task => !state.tasks.completed.includes(task.id));
 

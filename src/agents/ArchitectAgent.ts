@@ -43,13 +43,13 @@ export class ArchitectAgent {
         // After execution, we reload from disk to return the object.
         const doc = await this.workspace.getArchitecture('current');
 
-        // Save history
+        // Save history (archiving previous artifacts)
         await this.saveHistory(doc);
 
         return doc;
     }
 
     private async saveHistory(doc: Architecture): Promise<void> {
-        // Save to archive (TBD in Workspace/Project)
+        this.workspace.archiveArtifacts();
     }
 }

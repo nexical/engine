@@ -1,9 +1,5 @@
 import { jest, describe, beforeEach, it, expect } from '@jest/globals';
-import { Registry } from '../../../src/models/Registry.js';
-import { Orchestrator } from '../../../src/orchestrator.js';
-
-// Mock Orchestrator since Registry depends on it (via BaseRegistry/constructor)
-jest.mock('../../../src/orchestrator.js');
+import { Registry } from '../../../src/domain/Registry.js';
 
 interface TestItem {
     name: string;
@@ -14,19 +10,9 @@ class TestRegistry extends Registry<TestItem> { }
 
 describe('Registry Model', () => {
     let registry: TestRegistry;
-    let mockOrchestrator: jest.Mocked<Orchestrator>;
 
     beforeEach(() => {
-        mockOrchestrator = {
-            config: {},
-            disk: {},
-            driverRegistry: {},
-            promptEngine: {},
-            planner: {},
-            executor: {},
-            state: {}
-        } as any;
-        registry = new TestRegistry(mockOrchestrator);
+        registry = new TestRegistry();
     });
 
     it('should register and retrieve items', () => {

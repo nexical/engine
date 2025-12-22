@@ -2,6 +2,9 @@ import { FileSystemService } from '../services/FileSystemService.js';
 import { Project } from './Project.js';
 import { Architecture } from './Architecture.js';
 import { Plan } from './Plan.js';
+import { Signal, SignalType } from '../workflow/Signal.js';
+import yaml from 'js-yaml';
+import path from 'path';
 
 export class Workspace {
     private disk: FileSystemService;
@@ -39,8 +42,22 @@ export class Workspace {
     }
 
     public archiveArtifacts(): void {
-        // Implementation to move current architecture/plan to archive
-        // Logic to be moved from Workflow/Application if exists
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const archiveDir = this.project.paths.archive;
+
+        // Archive architecture
+        const archCurrent = this.project.paths.architectureCurrent;
+        if (this.disk.exists(archCurrent)) {
+            const archArchive = path.join(archiveDir, `${timestamp}.architecture.md`);
+            this.disk.copy(archCurrent, archArchive);
+        }
+
+        // Archive plan
+        const planCurrent = this.project.paths.planCurrent;
+        if (this.disk.exists(planCurrent)) {
+            const planArchive = path.join(archiveDir, `${timestamp}.plan.yml`);
+            this.disk.copy(planCurrent, planArchive);
+        }
     }
 
     /**
@@ -79,5 +96,3 @@ export class Workspace {
         }
     }
 }
-import yaml from 'js-yaml';
-import { Signal, SignalType } from '../workflow/Signal.js';
