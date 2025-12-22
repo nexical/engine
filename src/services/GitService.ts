@@ -1,16 +1,19 @@
-import { spawnSync } from 'child_process';
 import type { Orchestrator } from '../orchestrator.js';
+import { ShellExecutor } from '../utils/shell.js';
 
 export class GitService {
-    constructor(private core: Orchestrator) { }
+    private shell: ShellExecutor;
+
+    constructor(private core: Orchestrator) {
+        this.shell = new ShellExecutor(this.core.host);
+    }
 
     runCommand(args: string[], cwd?: string): string {
-        const result = spawnSync('git', args, {
-            cwd: cwd || this.core.project.rootDirectory,
-            encoding: 'utf-8',
+        const result = this.shell.executeSync('git', args, {
+            cwd: cwd || this.core.project.rootDirectory
         });
 
-        if (result.status !== 0) {
+        if (result.code !== 0) {
             throw new Error(`Git command failed: git ${args.join(' ')}\n${result.stderr}`);
         }
 
@@ -23,16 +26,10 @@ export class GitService {
 
     async clone(url: string, dir?: string): Promise<void> {
         let authUrl = url;
-        // Token injection removed - rely on system git credentials or environment variables
-
         const args = ['clone', authUrl];
         if (dir) {
             args.push(dir);
         }
-        // Clone runs in the parent directory of the project path usually, or current cwd
-        // But here we probably want to run it in the current working directory of the process
-        // if we are initializing a new project.
-        // use workingDirectory which is the sandbox root or the project root.
         this.runCommand(args, this.core.project.rootDirectory);
     }
 
