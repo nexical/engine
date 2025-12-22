@@ -1,7 +1,7 @@
 import path from 'path';
 import yaml from 'js-yaml';
 import { Task } from '../domain/Task.js';
-import { Skill } from '../domain/Driver.js';
+import { Skill, SkillSchema } from '../domain/Driver.js';
 import { Project } from '../domain/Project.js';
 import { DriverRegistry } from '../drivers/DriverRegistry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
@@ -40,10 +40,9 @@ export class SkillRunner implements ISkillRunner {
                 const filePath = path.join(skillsDir, filename);
                 const content = this.disk.readFile(filePath);
                 try {
-                    const profile = yaml.load(content) as Skill;
-                    if (profile && profile.name) {
-                        this.skills[profile.name] = profile;
-                    }
+                    const profile = yaml.load(content);
+                    const parsed = SkillSchema.parse(profile);
+                    this.skills[parsed.name] = parsed as Skill;
                 } catch (e) {
                     this.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
                 }

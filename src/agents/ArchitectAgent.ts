@@ -27,8 +27,9 @@ export class ArchitectAgent {
             evolution_log: evolutionLog
         });
 
+        const skillName = this.project.getConfig().agents?.['architect']?.skill || 'architect';
         const architectSkill: AISkill = {
-            name: 'architect',
+            name: skillName,
             prompt_template: '{prompt}'
         };
 

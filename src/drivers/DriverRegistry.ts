@@ -43,33 +43,49 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
         const files = await getFiles(dir);
 
         for (const file of files) {
-            if (file.endsWith('.ts') || file.endsWith('.js')) {
-                if (file.endsWith('.d.ts')) continue;
+            // Skip non-code files and definition files
+            if ((!file.endsWith('.ts') && !file.endsWith('.js')) || file.endsWith('.d.ts') || file.endsWith('.map')) {
+                continue;
+            }
 
-                try {
-                    const module = await import(file);
-                    for (const key in module) {
-                        const ExportedClass = module[key];
-                        if (typeof ExportedClass === 'function') {
-                            try {
-                                const instance = new ExportedClass(this.host, this.config);
-                                if (this.isDriver(instance)) {
-                                    if (await instance.isSupported()) {
-                                        const isDefault = instance.name === 'gemini';
-                                        this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
-                                        this.register(instance, isDefault);
-                                    } else {
-                                        this.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
-                                    }
+            try {
+                const module = await import(file);
+                let loaded = false;
+                for (const key in module) {
+                    const ExportedClass = module[key];
+                    if (typeof ExportedClass === 'function') {
+                        try {
+                            // Attempt instantiation
+                            // Note: we can't easily check 'implements Driver' at runtime before instantiation 
+                            // without checking prototype, but instantiation is safer if constructor is simple.
+                            // We assume drivers have a constructor compatible with (host, config)
+                            const instance = new ExportedClass(this.host, this.config);
+                            if (this.isDriver(instance)) {
+                                if (await instance.isSupported()) {
+                                    const isDefault = instance.name === 'gemini';
+                                    this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
+                                    this.register(instance, isDefault);
+                                    loaded = true;
+                                } else {
+                                    this.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
                                 }
-                            } catch (e) {
-                                // Ignore classes that fail to instantiate
                             }
+                        } catch (e) {
+                            // Instantiate failed, likely not a driver class or missing dependencies
+                            // We don't log this as error because we might be trying to instantiate helper classes
                         }
                     }
-                } catch (e) {
-                    this.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
                 }
+
+                if (!loaded) {
+                    // Verify if we should have loaded something (e.g. if file name ends in Driver.ts)
+                    if (file.match(/Driver\.(ts|js)$/)) {
+                        this.host.log('warn', `No valid driver found in ${file}`);
+                    }
+                }
+
+            } catch (e) {
+                this.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
             }
         }
     }

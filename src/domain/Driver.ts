@@ -10,7 +10,7 @@ export interface Skill {
 
 import { Result } from './Result.js';
 
-export interface Driver<TContext = any, TResult = string> {
+export interface Driver<TContext = Record<string, unknown>, TResult = string> {
     name: string;
     description: string;
     isSupported(): Promise<boolean>;
@@ -21,10 +21,11 @@ export interface Driver<TContext = any, TResult = string> {
 export const SkillSchema = z.object({
     name: z.string(),
     description: z.string().optional(),
+    provider: z.string().optional(),
     dependencies: z.array(z.string()).optional()
 }).loose();
 
-export abstract class BaseDriver<TContext = any, TResult = string> implements Driver<TContext, TResult> {
+export abstract class BaseDriver<TContext = Record<string, unknown>, TResult = string> implements Driver<TContext, TResult> {
     abstract name: string;
     abstract description: string;
 

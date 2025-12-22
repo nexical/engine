@@ -36,8 +36,9 @@ export class PlannerAgent {
             evolution_log: evolutionLog
         });
 
+        const skillName = this.project.getConfig().agents?.['planner']?.skill || 'planner';
         const plannerSkill: AISkill = {
-            name: 'planner',
+            name: skillName,
             prompt_template: '{prompt}'
         };
 

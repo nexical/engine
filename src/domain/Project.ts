@@ -1,6 +1,18 @@
 import path from 'path';
 import { FileSystemService } from '../services/FileSystemService.js';
 import yaml from 'js-yaml';
+import { z } from 'zod';
+
+export const AgentConfigSchema = z.object({
+    skill: z.string().optional()
+}).loose();
+
+export const ProjectConfigurationSchema = z.object({
+    agents: z.record(z.string(), AgentConfigSchema).optional(),
+    // Add other known config fields here
+}).loose();
+
+export type ProjectProfile = z.infer<typeof ProjectConfigurationSchema>;
 
 export interface IProject {
     readonly rootDirectory: string;
@@ -13,7 +25,7 @@ export class Project implements IProject {
     public readonly rootDirectory: string;
     public readonly paths: ProjectPaths;
     private disk: FileSystemService;
-    private profile: ProjectProfile | null = null; // Use local type
+    private profile: ProjectProfile | null = null;
 
     constructor(rootDirectory: string) {
         this.rootDirectory = rootDirectory;
@@ -42,7 +54,8 @@ export class Project implements IProject {
         }
         try {
             const content = this.disk.readFile(path);
-            return yaml.load(content) as ProjectProfile;
+            const raw = yaml.load(content);
+            return ProjectConfigurationSchema.parse(raw);
         } catch (e) {
             console.error(`Failed to load project profile from ${path}:`, e);
             throw e;
@@ -114,6 +127,4 @@ class ProjectPaths {
     }
 }
 
-export interface ProjectProfile {
-    [key: string]: any;
-}
+// End of file
