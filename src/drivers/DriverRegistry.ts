@@ -53,7 +53,7 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                     const ExportedClass = module[key];
                     if (typeof ExportedClass === 'function') {
                         try {
-                            const instance = new ExportedClass(this.host, this.config);
+                            const instance = new ExportedClass(this.host, this.config, this.fileSystem);
                             if (this.isDriver(instance)) {
                                 if (await instance.isSupported()) {
                                     const configuredDefault = this.config.defaultDriver || 'gemini';

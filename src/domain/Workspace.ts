@@ -154,7 +154,7 @@ export class Workspace implements IWorkspace {
         }
     }
     public async saveState(state: EngineState): Promise<void> {
-        await this.disk.writeFile(this.project.paths.state, state.toYaml());
+        await this.scheduleWrite(this.project.paths.state, state.toYaml());
     }
 
     public async loadState(): Promise<EngineState | undefined> {

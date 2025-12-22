@@ -25,14 +25,25 @@ export const SkillSchema = z.object({
     dependencies: z.array(z.string()).optional()
 }).loose();
 
+export interface DriverConfig {
+    rootDirectory: string;
+    defaultDriver?: string;
+    [key: string]: any;
+}
+
+import { IFileSystem } from './IFileSystem.js';
+import { FileSystemService } from '../services/FileSystemService.js';
+
 export abstract class BaseDriver<TContext = Record<string, unknown>, TResult = string> implements Driver<TContext, TResult> {
     abstract name: string;
     abstract description: string;
 
     protected shell: ShellExecutor;
+    protected fileSystem: IFileSystem;
 
-    constructor(protected host: RuntimeHost, protected config: any = {}) {
+    constructor(protected host: RuntimeHost, protected config: DriverConfig = { rootDirectory: process.cwd() }, fileSystem?: IFileSystem) {
         this.shell = new ShellExecutor(host);
+        this.fileSystem = fileSystem || new FileSystemService(host);
     }
 
     abstract isSupported(): Promise<boolean>;

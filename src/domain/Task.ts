@@ -44,7 +44,7 @@ export class Task {
             validated.message,
             validated.description,
             validated.skill,
-            (data as any).persona, // persona not in schema yet, will add
+            validated.persona,
             validated.params,
             validated.dependencies
         );
