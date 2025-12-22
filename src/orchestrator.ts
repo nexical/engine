@@ -30,14 +30,14 @@ export class Orchestrator {
         this.session = new Session(this.project, this.workspace, this.brain, this.host);
     }
 
-    async start(prompt: string, interactive: boolean = false): Promise<void> {
+    async start(prompt: string, interactive: boolean = true): Promise<void> {
         if (!this.session) {
             throw new Error("Orchestrator not initialized. Call init() first.");
         }
-        await this.session.start(prompt, interactive);
+        await this.session.start(prompt.trim(), interactive);
     }
 
-    async execute(input: string): Promise<void> {
-        await this.start(input.trim());
+    async execute(prompt: string): Promise<void> {
+        await this.start(prompt, false);
     }
 }
