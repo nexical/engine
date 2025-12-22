@@ -1,5 +1,4 @@
 import { FileSystemService } from '../services/FileSystemService.js';
-import { Project } from './Project.js';
 import { Architecture } from './Architecture.js';
 import { Plan } from './Plan.js';
 import { Signal, SignalType } from '../workflow/Signal.js';
@@ -127,7 +126,12 @@ export class Workspace implements IWorkspace {
             if (file.endsWith('.signal.yml') || file.endsWith('.signal.yaml')) {
                 const content = this.disk.readFile(`${signalsDir}/${file}`);
                 try {
-                    const data = yaml.load(content) as any;
+                    const data = yaml.load(content) as { type: string, reason: string, metadata?: Record<string, any> };
+                    // Validate minimal signal structure
+                    if (!data || !data.type || !data.reason) {
+                        console.warn(`Invalid signal file content in ${file}`);
+                        continue;
+                    }
                     return new Signal(data.type as SignalType, data.reason, data.metadata);
                 } catch (e) {
                     console.error(`Failed to parse signal file ${file}:`, e);

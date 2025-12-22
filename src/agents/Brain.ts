@@ -20,9 +20,6 @@ export class Brain {
     constructor(
         private project: IProject,
         public readonly host: RuntimeHost,
-        // Optional dependencies for DI/Testing. If not provided, defaults are created (for backward compat or ease of use)
-        // ideally in strict DI we enforce them, but here we can be pragmatic.
-        // Actually, Orchestrator should provide them.
         dependencies?: {
             promptEngine?: IPromptEngine;
             driverRegistry?: IDriverRegistry;
@@ -48,7 +45,7 @@ export class Brain {
                 ...project.paths,
                 rootDirectory: project.rootDirectory
             };
-            this.driverRegistry = new DriverRegistry(host, driverConfig);
+            this.driverRegistry = new DriverRegistry(host, driverConfig, project.fileSystem);
         }
 
         if (dependencies?.skillRunner) {

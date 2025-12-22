@@ -1,8 +1,9 @@
 import { Driver } from '../domain/Driver.js';
 import { Registry } from '../domain/Registry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
+import { IFileSystem } from '../domain/IFileSystem.js';
+import { FileSystemService } from '../services/FileSystemService.js';
 import path from 'path';
-import fs from 'fs-extra';
 
 export interface IDriverRegistry extends Registry<Driver> {
     register(plugin: Driver, isDefault?: boolean): void;
@@ -12,9 +13,11 @@ export interface IDriverRegistry extends Registry<Driver> {
 
 export class DriverRegistry extends Registry<Driver> implements IDriverRegistry {
     private defaultPlugin: Driver | undefined;
+    private fileSystem: IFileSystem;
 
-    constructor(protected host: RuntimeHost, protected config: any) {
+    constructor(protected host: RuntimeHost, protected config: any, fileSystem?: IFileSystem) {
         super();
+        this.fileSystem = fileSystem || new FileSystemService();
     }
 
     register(plugin: Driver, isDefault: boolean = false): void {
@@ -29,18 +32,35 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
     }
 
     async load(dir: string): Promise<void> {
-        if (!fs.existsSync(dir)) return;
+        if (!this.fileSystem.isDirectory(dir)) return;
 
-        async function getFiles(dir: string): Promise<string[]> {
-            const dirents = await fs.readdir(dir, { withFileTypes: true });
-            const files = await Promise.all(dirents.map((dirent) => {
-                const res = path.resolve(dir, dirent.name);
-                return dirent.isDirectory() ? getFiles(res) : res;
-            }));
-            return Array.prototype.concat(...files);
+        function getFiles(fileSystem: IFileSystem, dir: string): string[] {
+            // Note: IFileSystem.listFiles is currently shallow.
+            // But DriverRegistry needs recursive?
+            // The original code was recursive.
+            // IFileSystem.listFiles might not be recursive.
+            // Let's implement recursive logic here using IFileSystem or check if listFiles is sufficient.
+            // Wait, IFileSystem does NOT have listFilesRecursive.
+            // Let's check FileSystemService implementation.
+            // FileSystemService.listFiles uses fs.readdirSync(dirPath).map(...) -> shallow.
+            // So we need to implement recursion here using IFileSystem methods.
+
+            const result: string[] = [];
+            if (!fileSystem.isDirectory(dir)) return result;
+
+            const items = fileSystem.listFiles(dir);
+            for (const item of items) {
+                const fullPath = path.join(dir, item);
+                if (fileSystem.isDirectory(fullPath)) {
+                    result.push(...getFiles(fileSystem, fullPath));
+                } else {
+                    result.push(fullPath);
+                }
+            }
+            return result;
         }
 
-        const files = await getFiles(dir);
+        const files = getFiles(this.fileSystem, dir);
 
         for (const file of files) {
             // Skip non-code files and definition files

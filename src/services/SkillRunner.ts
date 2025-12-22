@@ -2,11 +2,10 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { Task } from '../domain/Task.js';
 import { Skill, SkillSchema } from '../domain/Driver.js';
-import { Project } from '../domain/Project.js';
+import { IProject } from '../domain/Project.js';
 import { DriverRegistry } from '../drivers/DriverRegistry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { PromptEngine } from './PromptEngine.js';
-import { FileSystemService } from './FileSystemService.js';
 
 export interface ISkillRunner {
     init(): Promise<void>;
@@ -19,7 +18,7 @@ export class SkillRunner implements ISkillRunner {
     private skills: Record<string, Skill> = {};
 
     constructor(
-        private project: Project,
+        private project: IProject,
         private driverRegistry: DriverRegistry,
         private promptEngine: PromptEngine,
         private host: RuntimeHost

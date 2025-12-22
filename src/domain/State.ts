@@ -66,15 +66,27 @@ export class EngineState {
     }
 
     static fromYaml(yamlString: string): EngineState {
-        const data = yaml.load(yamlString) as any;
-        const state = new EngineState(data.session_id);
-        state.status = data.status;
-        state.current_plan = data.current_plan;
-        state.loop_count = data.loop_count;
-        if (data.tasks) {
-            state.tasks = data.tasks;
+        const data = yaml.load(yamlString) as Partial<EngineState>;
+        if (!data || typeof data !== 'object') {
+            throw new Error("Invalid state YAML");
         }
-        state.last_signal = data.last_signal;
+
+        const session_id = data.session_id || 'unknown';
+        const state = new EngineState(session_id);
+
+        if (data.status) state.status = data.status;
+        if (data.current_plan) state.current_plan = data.current_plan;
+        if (typeof data.loop_count === 'number') state.loop_count = data.loop_count;
+
+        if (data.tasks) {
+            state.tasks = {
+                completed: data.tasks.completed || [],
+                failed: data.tasks.failed || [],
+                pending: data.tasks.pending || []
+            };
+        }
+
+        if (data.last_signal) state.last_signal = data.last_signal;
         state.user_prompt = data.user_prompt || "";
         state.interactive = data.interactive || false;
         state.context = data.context || {};
