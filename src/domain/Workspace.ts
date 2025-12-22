@@ -42,4 +42,42 @@ export class Workspace {
         // Implementation to move current architecture/plan to archive
         // Logic to be moved from Workflow/Application if exists
     }
+
+    /**
+     * Detects if any signal files exist in the signals directory.
+     * Returns the first valid signal found, or null.
+     */
+    public async detectSignal(): Promise<Signal | null> {
+        const signalsDir = this.project.paths.signals;
+        if (!this.disk.isDirectory(signalsDir)) return null;
+
+        const files = this.disk.listFiles(signalsDir);
+        for (const file of files) {
+            if (file.endsWith('.signal.yml') || file.endsWith('.signal.yaml')) {
+                const content = this.disk.readFile(`${signalsDir}/${file}`);
+                try {
+                    const data = yaml.load(content) as any;
+                    return new Signal(data.type as SignalType, data.reason, data.metadata);
+                } catch (e) {
+                    console.error(`Failed to parse signal file ${file}:`, e);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Clears all signal files from the signals directory.
+     */
+    public async clearSignals(): Promise<void> {
+        const signalsDir = this.project.paths.signals;
+        if (this.disk.isDirectory(signalsDir)) {
+            const files = this.disk.listFiles(signalsDir);
+            for (const file of files) {
+                this.disk.deleteFile(`${signalsDir}/${file}`);
+            }
+        }
+    }
 }
+import yaml from 'js-yaml';
+import { Signal, SignalType } from '../workflow/Signal.js';

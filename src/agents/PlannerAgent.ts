@@ -14,7 +14,7 @@ export class PlannerAgent {
 
     public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {
         const constraints = this.project.getConstraints();
-        const evolutionLog = "No historical failures recorded."; // Todo: implement
+        const evolutionLog = this.brain.getEvolution().getLogSummary();
 
         // We need agent skills. 
         // In original PlannerAgent: context.skillRunner.getSkills()

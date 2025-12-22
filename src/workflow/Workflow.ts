@@ -22,24 +22,32 @@ export class Workflow {
     ) {
         // Initialize States
         this.states = new Map();
-        this.states.set('ARCHITECTING', new ArchitectingState(brain, project, workspace));
-        this.states.set('PLANNING', new PlanningState(brain, project, workspace));
-        this.states.set('EXECUTING', new ExecutingState(brain, project, workspace));
-        this.states.set('COMPLETED', new CompletedState(brain, project, workspace));
+        this.states.set('ARCHITECTING', new ArchitectingState(brain, project, workspace, host));
+        this.states.set('PLANNING', new PlanningState(brain, project, workspace, host));
+        this.states.set('EXECUTING', new ExecutingState(brain, project, workspace, host));
+        this.states.set('COMPLETED', new CompletedState(brain, project, workspace, host));
 
         // Default start state
         this.currentState = this.states.get('ARCHITECTING')!;
     }
 
-    public async start(state: EngineState): Promise<void> {
-        this.currentState = this.states.get('ARCHITECTING')!;
+    public async start(state: EngineState, onStateChange?: () => Promise<void>): Promise<void> {
+        this.currentState = this.states.get(state.status === 'IDLE' ? 'ARCHITECTING' : state.status as string) || this.states.get('ARCHITECTING')!;
 
         while (true) {
             this.host.log('info', `[Workflow] Enter State: ${this.currentState.name}`);
             state.updateStatus(this.currentState.name as OrchestratorStatus);
+            if (onStateChange) await onStateChange();
 
             const signal = await this.currentState.run(state);
             this.host.log('debug', `[Workflow] Signal Received: ${signal.type}`);
+
+            // Record Signal in Evolution Log if it's a departure from normal flow
+            if ([SignalType.FAIL, SignalType.REPLAN, SignalType.REARCHITECT].includes(signal.type)) {
+                await this.brain.getEvolution().recordFailure(this.currentState.name, signal, state.tasks.completed);
+            }
+
+            if (onStateChange) await onStateChange();
 
             if (signal.type === SignalType.FAIL) {
                 this.host.log('error', `Workflow Failed: ${signal.reason}`);
@@ -71,8 +79,8 @@ export class Workflow {
         }
         else if (current.name === 'EXECUTING') {
             if (signal.type === SignalType.COMPLETE) return this.states.get('COMPLETED')!;
-            // Future: Handle REARCHITECT -> ARCHITECTING
-            // Future: Handle REPLAN -> PLANNING
+            if (signal.type === SignalType.REPLAN) return this.states.get('PLANNING')!;
+            if (signal.type === SignalType.REARCHITECT) return this.states.get('ARCHITECTING')!;
         }
 
         // Fallback or terminal

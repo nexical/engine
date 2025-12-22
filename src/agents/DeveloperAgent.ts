@@ -1,8 +1,10 @@
 import yaml from 'js-yaml';
 import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
+import { Workspace } from '../domain/Workspace.js';
 import { EngineState } from '../domain/State.js';
 import { Plan } from '../domain/Plan.js';
+import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 
 export class DeveloperAgent {
     public readonly name = 'Developer';
@@ -10,7 +12,8 @@ export class DeveloperAgent {
 
     constructor(
         private brain: Brain,
-        private project: Project
+        private project: Project,
+        private workspace: Workspace
     ) { }
 
     async execute(state: EngineState): Promise<void> {
@@ -84,6 +87,17 @@ export class DeveloperAgent {
 
             state.completeTask(task.id);
             console.log(`[INFO] Task ${task.id} completed.`);
+
+            // Check for signals after each task
+            await this.checkSignals(task.id);
+        }
+    }
+
+    private async checkSignals(taskId: string): Promise<void> {
+        const signal = await this.workspace.detectSignal();
+        if (signal) {
+            console.log(`[INFO] Signal detected after task ${taskId}: ${signal.type}`);
+            throw new SignalDetectedError(signal, taskId);
         }
     }
 }

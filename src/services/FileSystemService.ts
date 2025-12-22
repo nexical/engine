@@ -88,4 +88,14 @@ export class FileSystemService {
             throw error;
         }
     }
+
+    deleteFile(filePath: string): void {
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        } catch (error) {
+            console.error(`Error deleting file ${filePath}:`, error);
+        }
+    }
 }

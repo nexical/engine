@@ -2,6 +2,7 @@ import { State } from './State.js';
 import { Signal, SignalType } from '../Signal.js';
 import { EngineState } from '../../domain/State.js';
 import { DeveloperAgent } from '../../agents/DeveloperAgent.js';
+import { SignalDetectedError } from '../../errors/SignalDetectedError.js';
 
 export class ExecutingState extends State {
     get name(): string {
@@ -10,11 +11,13 @@ export class ExecutingState extends State {
 
     async run(state: EngineState): Promise<Signal> {
         try {
-            const developer = new DeveloperAgent(this.brain, this.project);
+            const developer = new DeveloperAgent(this.brain, this.project, this.workspace);
             await developer.execute(state);
             return Signal.COMPLETE;
         } catch (error) {
-            // Check if error is a Signal (future improvement for interrupts)
+            if (error instanceof SignalDetectedError) {
+                return error.signal;
+            }
             return Signal.fail(`Execution failed: ${(error as Error).message}`);
         }
     }

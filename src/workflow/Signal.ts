@@ -26,4 +26,12 @@ export class Signal {
     static retry(reason: string): Signal {
         return new Signal(SignalType.RETRY, reason);
     }
+
+    static replan(reason: string, metadata: any = {}): Signal {
+        return new Signal(SignalType.REPLAN, reason, metadata);
+    }
+
+    static rearchitect(reason: string, metadata: any = {}): Signal {
+        return new Signal(SignalType.REARCHITECT, reason, metadata);
+    }
 }

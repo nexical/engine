@@ -5,6 +5,8 @@ import { Project } from '../domain/Project.js';
 import { Skill } from '../domain/Driver.js';
 import { Driver } from '../domain/Driver.js';
 import { FileSystemService } from '../services/FileSystemService.js';
+import { SkillRunner } from '../services/SkillRunner.js'; // Statically import SkillRunner
+import { EvolutionService } from '../services/EvolutionService.js'; // Import EvolutionService
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -12,8 +14,9 @@ const require = createRequire(import.meta.url);
 export class Brain {
     private promptEngine: PromptEngine;
     private driverRegistry: DriverRegistry;
-    private skillRunner: any; // Type as SkillRunner
+    private skillRunner: SkillRunner; // Type as SkillRunner
     private contextAdapter: any; // Legacy compatibility
+    private evolution: EvolutionService; // Add evolution service property
 
     constructor(
         private project: Project,
@@ -34,10 +37,12 @@ export class Brain {
         this.driverRegistry = new DriverRegistry(host, driverConfig);
 
         // 3. Initialize SkillRunner
-        const { SkillRunner } = require('../services/SkillRunner.js');
         this.skillRunner = new SkillRunner(project, this.driverRegistry, this.promptEngine, host);
 
-        // 4. Create Legacy Context Adapter (if needed by getContext())
+        // 4. Initialize EvolutionService
+        this.evolution = new EvolutionService(project);
+
+        // 5. Create Legacy Context Adapter (if needed by getContext())
         this.contextAdapter = {
             host: host,
             config: driverConfig,
@@ -66,8 +71,12 @@ export class Brain {
         return this.promptEngine;
     }
 
-    public getSkillRunner(): any { // Return SkillRunner
+    public getSkillRunner(): SkillRunner { // Return SkillRunner
         return this.skillRunner;
+    }
+
+    public getEvolution(): EvolutionService {
+        return this.evolution;
     }
 
     public getDriver(name: string): Driver | undefined {

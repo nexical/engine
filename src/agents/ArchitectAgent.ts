@@ -15,10 +15,7 @@ export class ArchitectAgent {
 
     public async design(userRequest: string): Promise<Architecture> {
         const constraints = this.project.getConstraints();
-        // Evolution log logic needs to be moved to Project or kept here?
-        // Project.paths.log exists.
-        // Let's implement a helper in this file or Project to read log.
-        const evolutionLog = this.getEvolutionLog();
+        const evolutionLog = this.brain.getEvolution().getLogSummary();
 
         const fullPrompt = this.brain.getPromptEngine().render(this.project.paths.architecturePrompt, {
             user_request: userRequest,

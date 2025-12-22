@@ -1,158 +1,102 @@
 import { jest, describe, beforeEach, it, expect } from '@jest/globals';
 import { Workflow } from '../../../src/workflow/Workflow.js';
-import { EngineState } from '../../../src/models/State.js';
-import { RuntimeContext } from '../../../src/interfaces/RuntimeContext.js';
-
-// Mock Agents
-jest.mock('../../../src/agents/ArchitectAgent.js', () => {
-    return {
-        ArchitectAgent: jest.fn().mockImplementation(() => {
-            return {
-                run: jest.fn().mockImplementation(async (context, state) => {
-                    // Simulate state update
-                    context.host.log('info', "ArchitectAgent running");
-                })
-            };
-        })
-    };
-});
-jest.mock('../../../src/agents/PlannerAgent.js', () => {
-    return {
-        PlannerAgent: jest.fn().mockImplementation(() => {
-            return {
-                run: jest.fn().mockImplementation(async (context, state) => {
-                    context.host.log('info', "PlannerAgent running");
-                    state.current_plan = "test-plan";
-                })
-            };
-        })
-    };
-});
-jest.mock('../../../src/agents/DeveloperAgent.js', () => {
-    return {
-        DeveloperAgent: jest.fn().mockImplementation(() => {
-            return {
-                run: jest.fn().mockImplementation(async (context, state) => {
-                    context.host.log('info', "DeveloperAgent running");
-                })
-            };
-        })
-    };
-});
+import { EngineState } from '../../../src/domain/State.js';
+import { Project } from '../../../src/domain/Project.js';
+import { Brain } from '../../../src/agents/Brain.js';
+import { Workspace } from '../../../src/domain/Workspace.js';
+import { RuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { Signal, SignalType } from '../../../src/workflow/Signal.js';
+import { ArchitectingState } from '../../../src/workflow/states/ArchitectingState.js';
+import { PlanningState } from '../../../src/workflow/states/PlanningState.js';
+import { ExecutingState } from '../../../src/workflow/states/ExecutingState.js';
 
 describe('Workflow Engine', () => {
     let workflow: Workflow;
-    let context: RuntimeContext;
+    let brain: Brain;
+    let project: Project;
+    let workspace: Workspace;
+    let host: RuntimeHost;
     let state: EngineState;
 
     beforeEach(() => {
-        // Setup Mocks
-        const mockHost = {
+        host = {
             log: jest.fn(),
             ask: jest.fn(),
             status: jest.fn()
-        };
-        const mockDisk = {
-            readFile: jest.fn().mockImplementation((filePath: string) => {
-                if (filePath.includes('plan.yml')) {
-                    return "plan_name: test-plan\ntasks: []";
-                }
-                return 'mock-content';
-            }),
-            exists: jest.fn().mockReturnValue(true),
-            writeFileAtomic: jest.fn(),
-            listFiles: jest.fn().mockReturnValue([]),
-            move: jest.fn()
-        };
-        const mockConfig = {
-            architecturePath: '/mock/arch.md',
-            planPath: '/mock/plan.yml',
-            logPath: '/mock/log.yml',
-            statePath: '/mock/state.yml',
-            planDirectory: '/mock/plans',
-            signalsDirectory: '/mock/signals',
-            archiveDirectory: '/mock/archive',
-            constraintsPath: '/mock/constraints.md',
-            architecturePromptFile: '/mock/arch_prompt.txt',
-            personasDirectory: '/mock/personas',
-            architectureDirectory: '/mock/arch_history',
-            plannerPromptFile: '/mock/planner_prompt.txt'
-        };
+        } as any;
 
-        const mockDriver = {
-            execute: jest.fn().mockResolvedValue({})
-        };
+        project = {
+            paths: {
+                architectureCurrent: '/mock/arch.md',
+                planCurrent: '/mock/plan.yml',
+                log: '/mock/log.yml',
+                state: '/mock/state.yml',
+                signals: '/mock/signals'
+            },
+            rootDirectory: '/mock'
+        } as any;
 
-        const mockRegistry = {
-            get: jest.fn().mockReturnValue(mockDriver)
-        };
+        brain = {
+            init: jest.fn(),
+            getEvolution: jest.fn().mockReturnValue({
+                recordFailure: jest.fn(),
+                getLogSummary: jest.fn().mockReturnValue('mock log')
+            })
+        } as any;
 
-        const mockPromptEngine = {
-            render: jest.fn().mockReturnValue('mock-rendered-prompt')
-        };
-
-        const mockSkillRunner = {
-            validateAvailableSkills: jest.fn(),
-            getSkills: jest.fn().mockReturnValue([])
-        };
-
-        context = {
-            host: mockHost,
-            disk: mockDisk,
-            config: mockConfig,
-            driverRegistry: mockRegistry,
-            promptEngine: mockPromptEngine,
-            skillRunner: mockSkillRunner,
-            interactive: false
+        workspace = {
+            getArchitecture: jest.fn<() => Promise<any>>().mockResolvedValue({ content: 'arch' }),
+            loadPlan: jest.fn<() => Promise<any>>().mockResolvedValue({ plan_name: 'test', tasks: [] }),
+            detectSignal: jest.fn<() => Promise<any>>().mockResolvedValue(null),
+            clearSignals: jest.fn<() => Promise<void>>()
         } as any;
 
         state = new EngineState('test-session');
-        state.updateStatus = jest.fn((s) => state.status = s);
-
-        workflow = new Workflow(context, state);
+        workflow = new Workflow(brain, project, workspace, host);
     });
 
     it('should run through the standard lifecycle (Architect -> Plan -> Execute -> Complete)', async () => {
-        // Mock Planner specifically because it might return something that needs parsing?
-        // Planner calls promptEngine.render (mocked)
-        // Planner calls driver.execute (mocked).
-        // Planner expects valid YAML plan from driver?
-        // If driver returns {}, Planner might fail to parse "plan".
-        // Planner.generatePlan returns `Plan` object.
-        // Let's verify Planner.ts behavior on empty response.
-        // It likely parses response.
-        // If driver returns empty object, `output` is undefined -> crash?
+        jest.spyOn(ArchitectingState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(PlanningState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(ExecutingState.prototype, 'run').mockResolvedValue(Signal.COMPLETE);
 
-        // We might need to mock module Planner if it's complex.
-        // But let's try to mock the specific calls.
+        await workflow.start(state);
 
-        // Architect and Planner rely on driver output.
-        // For Architect, it just runs.
-        // For Planner, it returns a Plan.
+        expect(host.log).toHaveBeenCalledWith('info', expect.stringContaining('Enter State: ARCHITECTING'));
+        expect(host.log).toHaveBeenCalledWith('info', expect.stringContaining('Enter State: PLANNING'));
+        expect(host.log).toHaveBeenCalledWith('info', expect.stringContaining('Enter State: EXECUTING'));
+        expect(state.status).toBe('COMPLETED');
+    });
 
-        // We need to inject a valid plan YAML coming from the Driver mock for "Planner" calls.
-        // But DriverRegistry.get('gemini') returns the same driver mock.
-        // We can make driver.execute return based on input?
-        // Or simplified: Just mock the Plan object?
-        // But strictly, we removed module mocks.
-
-        // Let's TRY to run it. If it fails, we fix the Driver mock.
-
-        // Planner calls `driver.execute`.
-        // Then it parses `response.content`.
-        // So mockDriver.execute should return `{ content: "plan_name: test\ntasks: []" }`.
-
-        (context.driverRegistry.get('gemini') as any).execute.mockResolvedValue({
-            content: "plan_name: test-plan\ntasks: []"
+    it('should handle REPLAN signal by transitioning to PLANNING', async () => {
+        let executionCount = 0;
+        jest.spyOn(ArchitectingState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(PlanningState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(ExecutingState.prototype, 'run').mockImplementation(async () => {
+            executionCount++;
+            if (executionCount === 1) return Signal.replan("Needs more tasks");
+            return Signal.COMPLETE;
         });
 
-        await workflow.start('Create a Hello World app');
+        await workflow.start(state);
 
-        expect(context.host.log).toHaveBeenCalledWith('info', 'State: ARCHITECTING');
-        expect(context.host.log).toHaveBeenCalledWith('info', 'State: PLANNING');
-        expect(context.host.log).toHaveBeenCalledWith('info', 'State: EXECUTING');
-        expect(context.host.log).toHaveBeenCalledWith('info', 'Workflow Completed.');
+        expect(executionCount).toBe(2);
+        expect(state.status).toBe('COMPLETED');
+    });
 
+    it('should handle REARCHITECT signal by transitioning to ARCHITECTING', async () => {
+        let executionCount = 0;
+        jest.spyOn(ArchitectingState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(PlanningState.prototype, 'run').mockResolvedValue(Signal.NEXT);
+        jest.spyOn(ExecutingState.prototype, 'run').mockImplementation(async () => {
+            executionCount++;
+            if (executionCount === 1) return Signal.rearchitect("Architecture invalid");
+            return Signal.COMPLETE;
+        });
+
+        await workflow.start(state);
+
+        expect(executionCount).toBe(2);
         expect(state.status).toBe('COMPLETED');
     });
 });
