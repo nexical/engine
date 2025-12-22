@@ -60,8 +60,9 @@ export class Workflow {
 
         while (true) {
             // Retry/Loop protection: Check before entering state
-            if (state.loop_count > 10) {
-                this.host.log('error', "Maximum retry limit reached (10 loops). Failing workflow.");
+            const maxLoops = this.graph.getConfig().maxLoops || 10;
+            if (state.loop_count > maxLoops) {
+                this.host.log('error', `Maximum retry limit reached (${maxLoops} loops). Failing workflow.`);
                 state.updateStatus('FAILED');
                 await this.workspace.saveState(state);
                 break;

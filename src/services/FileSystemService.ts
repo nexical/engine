@@ -1,14 +1,18 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { IFileSystem } from '../domain/IFileSystem.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
+import { SystemError } from '../errors/SystemError.js';
 
 export class FileSystemService implements IFileSystem {
+    constructor(private host: RuntimeHost) { }
+
     readFile(filePath: string): string {
         try {
             return fs.readFileSync(filePath, 'utf-8');
         } catch (error) {
-            console.error(`Error reading file ${filePath}:`, error);
-            return '';
+            this.host.log('error', `Error reading file ${filePath}: ${error}`);
+            throw SystemError.io(`Failed to read file ${filePath}`, filePath);
         }
     }
 
@@ -21,7 +25,8 @@ export class FileSystemService implements IFileSystem {
                 fs.writeFileSync(filePath, content);
             }
         } catch (error) {
-            console.error(`Error writing file ${filePath}:`, error);
+            this.host.log('error', `Error writing file ${filePath}: ${error}`);
+            throw SystemError.io(`Failed to write file ${filePath}`, filePath);
         }
     }
 
@@ -30,7 +35,8 @@ export class FileSystemService implements IFileSystem {
             fs.ensureDirSync(path.dirname(filePath));
             fs.appendFileSync(filePath, content, 'utf-8');
         } catch (error) {
-            console.error(`Error appending to file ${filePath}:`, error);
+            this.host.log('error', `Error appending to file ${filePath}: ${error}`);
+            throw SystemError.io(`Failed to append to file ${filePath}`, filePath);
         }
     }
 
@@ -39,7 +45,8 @@ export class FileSystemService implements IFileSystem {
             fs.ensureDirSync(path.dirname(destination));
             fs.moveSync(source, destination, options);
         } catch (error) {
-            console.error(`Error moving file from ${source} to ${destination}:`, error);
+            this.host.log('error', `Error moving file from ${source} to ${destination}: ${error}`);
+            throw SystemError.io(`Failed to move file ${source} to ${destination}`, source);
         }
     }
 
@@ -48,7 +55,8 @@ export class FileSystemService implements IFileSystem {
             fs.ensureDirSync(path.dirname(destination));
             fs.copySync(source, destination, options);
         } catch (error) {
-            console.error(`Error copying file from ${source} to ${destination}:`, error);
+            this.host.log('error', `Error copying file from ${source} to ${destination}: ${error}`);
+            throw SystemError.io(`Failed to copy file ${source} to ${destination}`, source);
         }
     }
 
@@ -56,7 +64,8 @@ export class FileSystemService implements IFileSystem {
         try {
             fs.ensureDirSync(dirPath);
         } catch (error) {
-            console.error(`Error ensuring directory ${dirPath}:`, error);
+            this.host.log('error', `Error ensuring directory ${dirPath}: ${error}`);
+            throw SystemError.io(`Failed to ensure directory ${dirPath}`, dirPath);
         }
     }
 
@@ -75,7 +84,10 @@ export class FileSystemService implements IFileSystem {
     listFiles(dirPath: string): string[] {
         try {
             return fs.readdirSync(dirPath);
-        } catch {
+        } catch (error) {
+            // We usually return empty array for listing failure in loose checks, but strict mode should throw?
+            // Keeping safe behavior for now but logging
+            this.host.log('warn', `Failed to list directory ${dirPath}: ${error}`);
             return [];
         }
     }
@@ -86,7 +98,7 @@ export class FileSystemService implements IFileSystem {
             this.writeFile(tempPath, content);
             fs.renameSync(tempPath, filePath);
         } catch (error) {
-            console.error(`Error writing atomic file ${filePath}:`, error);
+            this.host.log('error', `Error writing atomic file ${filePath}: ${error}`);
             // Try to clean up temp file
             if (this.exists(tempPath)) {
                 try {
@@ -95,7 +107,7 @@ export class FileSystemService implements IFileSystem {
                     // Ignore
                 }
             }
-            throw error;
+            throw SystemError.io(`Failed to write atomic file ${filePath}`, filePath);
         }
     }
 
@@ -105,7 +117,8 @@ export class FileSystemService implements IFileSystem {
                 fs.unlinkSync(filePath);
             }
         } catch (error) {
-            console.error(`Error deleting file ${filePath}:`, error);
+            this.host.log('error', `Error deleting file ${filePath}: ${error}`);
+            throw SystemError.io(`Failed to delete file ${filePath}`, filePath);
         }
     }
 
@@ -133,7 +146,7 @@ export class FileSystemService implements IFileSystem {
                 fs.unlinkSync(lockPath);
             }
         } catch (e) {
-            console.error(`Error releasing lock for ${filePath}:`, e);
+            this.host.log('error', `Error releasing lock for ${filePath}: ${e}`);
         }
     }
 }

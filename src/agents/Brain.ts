@@ -6,6 +6,7 @@ import { IWorkspace } from '../domain/Workspace.js';
 import { Driver } from '../domain/Driver.js';
 import { SkillRunner, ISkillRunner } from '../services/SkillRunner.js';
 import { EvolutionService, IEvolutionService } from '../services/EvolutionService.js';
+import { FileSystemService } from '../services/FileSystemService.js';
 import type { ArchitectAgent } from './ArchitectAgent.js';
 import type { PlannerAgent } from './PlannerAgent.js';
 import type { DeveloperAgent } from './DeveloperAgent.js';
@@ -57,7 +58,7 @@ export class Brain {
         if (dependencies?.evolution) {
             this.evolution = dependencies.evolution;
         } else {
-            this.evolution = new EvolutionService(project as Project);
+            this.evolution = new EvolutionService(project as Project, project.fileSystem as FileSystemService);
         }
     }
 

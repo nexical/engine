@@ -29,9 +29,9 @@ export class Project implements IProject {
     public readonly fileSystem: IFileSystem;
     private profile: ProjectProfile | null = null;
 
-    constructor(rootDirectory: string, fileSystem?: IFileSystem) {
+    constructor(rootDirectory: string, fileSystem: IFileSystem) {
         this.rootDirectory = rootDirectory;
-        this.fileSystem = fileSystem || new FileSystemService();
+        this.fileSystem = fileSystem;
         this.paths = new ProjectPaths(rootDirectory);
         this.ensureStructure();
     }

@@ -18,10 +18,7 @@ export interface IEvolutionService {
 }
 
 export class EvolutionService implements IEvolutionService {
-    private disk: FileSystemService;
-
-    constructor(private project: Project) {
-        this.disk = new FileSystemService();
+    constructor(private project: Project, private disk: FileSystemService) {
     }
 
     public async recordFailure(stateName: string, signal: Signal, completedTasks: string[] = []): Promise<void> {

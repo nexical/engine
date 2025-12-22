@@ -14,6 +14,7 @@ export interface StateDefinition {
 export interface WorkflowConfig {
     initialState: string;
     states: StateDefinition[];
+    maxLoops?: number;
 }
 
 export class WorkflowGraph {
@@ -50,6 +51,10 @@ export class WorkflowGraph {
 
     public getInitialState(): string {
         return this.config.initialState;
+    }
+
+    public getConfig(): WorkflowConfig {
+        return this.config;
     }
 }
 

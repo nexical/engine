@@ -102,7 +102,7 @@ export class ImageGenDriver extends BaseDriver<any, string> {
                 outputPath = path.join(this.config.rootDirectory, outputPath);
             }
 
-            const disk = new FileSystemService();
+            const disk = new FileSystemService(this.host);
             disk.writeFile(outputPath, Buffer.from(base64Data, 'base64'));
 
             this.host.log('info', `Image saved to: ${outputPath}`);

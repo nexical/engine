@@ -4,7 +4,7 @@ import { Workspace, IWorkspace } from '../domain/Workspace.js';
 import { Brain } from '../agents/Brain.js';
 import { Session } from '../domain/Session.js';
 import { IFileSystem } from '../domain/IFileSystem.js';
-import { DIContainer } from '../DIContainer.js';
+import { DIContainer } from './DIContainer.js';
 import { FileSystemService } from './FileSystemService.js';
 import { ArchitectAgent } from '../agents/ArchitectAgent.js';
 import { PlannerAgent } from '../agents/PlannerAgent.js';
@@ -33,7 +33,8 @@ export class ServiceFactory {
         // 1. Register Core Dependencies
         container.register('rootDirectory', rootDirectory);
         container.register('host', host);
-        container.register('fileSystem', fileSystem || new FileSystemService());
+        // Inject host into FileSystemService
+        container.register('fileSystem', fileSystem || new FileSystemService(host));
 
         // 2. Register Project
         container.registerFactory('project', () => {
@@ -51,7 +52,7 @@ export class ServiceFactory {
                 ...project.paths,
                 rootDirectory: project.rootDirectory
             };
-            return new DriverRegistry(host, config, project.fileSystem);
+            return new DriverRegistry(host, config, container.resolve('fileSystem'));
         });
 
         container.registerFactory('promptEngine', () => {
@@ -67,8 +68,6 @@ export class ServiceFactory {
         container.registerFactory('skillRunner', () => {
             const project = container.resolve<Project>('project');
             // Resolve registry to pass it, rather than depending on Brain internal.
-            // But wait, Brain usually creates SkillRunner. 
-            // If we register SkillRunner here, we need DriverRegistry.
             const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
             const promptEngine = container.resolve<PromptEngine>('promptEngine');
             const host = container.resolve<RuntimeHost>('host');
@@ -77,7 +76,19 @@ export class ServiceFactory {
 
         container.registerFactory('evolutionService', () => {
             const project = container.resolve<Project>('project');
-            return new EvolutionService(project);
+            const fileSystem = container.resolve<FileSystemService>('fileSystem') as FileSystemService; // Cast as concrete because EvolutionService expects concrete or IFileSystem?
+            // EvolutionService implementation expects FileSystemService (concrete) or interface?
+            // EvolutionService.ts imports FileSystemService concrete class.
+            // Let's check EvolutionService again. 
+            // It has `private disk: FileSystemService;`
+            // So we need to pass strict FileSystemService or change EvolutionService to use IFileSystem interface.
+            // Good practice: Use Interface. 
+            // But for now, let's pass what we have.
+            // Note: IFileSystem in domain might be interface. FileSystemService implements it.
+            // The container 'fileSystem' is registered as IFileSystem | FileSystemService.
+            // We'll resolve it.
+
+            return new EvolutionService(project, fileSystem);
         });
 
         // 4. Register Brain

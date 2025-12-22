@@ -27,7 +27,7 @@ export class Workspace implements IWorkspace {
     private pendingWrites: Set<Promise<void>> = new Set();
 
     constructor(private project: IProject) {
-        this.disk = new FileSystemService();
+        this.disk = project.fileSystem as FileSystemService;
     }
 
     private async scheduleWrite(filePath: string, content: string): Promise<void> {

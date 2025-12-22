@@ -18,7 +18,7 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
 
     constructor(protected host: RuntimeHost, protected config: any, fileSystem?: IFileSystem) {
         super();
-        this.fileSystem = fileSystem || new FileSystemService();
+        this.fileSystem = fileSystem || new FileSystemService(host);
     }
 
     register(plugin: Driver, isDefault: boolean = false): void {
@@ -56,7 +56,8 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                             const instance = new ExportedClass(this.host, this.config);
                             if (this.isDriver(instance)) {
                                 if (await instance.isSupported()) {
-                                    const isDefault = instance.name === 'gemini'; // Simple default logic for now
+                                    const configuredDefault = this.config.defaultDriver || 'gemini';
+                                    const isDefault = instance.name === configuredDefault;
                                     this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
                                     this.register(instance, isDefault);
                                     loaded = true;
