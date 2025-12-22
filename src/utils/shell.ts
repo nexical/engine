@@ -66,7 +66,6 @@ export class ShellExecutor {
     }
 
     executeSync(command: string, args: string[] = [], options: SpawnOptions = {}): ShellResult {
-        // log(`Executing sync: ${command} ${args.join(' ')}`);
         const result = spawnSync(command, args, {
             encoding: 'utf-8',
             ...options

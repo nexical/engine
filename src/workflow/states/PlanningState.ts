@@ -23,14 +23,13 @@ export class PlanningState extends State {
             state.current_plan = 'current';
 
             // Interactive Approval
-            if (state.interactive) {
-                const response = await this.host.ask("Plan generated. Approve? (yes/feedback)");
-                if (typeof response === 'string' && response.toLowerCase() !== 'yes') {
-                    return Signal.replan("User feedback on plan", { feedback: response });
-                } else if (response === false) {
-                    return Signal.fail("User rejected plan.");
-                }
-            }
+            const approval = await this.askApproval(
+                state,
+                "Plan generated. Approve? (yes/feedback)",
+                Signal.fail("User rejected plan."),
+                (feedback) => Signal.replan("User feedback on plan", { feedback })
+            );
+            if (approval) return approval;
 
             return Signal.NEXT;
         } catch (error) {

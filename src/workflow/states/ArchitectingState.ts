@@ -14,14 +14,13 @@ export class ArchitectingState extends State {
             await architect.design(state.user_prompt);
 
             // Interactive Approval
-            if (state.interactive) {
-                const response = await this.host.ask("Architecture generated. Approve? (yes/feedback)");
-                if (typeof response === 'string' && response.toLowerCase() !== 'yes') {
-                    return Signal.rearchitect("User feedback on architecture", { feedback: response });
-                } else if (response === false) {
-                    return Signal.fail("User rejected architecture.");
-                }
-            }
+            const approval = await this.askApproval(
+                state,
+                "Architecture generated. Approve? (yes/feedback)",
+                Signal.fail("User rejected architecture."),
+                (feedback) => Signal.rearchitect("User feedback on architecture", { feedback })
+            );
+            if (approval) return approval;
 
             return Signal.NEXT;
         } catch (error) {

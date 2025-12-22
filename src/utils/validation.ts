@@ -14,6 +14,7 @@ export const TaskSchema = z.object({
     description: z.string(),
     message: z.string(),
     skill: z.string(),
+    persona: z.string().optional(),
     dependencies: z.array(z.string()).optional(),
     params: z.record(z.string(), z.any()).optional(),
 });

@@ -1,5 +1,6 @@
 import { Task } from './Task.js';
 import yaml from 'js-yaml';
+import { PlanSchema } from '../utils/validation.js';
 
 export class Plan {
     public plan_name: string;
@@ -24,7 +25,8 @@ export class Plan {
 
     static fromYaml(yamlString: string): Plan {
         const data = yaml.load(yamlString) as any;
-        const tasks = (data.tasks || []).map((t: any) => Task.fromData(t));
-        return new Plan(data.plan_name, tasks);
+        const validated = PlanSchema.parse(data);
+        const tasks = validated.tasks.map((t: any) => Task.fromData(t));
+        return new Plan(validated.plan_name, tasks);
     }
 }

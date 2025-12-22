@@ -40,14 +40,6 @@ export class ArchitectAgent {
             }
         });
 
-        // Current GeminiDriver writes to file directly? 
-        // No, GeminiDriver executes and usually writes to stdout or file if instructed.
-        // Wait, the original ArchitectAgent didn't write to file, the Driver or the Skill responsible?
-        // In the original code: `driver.execute` is called.
-        // Then `this.saveArchitectureToHistory(context)`.
-
-        // So the driver/model writes the file `current.md`.
-
         // After execution, we reload from disk to return the object.
         const doc = await this.workspace.getArchitecture('current');
 
@@ -57,15 +49,7 @@ export class ArchitectAgent {
         return doc;
     }
 
-    private getEvolutionLog(): string {
-        // ... Logic to read log ...
-        // For now return empty or implement similar to before using fs
-        return "No historical failures recorded.";
-    }
-
     private async saveHistory(doc: Architecture): Promise<void> {
-        // Save to archive
-        // We can implement this on Workspace or Project
-        // For now, let's assume Workspace has archiving logic or we do it here.
+        // Save to archive (TBD in Workspace/Project)
     }
 }

@@ -1,3 +1,5 @@
+import { TaskSchema } from '../utils/validation.js';
+
 export class Task {
     public id: string;
     public message: string;
@@ -26,14 +28,15 @@ export class Task {
     }
 
     static fromData(data: any): Task {
+        const validated = TaskSchema.parse(data);
         return new Task(
-            data.id,
-            data.message,
-            data.description,
-            data.skill,
-            data.persona,
-            data.params,
-            data.dependencies
+            validated.id || `task-${Math.random().toString(36).substr(2, 9)}`,
+            validated.message,
+            validated.description,
+            validated.skill,
+            (data as any).persona, // persona not in schema yet, will add
+            validated.params,
+            validated.dependencies
         );
     }
 }

@@ -15,12 +15,11 @@ export class Brain {
     private promptEngine: PromptEngine;
     private driverRegistry: DriverRegistry;
     private skillRunner: SkillRunner; // Type as SkillRunner
-    private contextAdapter: any; // Legacy compatibility
     private evolution: EvolutionService; // Add evolution service property
 
     constructor(
         private project: Project,
-        private host: RuntimeHost
+        public readonly host: RuntimeHost
     ) {
         // 1. Initialize PromptEngine
         const promptConfig: PromptEngineConfig = {
@@ -42,22 +41,12 @@ export class Brain {
         // 4. Initialize EvolutionService
         this.evolution = new EvolutionService(project);
 
-        // 5. Create Legacy Context Adapter (if needed by getContext())
-        this.contextAdapter = {
-            host: host,
-            config: driverConfig,
-            promptEngine: this.promptEngine,
-            driverRegistry: this.driverRegistry,
-            skillRunner: this.skillRunner,
-            disk: new FileSystemService()
-        };
+        // 4. Initialize EvolutionService
+        this.evolution = new EvolutionService(project);
     }
 
 
 
-    public getContext(): any {
-        return this.contextAdapter;
-    }
 
     public async init(): Promise<void> {
         // Load drivers

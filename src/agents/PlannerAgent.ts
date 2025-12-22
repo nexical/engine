@@ -16,13 +16,7 @@ export class PlannerAgent {
         const constraints = this.project.getConstraints();
         const evolutionLog = this.brain.getEvolution().getLogSummary();
 
-        // We need agent skills. 
-        // In original PlannerAgent: context.skillRunner.getSkills()
-        // We need a way to access SkillRunner. Brain has PromptEngine and DriverRegistry.
-        // SkillRunner is in services/SkillRunner.ts.
-        // Brain should probably hold SkillRunner too.
-        // For now, let's stub it or access via Brain if we add it.
-        const agentSkills = "[]"; // Placeholder
+        const agentSkills = JSON.stringify(this.brain.getSkillRunner().getSkills(), null, 2);
 
         const fullPrompt = this.brain.getPromptEngine().render(this.project.paths.plannerPrompt, {
             user_prompt: userRequest,
