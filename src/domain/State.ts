@@ -16,6 +16,7 @@ export class EngineState {
     public last_signal?: Signal;
     public user_prompt: string = "";
     public interactive: boolean = false;
+    public context: Record<string, unknown> = {};
 
     constructor(session_id: string) {
         this.session_id = session_id;
@@ -27,6 +28,7 @@ export class EngineState {
             pending: []
         };
         this.user_prompt = "";
+        this.context = {};
     }
 
     public initialize(prompt: string, interactive: boolean = false): void {
@@ -35,6 +37,7 @@ export class EngineState {
         this.status = 'IDLE';
         this.loop_count = 0;
         this.tasks.failed = [];
+        this.context = {};
         // Keep completed tasks for resumability? 
         // If it's a new prompt, maybe we should clear them, 
         // but start() is for new prompts, resume() is for existing.
@@ -74,6 +77,7 @@ export class EngineState {
         state.last_signal = data.last_signal;
         state.user_prompt = data.user_prompt || "";
         state.interactive = data.interactive || false;
+        state.context = data.context || {};
         return state;
     }
 

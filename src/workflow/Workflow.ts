@@ -25,15 +25,23 @@ export class Workflow {
     ) {
         // Initialize States
         this.states = new Map();
-        this.states.set('ARCHITECTING', new ArchitectingState(brain, project, workspace, host));
-        this.states.set('PLANNING', new PlanningState(brain, project, workspace, host));
-        this.states.set('EXECUTING', new ExecutingState(brain, project, workspace, host));
-        this.states.set('COMPLETED', new CompletedState(brain, project, workspace, host));
+        this.registerDefaultStates();
 
         this.graph = new WorkflowGraph(config);
 
         // Default start state (will be overridden by resume or start args)
         this.currentState = this.states.get(this.graph.getInitialState())!;
+    }
+
+    private registerDefaultStates(): void {
+        this.registerState(new ArchitectingState(this.brain, this.project, this.workspace, this.host));
+        this.registerState(new PlanningState(this.brain, this.project, this.workspace, this.host));
+        this.registerState(new ExecutingState(this.brain, this.project, this.workspace, this.host));
+        this.registerState(new CompletedState(this.brain, this.project, this.workspace, this.host));
+    }
+
+    public registerState(state: State): void {
+        this.states.set(state.name, state);
     }
 
     public async start(state: EngineState, onStateChange?: () => Promise<void>): Promise<void> {

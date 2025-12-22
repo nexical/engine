@@ -9,7 +9,7 @@ export interface PromptEngineConfig {
 }
 
 export interface IPromptEngine {
-    render(templateName: string, context: any): string;
+    render(templateName: string, context: Record<string, unknown>): string;
 }
 
 export class PromptEngine implements IPromptEngine {
@@ -47,7 +47,7 @@ export class PromptEngine implements IPromptEngine {
         });
     }
 
-    render(templateName: string, context: any): string {
+    render(templateName: string, context: Record<string, unknown>): string {
         try {
             this.host.log('debug', `Rendering template: ${templateName}`);
             return this.env.render(templateName, context);

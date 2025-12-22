@@ -5,6 +5,8 @@ import { Session } from './domain/Session.js';
 import { Brain } from './agents/Brain.js';
 import { EventEmitter } from 'events';
 
+import { ServiceFactory } from './ServiceFactory.js';
+
 export class Orchestrator extends EventEmitter {
     private _project?: Project;
     private _brain?: Brain;
@@ -49,18 +51,13 @@ export class Orchestrator extends EventEmitter {
     }
 
     async init(): Promise<void> {
-        // 1. Initialize Project (Configuration & Paths)
-        this._project = new Project(this.rootDirectory);
+        const services = await ServiceFactory.createServices(this.rootDirectory, this.host);
 
-        // 2. Initialize Brain (Cognitive Services)
-        this._brain = new Brain(this._project, this.host);
-        await this._brain.init();
-
-        // 3. Initialize Workspace (Mutable state)
-        this._workspace = new Workspace(this._project);
-
-        // 4. Initialize Session (Execution State)
-        this._session = new Session(this._project, this._workspace, this._brain, this.host);
+        // Wire up services
+        this._project = services.project as Project;
+        this._brain = services.brain;
+        this._workspace = services.workspace as Workspace;
+        this._session = services.session;
     }
 
     async start(prompt: string, interactive: boolean = true): Promise<void> {

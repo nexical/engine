@@ -9,6 +9,7 @@ import { PromptEngine } from './PromptEngine.js';
 import { FileSystemService } from './FileSystemService.js';
 
 export interface ISkillRunner {
+    init(): Promise<void>;
     validateAvailableSkills(): Promise<void>;
     getSkills(): Skill[];
     runSkill(task: Task, userPrompt: string): Promise<void>;
@@ -16,7 +17,6 @@ export interface ISkillRunner {
 
 export class SkillRunner implements ISkillRunner {
     private skills: Record<string, Skill> = {};
-    private disk: FileSystemService;
 
     constructor(
         private project: Project,
@@ -24,21 +24,23 @@ export class SkillRunner implements ISkillRunner {
         private promptEngine: PromptEngine,
         private host: RuntimeHost
     ) {
-        this.disk = new FileSystemService();
-        this.loadYamlSkills();
     }
 
-    private loadYamlSkills(): void {
+    async init(): Promise<void> {
+        await this.loadYamlSkills();
+    }
+
+    private async loadYamlSkills(): Promise<void> {
         const skillsDir = this.project.paths.skills;
-        if (!this.disk.isDirectory(skillsDir)) {
+        if (!this.project.fileSystem.isDirectory(skillsDir)) {
             return;
         }
 
-        const files = this.disk.listFiles(skillsDir);
+        const files = this.project.fileSystem.listFiles(skillsDir);
         for (const filename of files) {
             if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml')) {
                 const filePath = path.join(skillsDir, filename);
-                const content = this.disk.readFile(filePath);
+                const content = this.project.fileSystem.readFile(filePath);
                 try {
                     const profile = yaml.load(content);
                     const parsed = SkillSchema.parse(profile);
@@ -134,8 +136,8 @@ export class SkillRunner implements ISkillRunner {
         if (task.persona) {
             // Updated to use project paths
             const personaFile = path.join(this.project.paths.personas, `${task.persona}.md`);
-            if (this.disk.exists(personaFile)) {
-                personaContext = this.disk.readFile(personaFile);
+            if (this.project.fileSystem.exists(personaFile)) {
+                personaContext = this.project.fileSystem.readFile(personaFile);
             } else {
                 this.host.log('warn', `Persona file not found: ${personaFile}`);
             }

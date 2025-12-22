@@ -1,7 +1,8 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { IFileSystem } from '../domain/IFileSystem.js';
 
-export class FileSystemService {
+export class FileSystemService implements IFileSystem {
     readFile(filePath: string): string {
         try {
             return fs.readFileSync(filePath, 'utf-8');

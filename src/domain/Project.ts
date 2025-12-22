@@ -1,4 +1,5 @@
 import path from 'path';
+import { IFileSystem } from './IFileSystem.js';
 import { FileSystemService } from '../services/FileSystemService.js';
 import yaml from 'js-yaml';
 import { z } from 'zod';
@@ -16,6 +17,7 @@ export type ProjectProfile = z.infer<typeof ProjectConfigurationSchema>;
 
 export interface IProject {
     readonly rootDirectory: string;
+    readonly fileSystem: IFileSystem;
     readonly paths: ProjectPaths;
     getConstraints(): string;
     getConfig(): ProjectProfile;
@@ -24,19 +26,19 @@ export interface IProject {
 export class Project implements IProject {
     public readonly rootDirectory: string;
     public readonly paths: ProjectPaths;
-    private disk: FileSystemService;
+    public readonly fileSystem: IFileSystem;
     private profile: ProjectProfile | null = null;
 
-    constructor(rootDirectory: string) {
+    constructor(rootDirectory: string, fileSystem?: IFileSystem) {
         this.rootDirectory = rootDirectory;
-        this.disk = new FileSystemService();
+        this.fileSystem = fileSystem || new FileSystemService();
         this.paths = new ProjectPaths(rootDirectory);
         this.ensureStructure();
     }
 
     public getConstraints(): string {
-        if (this.disk.exists(this.paths.constraints)) {
-            return this.disk.readFile(this.paths.constraints);
+        if (this.fileSystem.exists(this.paths.constraints)) {
+            return this.fileSystem.readFile(this.paths.constraints);
         }
         return "No global constraints defined.";
     }
@@ -49,11 +51,11 @@ export class Project implements IProject {
     }
 
     private loadProfile(path: string): ProjectProfile {
-        if (!this.disk.exists(path)) {
+        if (!this.fileSystem.exists(path)) {
             return {};
         }
         try {
-            const content = this.disk.readFile(path);
+            const content = this.fileSystem.readFile(path);
             const raw = yaml.load(content);
             return ProjectConfigurationSchema.parse(raw);
         } catch (e) {
@@ -63,15 +65,15 @@ export class Project implements IProject {
     }
 
     private ensureStructure(): void {
-        this.disk.ensureDir(this.paths.ai);
-        this.disk.ensureDir(this.paths.prompts);
-        this.disk.ensureDir(this.paths.architecture);
-        this.disk.ensureDir(this.paths.plan);
-        this.disk.ensureDir(this.paths.personas);
-        this.disk.ensureDir(this.paths.drivers);
-        this.disk.ensureDir(this.paths.skills);
-        this.disk.ensureDir(this.paths.signals);
-        this.disk.ensureDir(this.paths.archive);
+        this.fileSystem.ensureDir(this.paths.ai);
+        this.fileSystem.ensureDir(this.paths.prompts);
+        this.fileSystem.ensureDir(this.paths.architecture);
+        this.fileSystem.ensureDir(this.paths.plan);
+        this.fileSystem.ensureDir(this.paths.personas);
+        this.fileSystem.ensureDir(this.paths.drivers);
+        this.fileSystem.ensureDir(this.paths.skills);
+        this.fileSystem.ensureDir(this.paths.signals);
+        this.fileSystem.ensureDir(this.paths.archive);
     }
 }
 

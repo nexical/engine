@@ -15,6 +15,7 @@ export class Brain {
     private driverRegistry: IDriverRegistry;
     private skillRunner: ISkillRunner;
     private evolution: IEvolutionService;
+    private agentFactories: Map<string, (workspace: IWorkspace) => any> = new Map();
 
     constructor(
         private project: IProject,
@@ -53,18 +54,6 @@ export class Brain {
         if (dependencies?.skillRunner) {
             this.skillRunner = dependencies.skillRunner;
         } else {
-            // Need cast or concrete implementation because SkillRunner constructor expects concrete Project/DriverRegistry if we are creating it here.
-            // But SkillRunner constructor uses interfaces now? No, I updated SkillRunner.ts to export interface ISkillRunner and class SkillRunner implements it.
-            // The class SkillRunner constructor typically takes concrete classes if strictly typed or interfaces.
-            // Let's assume class SkillRunner checks out.
-            // Wait, I updated SkillRunner constructor types? 
-            // I only updated `PlannerAgent` etc. 
-            // I did NOT update `SkillRunner` constructor to take interfaces. I just updated the class definition `implements ISkillRunner`.
-            // So default instantiation here implies passing concrete `this.project` (which is IProject now).
-            // `this.project` is typed as `IProject`. `SkillRunner` constructor likely expects `Project` (concrete) if I didn't update it.
-            // I need to check `SkillRunner` constructor.
-            // I'll assume for now `this.project` as `any` or strict cast if needed.
-            // Ideally I should update Service constructors (SkillRunner, DriverRegistry) to accept interfaces too.
             this.skillRunner = new SkillRunner(project as Project, this.driverRegistry as DriverRegistry, this.promptEngine as PromptEngine, host);
         }
 
@@ -73,14 +62,34 @@ export class Brain {
         } else {
             this.evolution = new EvolutionService(project as Project);
         }
+
+        this.registerDefaultAgents();
     }
 
+    private registerDefaultAgents(): void {
+        this.registerAgent('architect', (workspace) => new ArchitectAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.evolution));
+        this.registerAgent('planner', (workspace) => new PlannerAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.skillRunner, this.evolution));
+        this.registerAgent('developer', (workspace) => new DeveloperAgent(this.project, workspace, this.skillRunner, this.host));
+    }
 
+    public registerAgent<T>(name: string, factory: (workspace: IWorkspace) => T): void {
+        this.agentFactories.set(name, factory);
+    }
 
+    public createAgent<T>(name: string, workspace: IWorkspace): T {
+        const factory = this.agentFactories.get(name);
+        if (!factory) {
+            throw new Error(`Agent type '${name}' not registered.`);
+        }
+        return factory(workspace) as T;
+    }
 
     public async init(): Promise<void> {
         // Load drivers
         await this.driverRegistry.load(this.project.paths.drivers);
+
+        // Init skills
+        await this.skillRunner.init();
 
         // Validate skills
         await this.skillRunner.validateAvailableSkills();
@@ -108,14 +117,14 @@ export class Brain {
 
     // Factory methods for Agents
     public createArchitect(workspace: IWorkspace): ArchitectAgent {
-        return new ArchitectAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.evolution);
+        return this.createAgent<ArchitectAgent>('architect', workspace);
     }
 
     public createPlanner(workspace: IWorkspace): PlannerAgent {
-        return new PlannerAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.skillRunner, this.evolution);
+        return this.createAgent<PlannerAgent>('planner', workspace);
     }
 
     public createDeveloper(workspace: IWorkspace): DeveloperAgent {
-        return new DeveloperAgent(this.project, workspace, this.skillRunner, this.host);
+        return this.createAgent<DeveloperAgent>('developer', workspace);
     }
 }
