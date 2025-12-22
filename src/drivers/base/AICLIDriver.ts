@@ -1,5 +1,5 @@
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
-import { Skill } from '../../domain/Driver.js';
+import { Skill, DriverContext } from '../../domain/Driver.js';
 import { interpolate } from '../../utils/interpolation.js';
 import { z, ZodSafeParseResult } from 'zod';
 
@@ -9,7 +9,7 @@ export const AISkillSchema = CLISkillSchema.extend({
 
 export type AISkill = z.infer<typeof AISkillSchema>;
 
-export abstract class AICLIDriver<TContext = any> extends CLIDriver<TContext> {
+export abstract class AICLIDriver<TContext extends DriverContext = DriverContext> extends CLIDriver<TContext> {
 
     async isSupported(): Promise<boolean> {
         return false;
@@ -22,15 +22,15 @@ export abstract class AICLIDriver<TContext = any> extends CLIDriver<TContext> {
     protected abstract getExecutable(skill: AISkill): string;
     protected abstract getArguments(skill: AISkill): string[];
 
-    async run(skill: Skill, context: any = {}): Promise<string> {
+    async run(skill: Skill, context?: TContext): Promise<string> {
         const aiSkill = skill as AISkill;
         const promptTemplate = aiSkill.prompt_template || '';
-        const params = context.params || {};
+        const params = (context as DriverContext | undefined)?.params || {};
 
-        const formatArgs: Record<string, any> = {
-            user_request: context.userPrompt || '',
-            task_id: context.taskId || '',
-            task_prompt: context.taskPrompt,
+        const formatArgs: Record<string, unknown> = {
+            user_request: (context as DriverContext | undefined)?.userPrompt || '',
+            task_id: (context as DriverContext | undefined)?.taskId || '',
+            task_prompt: (context as DriverContext | undefined)?.taskPrompt,
             ...params
         };
         formatArgs['prompt'] = interpolate(promptTemplate, formatArgs);
@@ -38,6 +38,6 @@ export abstract class AICLIDriver<TContext = any> extends CLIDriver<TContext> {
         const argsTemplate = this.getArguments(aiSkill);
         const finalArgs = argsTemplate.map(arg => interpolate(arg, formatArgs));
 
-        return await this.executeShell(aiSkill as any, finalArgs, context);
+        return await this.executeShell(aiSkill, finalArgs, context);
     }
 }

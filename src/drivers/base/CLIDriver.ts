@@ -1,4 +1,4 @@
-import { Driver, Skill, SkillSchema, BaseDriver } from '../../domain/Driver.js';
+import { Driver, Skill, SkillSchema, BaseDriver, DriverContext } from '../../domain/Driver.js';
 import { RuntimeHost } from '../../domain/RuntimeHost.js';
 import { interpolate } from '../../utils/interpolation.js';
 import { z, ZodSafeParseResult } from 'zod';
@@ -11,7 +11,7 @@ export const CLISkillSchema = SkillSchema.extend({
 
 export type CLISkill = z.infer<typeof CLISkillSchema>;
 
-export abstract class CLIDriver<TContext = any> extends BaseDriver<TContext, string> {
+export abstract class CLIDriver<TContext extends DriverContext = DriverContext> extends BaseDriver<TContext, string> {
 
     async isSupported(): Promise<boolean> {
         return false;
@@ -24,16 +24,16 @@ export abstract class CLIDriver<TContext = any> extends BaseDriver<TContext, str
     protected abstract getExecutable(skill: Skill): string;
 
     protected getArguments(skill: Skill): string[] {
-        return skill.args || [];
+        return (skill.args as string[]) || [];
     }
 
-    async run(skill: Skill, context: any = {}): Promise<string> {
+    async run(skill: Skill, context?: TContext): Promise<string> {
         const cliSkill = skill as CLISkill;
-        const params = context.params || {};
+        const params = (context as DriverContext | undefined)?.params || {};
 
-        const formatArgs: Record<string, any> = {
-            user_request: context.userPrompt || '',
-            task_id: context.taskId || '',
+        const formatArgs: Record<string, unknown> = {
+            user_request: (context as DriverContext | undefined)?.userPrompt || '',
+            task_id: (context as DriverContext | undefined)?.taskId || '',
             ...params
         };
 
@@ -43,7 +43,7 @@ export abstract class CLIDriver<TContext = any> extends BaseDriver<TContext, str
         return await this.executeShell(cliSkill, finalArgs, context);
     }
 
-    protected async executeShell(skill: Skill, args: Array<string>, context: any = {}): Promise<string> {
+    protected async executeShell(skill: Skill, args: Array<string>, context?: TContext): Promise<string> {
         const commandBin = this.getExecutable(skill);
 
         this.host.log('debug', `Running CLI skill: ${skill.name}`);
@@ -53,7 +53,7 @@ export abstract class CLIDriver<TContext = any> extends BaseDriver<TContext, str
             const result = await this.shell.execute(commandBin, args, {
                 cwd: this.config.rootDirectory,
                 // Merge context.env with process.env to preserve standard vars
-                env: { ...process.env, ...(context.env || {}) }
+                env: { ...process.env, ...(context?.env || {}) }
             });
 
             this.host.log('debug', "--- stdout ---");

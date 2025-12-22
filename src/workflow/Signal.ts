@@ -12,7 +12,7 @@ export class Signal {
     constructor(
         public readonly type: SignalType,
         public readonly reason: string = '',
-        public readonly metadata: any = {}
+        public readonly metadata: Record<string, unknown> = {}
     ) { }
 
     static NEXT = new Signal(SignalType.NEXT);
@@ -27,11 +27,11 @@ export class Signal {
         return new Signal(SignalType.RETRY, reason);
     }
 
-    static replan(reason: string, metadata: any = {}): Signal {
+    static replan(reason: string, metadata: Record<string, unknown> = {}): Signal {
         return new Signal(SignalType.REPLAN, reason, metadata);
     }
 
-    static rearchitect(reason: string, metadata: any = {}): Signal {
+    static rearchitect(reason: string, metadata: Record<string, unknown> = {}): Signal {
         return new Signal(SignalType.REARCHITECT, reason, metadata);
     }
 }

@@ -43,7 +43,7 @@ export class Orchestrator extends EventEmitter {
         // Wrap host to bubble events to Orchestrator
         this.host = {
             ...host,
-            emit: (event: string, data: any) => {
+            emit: (event: string, data: unknown) => {
                 host.emit(event, data);
                 this.emit(event, data);
             }

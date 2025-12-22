@@ -34,14 +34,12 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
 
     async load(dir: string): Promise<void> {
         if (!this.fileSystem.isDirectory(dir)) {
-            // Not an error if the directory doesn't exist, just nothing to load
             return;
         }
 
         const files = this.findDriversRecursive(dir);
 
         for (const file of files) {
-            // Skip definition files and maps
             if (file.endsWith('.d.ts') || file.endsWith('.map')) {
                 continue;
             }
@@ -66,7 +64,7 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                                 }
                             }
                         } catch (e) {
-                            // Helper classes or non-driver classes might fail instantiation
+                            // Non-driver class instantiation failure is expected
                         }
                     }
                 }
@@ -76,9 +74,14 @@ export class DriverRegistry extends Registry<Driver> implements IDriverRegistry 
                 }
 
             } catch (e) {
-                // Wrap in SystemError but log it instead of throwing to prevent stopping other drivers from loading
-                const error = SystemError.io(`Failed to load driver from ${file}: ${(e as Error).message}`, file);
+                const errorMessage = (e as Error).message;
+                const error = SystemError.io(`Failed to load driver from ${file}: ${errorMessage}`, file);
                 this.host.log('error', error.message);
+
+                // Track load failures in evolution if it's a critical driver
+                if (file.includes('GeminiDriver') || file.includes('ImageGenDriver')) {
+                    this.host.log('error', `CRITICAL DRIVER LOAD FAILURE: ${file}`);
+                }
             }
         }
     }

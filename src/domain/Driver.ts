@@ -5,12 +5,20 @@ import { ShellExecutor } from '../utils/shell.js';
 export interface Skill {
     name: string;
     description?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 import { Result } from './Result.js';
 
-export interface Driver<TContext = Record<string, unknown>, TResult = string> {
+export interface DriverContext {
+    userPrompt: string;
+    taskId?: string;
+    taskPrompt?: string;
+    params?: Record<string, unknown>;
+    env?: Record<string, string>;
+}
+
+export interface Driver<TContext = DriverContext, TResult = string> {
     name: string;
     description: string;
     isSupported(): Promise<boolean>;
@@ -28,13 +36,13 @@ export const SkillSchema = z.object({
 export interface DriverConfig {
     rootDirectory: string;
     defaultDriver?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 import { IFileSystem } from './IFileSystem.js';
 import { FileSystemService } from '../services/FileSystemService.js';
 
-export abstract class BaseDriver<TContext = Record<string, unknown>, TResult = string> implements Driver<TContext, TResult> {
+export abstract class BaseDriver<TContext = DriverContext, TResult = string> implements Driver<TContext, TResult> {
     abstract name: string;
     abstract description: string;
 
@@ -87,7 +95,7 @@ export abstract class BaseDriver<TContext = Record<string, unknown>, TResult = s
         return !!process.env[key];
     }
 
-    protected checkConfig(key: string): any {
+    protected checkConfig(key: string): unknown {
         return this.config[key];
     }
 }

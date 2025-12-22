@@ -38,9 +38,6 @@ export class EngineState {
         this.loop_count = 0;
         this.tasks.failed = [];
         this.context = {};
-        // Keep completed tasks for resumability? 
-        // If it's a new prompt, maybe we should clear them, 
-        // but start() is for new prompts, resume() is for existing.
     }
 
     updateStatus(status: OrchestratorStatus): void {
@@ -66,7 +63,7 @@ export class EngineState {
     }
 
     static fromYaml(yamlString: string): EngineState {
-        const data = yaml.load(yamlString) as Partial<EngineState>;
+        const data = yaml.load(yamlString) as Record<string, any>;
         if (!data || typeof data !== 'object') {
             throw new Error("Invalid state YAML");
         }
@@ -74,22 +71,26 @@ export class EngineState {
         const session_id = data.session_id || 'unknown';
         const state = new EngineState(session_id);
 
-        if (data.status) state.status = data.status;
+        if (data.status) state.status = data.status as OrchestratorStatus;
         if (data.current_plan) state.current_plan = data.current_plan;
         if (typeof data.loop_count === 'number') state.loop_count = data.loop_count;
 
         if (data.tasks) {
             state.tasks = {
-                completed: data.tasks.completed || [],
-                failed: data.tasks.failed || [],
-                pending: data.tasks.pending || []
+                completed: Array.isArray(data.tasks.completed) ? data.tasks.completed : [],
+                failed: Array.isArray(data.tasks.failed) ? data.tasks.failed : [],
+                pending: Array.isArray(data.tasks.pending) ? data.tasks.pending : []
             };
         }
 
-        if (data.last_signal) state.last_signal = data.last_signal;
+        if (data.last_signal) {
+            state.last_signal = data.last_signal as Signal;
+        }
+
         state.user_prompt = data.user_prompt || "";
         state.interactive = data.interactive || false;
         state.context = data.context || {};
+
         return state;
     }
 

@@ -7,7 +7,7 @@ export const TaskSchema = z.object({
     skill: z.string(),
     persona: z.string().optional(),
     dependencies: z.array(z.string()).optional(),
-    params: z.record(z.string(), z.any()).optional(),
+    params: z.record(z.string(), z.unknown()).optional(),
 });
 
 export class Task {
@@ -16,7 +16,7 @@ export class Task {
     public description: string;
     public skill: string;
     public persona?: string;
-    public params?: Record<string, any>;
+    public params?: Record<string, unknown>;
     public dependencies?: string[];
 
     constructor(
@@ -25,7 +25,7 @@ export class Task {
         description: string,
         skill: string,
         persona?: string,
-        params?: Record<string, any>,
+        params?: Record<string, unknown>,
         dependencies?: string[]
     ) {
         this.id = id;
@@ -37,7 +37,7 @@ export class Task {
         this.dependencies = dependencies;
     }
 
-    static fromData(data: any): Task {
+    static fromData(data: unknown): Task {
         const validated = TaskSchema.parse(data);
         return new Task(
             validated.id || `task-${Math.random().toString(36).substr(2, 9)}`,

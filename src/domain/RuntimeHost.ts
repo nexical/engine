@@ -2,7 +2,7 @@ export interface RuntimeHost {
     /**
      * Log a message to the host system.
      */
-    log(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: any): void;
+    log(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown): void;
 
     /**
      * Update the status of the current operation.
@@ -17,5 +17,5 @@ export interface RuntimeHost {
     /**
      * Emit a structured event for observability.
      */
-    emit(event: string, data: any): void;
+    emit(event: string, data: unknown): void;
 }

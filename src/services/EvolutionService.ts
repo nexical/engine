@@ -49,7 +49,7 @@ export class EvolutionService implements IEvolutionService {
             state: stateName,
             signal_type: signal.type,
             reason: signal.reason,
-            feedback: signal.metadata?.feedback,
+            feedback: signal.metadata?.feedback as string | undefined,
             tasks_at_failure: completedTasks
         };
 

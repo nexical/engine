@@ -1,6 +1,6 @@
 import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
-import { BaseDriver, SkillSchema, Skill } from '../domain/Driver.js';
+import { BaseDriver, SkillSchema, Skill, DriverContext } from '../domain/Driver.js';
 import { interpolate } from '../utils/interpolation.js';
 import { FileSystemService } from '../services/FileSystemService.js';
 
@@ -13,7 +13,7 @@ export const ImageGenSkillSchema = SkillSchema.extend({
 
 export type ImageGenSkill = z.infer<typeof ImageGenSkillSchema>;
 
-export class ImageGenDriver extends BaseDriver<any, string> {
+export class ImageGenDriver extends BaseDriver<DriverContext, string> {
     name = 'image-gen';
     description = 'Generates images using AI SDK and saves them to a file.';
 
@@ -25,21 +25,21 @@ export class ImageGenDriver extends BaseDriver<any, string> {
         return ImageGenSkillSchema.safeParse(skill);
     }
 
-    async run(skill: Skill, context: any = {}): Promise<string> {
+    async run(skill: Skill, context?: DriverContext): Promise<string> {
         const imageGenSkill = skill as ImageGenSkill;
         const promptTemplate = imageGenSkill.prompt_template;
-        const params = context.params || {};
+        const params = context?.params || {};
 
-        const formatArgs: Record<string, any> = {
-            user_request: context.userPrompt || '',
-            task_id: context.taskId || '',
-            task_prompt: context.taskPrompt,
+        const formatArgs: Record<string, unknown> = {
+            user_request: context?.userPrompt || '',
+            task_id: context?.taskId || '',
+            task_prompt: context?.taskPrompt,
             ...params
         };
         const prompt = interpolate(promptTemplate, formatArgs);
         const modelName = imageGenSkill.model || 'google/gemini-3-pro-image-preview';
-        const aspectRatio = params.aspectRatio || imageGenSkill.aspect_ratio || '1:1';
-        const resolution = params.resolution || imageGenSkill.resolution || '1K';
+        const aspectRatio = (params.aspectRatio as string) || imageGenSkill.aspect_ratio || '1:1';
+        const resolution = (params.resolution as string) || imageGenSkill.resolution || '1K';
 
         this.host.log('debug', `Generating image with model: ${modelName}`);
         this.host.log('debug', `Prompt: ${prompt}`);
@@ -69,14 +69,14 @@ export class ImageGenDriver extends BaseDriver<any, string> {
                 }),
             });
 
-            const result = await response.json();
+            const result = (await response.json()) as any;
             let base64Data: string | null = null;
 
             if (result.choices) {
                 const message = result.choices[0].message;
                 if (message.images) {
                     for (const image of message.images) {
-                        const url = image.image_url.url;
+                        const url = image.image_url.url as string;
                         if (url.startsWith('http')) {
                             const imgResp = await fetch(url);
                             const arrayBuffer = await imgResp.arrayBuffer();
@@ -94,12 +94,12 @@ export class ImageGenDriver extends BaseDriver<any, string> {
             }
 
             // Determine output path
-            let outputPath = params.output_path;
+            let outputPath = params.output_path as string | undefined;
             if (!outputPath) {
                 const fileName = `image-${Date.now()}.png`;
-                outputPath = path.join(this.config.rootDirectory, fileName);
+                outputPath = path.join(this.config.rootDirectory as string, fileName);
             } else {
-                outputPath = path.join(this.config.rootDirectory, outputPath);
+                outputPath = path.join(this.config.rootDirectory as string, outputPath);
             }
 
             const disk = this.fileSystem;

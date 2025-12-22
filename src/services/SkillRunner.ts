@@ -58,7 +58,7 @@ export class SkillRunner implements ISkillRunner {
             try {
                 let driver;
                 if (skill.provider) {
-                    driver = this.driverRegistry.get(skill.provider);
+                    driver = this.driverRegistry.get(skill.provider as string);
                     if (!driver) {
                         errors.push(`Skill '${name}' requires missing driver '${skill.provider}'.`);
                         continue;
@@ -112,7 +112,7 @@ export class SkillRunner implements ISkillRunner {
         let driver;
         if (profile.provider) {
             this.host.log('debug', `[DEBUG] Skill ${profile.name} provider: ${profile.provider}`);
-            driver = this.driverRegistry.get(profile.provider);
+            driver = this.driverRegistry.get(profile.provider as string);
             if (!driver) {
                 throw new Error(`Driver '${profile.provider}' not found.`);
             }

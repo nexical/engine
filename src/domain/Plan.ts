@@ -29,9 +29,9 @@ export class Plan {
     }
 
     static fromYaml(yamlString: string): Plan {
-        const data = yaml.load(yamlString) as any;
+        const data = yaml.load(yamlString) as unknown;
         const validated = PlanSchema.parse(data);
-        const tasks = validated.tasks.map((t: any) => Task.fromData(t));
+        const tasks = validated.tasks.map((t: unknown) => Task.fromData(t));
         return new Plan(validated.plan_name, tasks);
     }
 }

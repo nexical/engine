@@ -47,13 +47,8 @@ export class Brain {
     }
 
     public async init(): Promise<void> {
-        // Load drivers
         await this.driverRegistry.load(this.project.paths.drivers);
-
-        // Init skills
         await this.skillRunner.init();
-
-        // Validate skills
         await this.skillRunner.validateAvailableSkills();
     }
 
@@ -61,7 +56,7 @@ export class Brain {
         return this.promptEngine;
     }
 
-    public getSkillRunner(): ISkillRunner { // Return SkillRunner
+    public getSkillRunner(): ISkillRunner {
         return this.skillRunner;
     }
 
@@ -77,7 +72,6 @@ export class Brain {
         return this.driverRegistry.getDefault();
     }
 
-    // Factory methods for Agents
     public createArchitect(workspace: IWorkspace): ArchitectAgent {
         return this.createAgent<ArchitectAgent>('architect', workspace);
     }
