@@ -142,12 +142,16 @@ export class SkillRunner {
         });
 
         try {
-            await driver.execute(profile, {
+            const result = await driver.execute(profile, {
                 userPrompt: userPromptWithPersona,
                 taskId: task.id,
                 taskPrompt: task.description,
                 params: task.params
             });
+
+            if (result.isFail()) {
+                throw result.error();
+            }
         } catch (err) {
             this.host.log('error', `An error occurred while executing the skill ${task.skill}: ${err}`);
             throw err;

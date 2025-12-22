@@ -11,7 +11,7 @@ export class ExecutingState extends State {
 
     async run(state: EngineState): Promise<Signal> {
         try {
-            const developer = new DeveloperAgent(this.brain, this.project, this.workspace);
+            const developer = this.brain.createDeveloper(this.workspace);
             await developer.execute(state);
             return Signal.COMPLETE;
         } catch (error) {

@@ -2,9 +2,13 @@ import { PromptEngine, PromptEngineConfig } from '../services/PromptEngine.js';
 import { DriverRegistry } from '../drivers/Registry.js';
 import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
+import { Workspace } from '../domain/Workspace.js';
 import { Driver } from '../domain/Driver.js';
 import { SkillRunner } from '../services/SkillRunner.js';
 import { EvolutionService } from '../services/EvolutionService.js';
+import { ArchitectAgent } from './ArchitectAgent.js';
+import { PlannerAgent } from './PlannerAgent.js';
+import { DeveloperAgent } from './DeveloperAgent.js';
 
 export class Brain {
     private promptEngine: PromptEngine;
@@ -66,5 +70,18 @@ export class Brain {
 
     public getDefaultDriver(): Driver | undefined {
         return this.driverRegistry.getDefault();
+    }
+
+    // Factory methods for Agents
+    public createArchitect(workspace: Workspace): ArchitectAgent {
+        return new ArchitectAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.evolution);
+    }
+
+    public createPlanner(workspace: Workspace): PlannerAgent {
+        return new PlannerAgent(this.project, workspace, this.promptEngine, this.driverRegistry, this.skillRunner, this.evolution);
+    }
+
+    public createDeveloper(workspace: Workspace): DeveloperAgent {
+        return new DeveloperAgent(this.project, workspace, this.skillRunner, this.host);
     }
 }

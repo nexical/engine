@@ -10,7 +10,7 @@ export class ArchitectingState extends State {
 
     async run(state: EngineState): Promise<Signal> {
         try {
-            const architect = new ArchitectAgent(this.brain, this.project, this.workspace);
+            const architect = this.brain.createArchitect(this.workspace);
             await architect.design(state.user_prompt);
 
             // Interactive Approval

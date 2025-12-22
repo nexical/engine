@@ -5,6 +5,7 @@ import { Plan } from './Plan.js';
 import { Signal, SignalType } from '../workflow/Signal.js';
 import yaml from 'js-yaml';
 import path from 'path';
+import { EngineState } from './State.js';
 
 export class Workspace {
     private disk: FileSystemService;
@@ -94,5 +95,16 @@ export class Workspace {
                 this.disk.deleteFile(`${signalsDir}/${file}`);
             }
         }
+    }
+    public async saveState(state: EngineState): Promise<void> {
+        await this.disk.writeFile(this.project.paths.state, state.toYaml());
+    }
+
+    public async loadState(): Promise<EngineState | undefined> {
+        if (this.disk.exists(this.project.paths.state)) {
+            const content = this.disk.readFile(this.project.paths.state);
+            return EngineState.fromYaml(content);
+        }
+        return undefined;
     }
 }

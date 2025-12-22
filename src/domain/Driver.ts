@@ -8,12 +8,14 @@ export interface Skill {
     [key: string]: any;
 }
 
+import { Result } from './Result.js';
+
 export interface Driver {
     name: string;
     description: string;
     isSupported(): Promise<boolean>;
     validateSkill(skill: Skill): Promise<boolean>;
-    execute(skill: Skill, context?: any): Promise<string>;
+    execute(skill: Skill, context?: any): Promise<Result<string, Error>>;
 }
 
 export const SkillSchema = z.object({
@@ -48,11 +50,16 @@ export abstract class BaseDriver implements Driver {
 
     abstract run(skill: Skill, context?: any): Promise<string>;
 
-    async execute(skill: Skill, context: any = {}): Promise<string> {
-        if (!this.validateSkill(skill)) {
-            throw new Error(`Invalid skill for ${this.name} driver: ${skill.name}`);
+    async execute(skill: Skill, context: any = {}): Promise<Result<string, Error>> {
+        if (!await this.validateSkill(skill)) {
+            return Result.fail(new Error(`Invalid skill for ${this.name} driver: ${skill.name}`));
         }
-        return await this.run(skill, context);
+        try {
+            const output = await this.run(skill, context);
+            return Result.ok(output);
+        } catch (e) {
+            return Result.fail(e instanceof Error ? e : new Error(String(e)));
+        }
     }
 
     protected async checkExecutable(name: string): Promise<boolean> {

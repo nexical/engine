@@ -1,5 +1,6 @@
 import yaml from 'js-yaml';
-import { Brain } from './Brain.js';
+import { SkillRunner } from '../services/SkillRunner.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
 import { EngineState } from '../domain/State.js';
@@ -11,9 +12,10 @@ export class DeveloperAgent {
     public readonly description = 'Executes the implementation plan by running skills.';
 
     constructor(
-        private brain: Brain,
         private project: Project,
-        private workspace: Workspace
+        private workspace: Workspace,
+        private skillRunner: SkillRunner,
+        private host: RuntimeHost
     ) { }
 
     async execute(state: EngineState): Promise<void> {
@@ -22,7 +24,7 @@ export class DeveloperAgent {
         // Load Plan using Workspace instead of direct fs access
         const plan = await this.workspace.loadPlan();
 
-        this.brain.host.log('info', `Executing plan: ${plan.plan_name} with ${plan.tasks.length} tasks.`);
+        this.host.log('info', `Executing plan: ${plan.plan_name} with ${plan.tasks.length} tasks.`);
 
         // Sync pending tasks in state
         state.tasks.pending = plan.tasks.map(t => t.id).filter(id => !state.tasks.completed.includes(id));
@@ -31,20 +33,20 @@ export class DeveloperAgent {
         const tasksToExecute = plan.tasks.filter(task => !state.tasks.completed.includes(task.id));
 
         if (tasksToExecute.length === 0) {
-            this.brain.host.log('info', "All tasks in plan are already completed.");
+            this.host.log('info', "All tasks in plan are already completed.");
             return;
         }
 
-        const skillRunner = this.brain.getSkillRunner();
+        const skillRunner = this.skillRunner;
 
         for (const task of tasksToExecute) {
-            this.brain.host.log('info', `Starting task: ${task.id} - ${task.message}`);
+            this.host.log('info', `Starting task: ${task.id} - ${task.message}`);
 
             // Resolve dependencies
             if (task.dependencies && task.dependencies.length > 0) {
                 const missingDeps = task.dependencies.filter(depId => !state.tasks.completed.includes(depId));
                 if (missingDeps.length > 0) {
-                    this.brain.host.log('warn', `Skipping task ${task.id} due to missing dependencies: ${missingDeps.join(', ')}`);
+                    this.host.log('warn', `Skipping task ${task.id} due to missing dependencies: ${missingDeps.join(', ')}`);
                     continue;
                 }
             }
@@ -54,14 +56,14 @@ export class DeveloperAgent {
                 await skillRunner.runSkill(task, prompt);
 
             } catch (e) {
-                this.brain.host.log('error', `Task ${task.id} failed: ${e}`);
+                this.host.log('error', `Task ${task.id} failed: ${e}`);
                 state.tasks.failed.push(task.id);
                 // We stop execution of the plan on the first failure to allow for replanning
                 throw e;
             }
 
             state.completeTask(task.id);
-            this.brain.host.log('info', `Task ${task.id} completed.`);
+            this.host.log('info', `Task ${task.id} completed.`);
 
             // Check for signals after each task
             await this.checkSignals(task.id);
@@ -71,7 +73,7 @@ export class DeveloperAgent {
     private async checkSignals(taskId: string): Promise<void> {
         const signal = await this.workspace.detectSignal();
         if (signal) {
-            this.brain.host.log('info', `Signal detected after task ${taskId}: ${signal.type}`);
+            this.host.log('info', `Signal detected after task ${taskId}: ${signal.type}`);
             throw new SignalDetectedError(signal, taskId);
         }
     }

@@ -1,23 +1,25 @@
-import { Brain } from './Brain.js';
 import { Project } from '../domain/Project.js';
 import { Workspace } from '../domain/Workspace.js';
 import { Architecture } from '../domain/Architecture.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
-import { GeminiDriver } from '../drivers/GeminiDriver.js';
-import yaml from 'js-yaml'; // For history log parsing if needed, though Project should handle it.
+import { PromptEngine } from '../services/PromptEngine.js';
+import { DriverRegistry } from '../drivers/Registry.js';
+import { EvolutionService } from '../services/EvolutionService.js';
 
 export class ArchitectAgent {
     constructor(
-        private brain: Brain,
         private project: Project,
-        private workspace: Workspace
+        private workspace: Workspace,
+        private promptEngine: PromptEngine,
+        private driverRegistry: DriverRegistry,
+        private evolutionService: EvolutionService
     ) { }
 
     public async design(userRequest: string): Promise<Architecture> {
         const constraints = this.project.getConstraints();
-        const evolutionLog = this.brain.getEvolution().getLogSummary();
+        const evolutionLog = this.evolutionService.getLogSummary();
 
-        const fullPrompt = this.brain.getPromptEngine().render(this.project.paths.architecturePrompt, {
+        const fullPrompt = this.promptEngine.render(this.project.paths.architecturePrompt, {
             user_request: userRequest,
             global_constraints: constraints,
             architecture_file: this.project.paths.architectureCurrent,
@@ -30,15 +32,19 @@ export class ArchitectAgent {
             prompt_template: '{prompt}'
         };
 
-        const driver = this.brain.getDriver('gemini') || this.brain.getDefaultDriver();
+        const driver = this.driverRegistry.get('gemini') || this.driverRegistry.getDefault();
         if (!driver) throw new Error("No driver available for Architect.");
 
-        await driver.execute(architectSkill, {
+        const result = await driver.execute(architectSkill, {
             userPrompt: userRequest,
             params: {
                 prompt: fullPrompt
             }
         });
+
+        if (result.isFail()) {
+            throw result.error();
+        }
 
         // After execution, we reload from disk to return the object.
         const doc = await this.workspace.getArchitecture('current');

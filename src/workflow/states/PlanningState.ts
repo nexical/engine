@@ -16,7 +16,7 @@ export class PlanningState extends State {
                 return Signal.fail("No architecture document found.");
             }
 
-            const planner = new PlannerAgent(this.brain, this.project, this.workspace);
+            const planner = this.brain.createPlanner(this.workspace);
             await planner.plan(Architecture, state.user_prompt);
 
             // Mark current plan in state
