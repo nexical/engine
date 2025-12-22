@@ -91,13 +91,27 @@ export class Orchestrator {
     }
 
     private appendEvolutionLog(signal: Signal): void {
-        const entry = `
-## [Session ${this.state.session_id}] ${signal.type}
-- **Source:** ${signal.source}
-- **Reason:** ${signal.reason}
-- **Timestamp:** ${signal.timestamp}
-`;
-        this.disk.appendFile(this.config.logPath, entry);
+        let history: any[] = [];
+        if (this.disk.exists(this.config.logPath)) {
+            try {
+                const content = this.disk.readFile(this.config.logPath);
+                history = yaml.load(content) as any[] || [];
+            } catch (e) {
+                this.host.log('warn', `Failed to load evolution log: ${(e as Error).message}. Starting new log.`);
+                history = [];
+            }
+        }
+
+        const entry = {
+            session_id: this.state.session_id,
+            type: signal.type,
+            source: signal.source,
+            reason: signal.reason,
+            timestamp: signal.timestamp
+        };
+
+        history.push(entry);
+        this.disk.writeFileAtomic(this.config.logPath, yaml.dump(history));
     }
 
     private archiveSignal(signalFile: string): void {

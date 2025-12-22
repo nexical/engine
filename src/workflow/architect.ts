@@ -2,6 +2,7 @@ import path from 'path';
 import type { Orchestrator } from '../orchestrator.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
 import { GeminiDriver } from '../drivers/GeminiDriver.js';
+import yaml from 'js-yaml';
 
 export class Architect {
     constructor(private core: Orchestrator) { }
@@ -16,7 +17,20 @@ export class Architect {
     private getEvolutionLog(): string {
         const logPath = this.core.config.logPath;
         if (this.core.disk.exists(logPath)) {
-            return this.core.disk.readFile(logPath);
+            try {
+                const content = this.core.disk.readFile(logPath);
+                const history = yaml.load(content) as any[];
+                if (Array.isArray(history) && history.length > 0) {
+                    return history.map(entry => `
+## [Session ${entry.session_id}] ${entry.type}
+- **Source:** ${entry.source}
+- **Reason:** ${entry.reason}
+- **Timestamp:** ${entry.timestamp}
+`).join('\n');
+                }
+            } catch (e) {
+                // Ignore error and return default
+            }
         }
         return "No historical failures recorded.";
     }
