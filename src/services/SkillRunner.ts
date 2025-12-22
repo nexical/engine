@@ -38,6 +38,47 @@ export class SkillRunner {
         }
     }
 
+    async validateAvailableSkills(): Promise<void> {
+        const errors: string[] = [];
+
+        for (const [name, skill] of Object.entries(this.skills)) {
+            try {
+                let driver;
+                if (skill.provider) {
+                    driver = this.core.driverRegistry.get(skill.provider);
+                    if (!driver) {
+                        errors.push(`Skill '${name}' requires missing driver '${skill.provider}'.`);
+                        continue;
+                    }
+                } else {
+                    driver = this.core.driverRegistry.getDefault();
+                    if (!driver) {
+                        errors.push(`Skill '${name}' needs a default driver but none is available.`);
+                        continue;
+                    }
+                }
+
+                if (!(await driver.isSupported())) {
+                    errors.push(`Skill '${name}' uses driver '${driver.name}' which is not supported in the current environment.`);
+                    continue;
+                }
+
+                if (!(await driver.validateSkill(skill))) {
+                    errors.push(`Skill '${name}' failed validation for driver '${driver.name}'.`);
+                }
+
+            } catch (e) {
+                errors.push(`Error validating skill '${name}': ${(e as Error).message}`);
+            }
+        }
+
+        if (errors.length > 0) {
+            throw new Error(`Skill validation failed:\n${errors.map(e => `- ${e}`).join('\n')}`);
+        }
+
+        log(`Validated ${Object.keys(this.skills).length} skills successfully.`);
+    }
+
     async runSkill(task: Task, userPrompt: string): Promise<void> {
         console.log(task.message);
 

@@ -122,6 +122,9 @@ export class Orchestrator {
             await this.driverRegistry.load(this.config.driversDirectory);
         }
 
+        // Validate all available skills
+        await this.skillRunner.validateAvailableSkills();
+
         this.loadState();
     }
 
