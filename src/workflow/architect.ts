@@ -1,10 +1,7 @@
 import path from 'path';
-import debug from 'debug';
 import type { Orchestrator } from '../orchestrator.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
 import { GeminiDriver } from '../drivers/GeminiDriver.js';
-
-const log = debug('architect');
 
 export class Architect {
     constructor(private core: Orchestrator) { }
@@ -55,7 +52,7 @@ export class Architect {
             this.saveArchitectureToHistory();
 
         } catch (e) {
-            console.error("Error generating architecture:", e);
+            this.core.host.log('error', `Error generating architecture: ${e}`);
             throw e;
         }
     }
@@ -64,7 +61,7 @@ export class Architect {
         const architecturePath = this.core.config.architecturePath;
 
         if (!this.core.disk.exists(architecturePath)) {
-            log(`Architecture file not found at ${architecturePath}, skipping history save.`);
+            this.core.host.log('debug', `Architecture file not found at ${architecturePath}, skipping history save.`);
             return;
         }
 
@@ -83,6 +80,6 @@ export class Architect {
         const content = this.core.disk.readFile(architecturePath);
         this.core.disk.writeFileAtomic(historyPath, content);
 
-        log(`Saved architecture history to: ${historyPath}`);
+        this.core.host.log('debug', `Saved architecture history to: ${historyPath}`);
     }
 }

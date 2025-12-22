@@ -1,11 +1,8 @@
 import path from 'path';
-import debug from 'debug';
 import { z, ZodSafeParseResult } from 'zod';
 import { BaseDriver, SkillSchema } from '../models/Driver.js';
 import { Skill } from '../interfaces/Skill.js';
 import { interpolate } from '../utils/interpolation.js';
-
-const log = debug('driver:image-gen');
 
 export const ImageGenSkillSchema = SkillSchema.extend({
     prompt_template: z.string(),
@@ -44,10 +41,10 @@ export class ImageGenDriver extends BaseDriver {
         const aspectRatio = params.aspectRatio || imageGenSkill.aspect_ratio || '1:1';
         const resolution = params.resolution || imageGenSkill.resolution || '1K';
 
-        log(`Generating image with model: ${modelName}`);
-        log(`Prompt: ${prompt}`);
-        log(`Aspect ratio: ${aspectRatio}`);
-        log(`Resolution: ${resolution}`);
+        this.core.host.log('debug', `Generating image with model: ${modelName}`);
+        this.core.host.log('debug', `Prompt: ${prompt}`);
+        this.core.host.log('debug', `Aspect ratio: ${aspectRatio}`);
+        this.core.host.log('debug', `Resolution: ${resolution}`);
 
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -112,11 +109,11 @@ export class ImageGenDriver extends BaseDriver {
             const buffer = Buffer.from(base64Data, 'base64');
             this.core.disk.writeFile(outputPath, buffer);
 
-            log(`Image saved to: ${outputPath}`);
+            this.core.host.log('info', `Image saved to: ${outputPath}`);
             return `Image generated and saved to: ${outputPath}`;
 
         } catch (error) {
-            console.error('Image generation failed:', error);
+            this.core.host.log('error', `Image generation failed: ${(error as Error).message}`);
             throw error;
         }
     }

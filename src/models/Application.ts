@@ -27,7 +27,6 @@ export class Application {
     public personasDirectory: string;
     public driversDirectory: string;
     public skillsDirectory: string;
-    public skillsPath: string;
 
     public signalsDirectory: string;
     public archiveDirectory: string;
@@ -57,7 +56,6 @@ export class Application {
         this.personasDirectory = path.join(this.aiDirectory, 'personas');
         this.driversDirectory = path.join(this.aiDirectory, 'drivers');
         this.skillsDirectory = path.join(this.aiDirectory, 'skills');
-        this.skillsPath = path.join(this.skillsDirectory, 'skills.yml');
 
         this.signalsDirectory = path.join(this.aiDirectory, 'signals');
         this.archiveDirectory = path.join(this.aiDirectory, 'archive');

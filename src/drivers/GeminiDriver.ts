@@ -1,8 +1,4 @@
-import debug from 'debug';
 import { AICLIDriver, AISkill } from './base/AICLIDriver.js';
-import { Skill } from '../interfaces/Skill.js';
-
-const log = debug('driver:gemini');
 
 export class GeminiDriver extends AICLIDriver {
     name = 'gemini';

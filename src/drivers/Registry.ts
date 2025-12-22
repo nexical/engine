@@ -2,9 +2,6 @@ import { Driver } from '../models/Driver.js';
 import { Registry } from '../models/Registry.js';
 import path from 'path';
 import fs from 'fs-extra';
-import debug from 'debug';
-
-const log = debug('driver-registry');
 
 export class DriverRegistry extends Registry<Driver> {
     private defaultPlugin: Driver | undefined;
@@ -49,10 +46,10 @@ export class DriverRegistry extends Registry<Driver> {
                                 if (this.isDriver(instance)) {
                                     if (await instance.isSupported()) {
                                         const isDefault = instance.name === 'gemini';
-                                        log(`Registering driver: ${instance.name} (Default: ${isDefault})`);
+                                        this.core.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
                                         this.register(instance, isDefault);
                                     } else {
-                                        log(`Driver '${instance.name}' is not supported by current environment.`);
+                                        this.core.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
                                     }
                                 }
                             } catch (e) {
@@ -61,7 +58,7 @@ export class DriverRegistry extends Registry<Driver> {
                         }
                     }
                 } catch (e) {
-                    console.error(`Failed to load driver from ${file}:`, e);
+                    this.core.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
                 }
             }
         }

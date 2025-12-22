@@ -1,12 +1,10 @@
 import path from 'path';
-import debug from 'debug';
 import type { Orchestrator } from '../orchestrator.js';
+import yaml from 'js-yaml';
 import { Plan } from '../models/Plan.js';
 import { Signal } from '../interfaces/Signal.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
 import { GeminiDriver } from '../drivers/GeminiDriver.js';
-
-const log = debug('planner');
 
 export class Planner {
     constructor(private core: Orchestrator) { }
@@ -20,11 +18,13 @@ export class Planner {
     }
 
     private getAgentSkills(): string {
-        const skillsPath = this.core.config.skillsPath;
-        if (this.core.disk.exists(skillsPath)) {
-            return this.core.disk.readFile(skillsPath);
-        }
-        return "No agent skills file found.";
+        const skills = this.core.skillRunner.getSkills();
+        const simplifiedSkills = skills.map(skill => ({
+            name: skill.name,
+            description: skill.description,
+            dependencies: skill.dependencies
+        }));
+        return yaml.dump(simplifiedSkills);
     }
 
     private getArchitecture(): string {
@@ -57,7 +57,7 @@ export class Planner {
 
         const yamlContent = plan.toYaml();
         this.core.disk.writeFileAtomic(filePath, yamlContent);
-        log(`Saved plan history to: ${filePath}`);
+        this.core.host.log('debug', `Saved plan history to: ${filePath}`);
     }
 
     async generatePlan(prompt: string, activeSignal?: Signal, completedTasks: string[] = []): Promise<Plan> {
@@ -120,7 +120,7 @@ ${activeSignal.reason}
             return plan;
 
         } catch (e) {
-            console.error("Error generating plan:", e);
+            this.core.host.log('error', `Error generating plan: ${e}`);
             throw e;
         }
     }

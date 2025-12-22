@@ -1,10 +1,7 @@
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
 import { Skill } from '../../interfaces/Skill.js';
 import { interpolate } from '../../utils/interpolation.js';
-import debug from 'debug';
 import { z, ZodSafeParseResult } from 'zod';
-
-const log = debug('driver:base-ai-cli');
 
 export const AISkillSchema = CLISkillSchema.extend({
     prompt_template: z.string()

@@ -1,9 +1,6 @@
 import nunjucks from 'nunjucks';
 import path from 'path';
-import debug from 'debug';
 import type { Orchestrator } from '../orchestrator.js';
-
-const log = debug('prompt-engine');
 
 export class PromptEngine {
     private env: nunjucks.Environment;
@@ -18,7 +15,7 @@ export class PromptEngine {
             path.join(this.core.config.appDirectory, '../prompts')
         ];
 
-        log(`Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);
+        this.core.host.log('debug', `Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);
 
         const loader = new nunjucks.FileSystemLoader(searchPaths, {
             noCache: true // Useful for development/overrides
@@ -34,10 +31,10 @@ export class PromptEngine {
 
     render(templateName: string, context: any): string {
         try {
-            log(`Rendering template: ${templateName}`);
+            this.core.host.log('debug', `Rendering template: ${templateName}`);
             return this.env.render(templateName, context);
         } catch (e) {
-            console.error(`Error rendering template ${templateName}:`, e);
+            this.core.host.log('error', `Error rendering template ${templateName}: ${(e as Error).message}`);
             throw e;
         }
     }

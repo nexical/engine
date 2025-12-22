@@ -15,9 +15,6 @@ import { SkillRunner } from './services/SkillRunner.js';
 import { DriverRegistry } from './drivers/Registry.js';
 import yaml from 'js-yaml';
 import path from 'path';
-import debug from 'debug';
-
-const log = debug('orchestrator');
 
 export class Orchestrator {
     public config: Application;
@@ -232,7 +229,6 @@ export class Orchestrator {
                         // Interactive Review Gate
                         if (this.interactive) {
                             const archContent = this.disk.readFile(this.config.architecturePath);
-                            const response = await this.host.ask(archContent, 'confirm'); // Using 'confirm' generic type but typically expects text or yes/no
 
                             // Re-check host usage. If we need a complex review (display markdown + input), we assume `ask` handles the prompt display.
                             const userResponse = await this.host.ask(archContent, 'text');

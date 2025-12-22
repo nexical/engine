@@ -1,7 +1,5 @@
-import debug from 'debug';
+import type { Orchestrator } from '../orchestrator.js';
 import { spawn, spawnSync, SpawnOptions } from 'child_process';
-
-const log = debug('shell-executor');
 
 export interface ShellResult {
     stdout: string;
@@ -14,10 +12,15 @@ export interface ShellOptions extends SpawnOptions {
 }
 
 export class ShellExecutor {
+    constructor(private core: Orchestrator) { }
 
-    static execute(command: string, args: string[] = [], options: ShellOptions = {}): Promise<ShellResult> {
+    async execute(command: string, args: string[] = [], options: ShellOptions = {}): Promise<ShellResult> {
         return new Promise((resolve, reject) => {
-            log(`Executing: ${command} ${args.join(' ')}`);
+            const log = (msg: string) => {
+                this.core.host.log('debug', msg);
+            };
+
+            this.core.host.log('debug', `Executing: ${command} ${args.join(' ')}`);
 
             const spawnOptions: SpawnOptions = {
                 ...options,
@@ -34,7 +37,7 @@ export class ShellExecutor {
                     const chunk = data.toString();
                     stdout += chunk;
                     if (options.streamStdio) {
-                        process.stdout.write(chunk);
+                        this.core.host.log('info', chunk);
                     }
                 });
             }
@@ -44,7 +47,7 @@ export class ShellExecutor {
                     const chunk = data.toString();
                     stderr += chunk;
                     if (options.streamStdio) {
-                        process.stderr.write(chunk);
+                        this.core.host.log('error', chunk);
                     }
                 });
             }
@@ -55,14 +58,15 @@ export class ShellExecutor {
             });
 
             child.on('error', (err: Error) => {
-                log(`Command failed: ${err.message}`);
+                const errorMsg = `Command failed: ${err.message}`;
+                this.core.host.log('error', errorMsg);
                 reject(err);
             });
         });
     }
 
-    static executeSync(command: string, args: string[] = [], options: SpawnOptions = {}): ShellResult {
-        log(`Executing sync: ${command} ${args.join(' ')}`);
+    executeSync(command: string, args: string[] = [], options: SpawnOptions = {}): ShellResult {
+        // log(`Executing sync: ${command} ${args.join(' ')}`);
         const result = spawnSync(command, args, {
             encoding: 'utf-8',
             ...options

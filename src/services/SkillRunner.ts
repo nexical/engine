@@ -1,11 +1,8 @@
 import path from 'path';
 import yaml from 'js-yaml';
-import debug from 'debug';
 import { Task } from '../models/Task.js';
 import { Skill } from '../interfaces/Skill.js';
 import type { Orchestrator } from '../orchestrator.js';
-
-const log = debug('skill-runner');
 
 export class SkillRunner {
     private skills: Record<string, Skill> = {};
@@ -32,7 +29,7 @@ export class SkillRunner {
                         this.skills[profile.name] = profile;
                     }
                 } catch (e) {
-                    console.error(`Error loading skill profile ${filename}:`, e);
+                    this.core.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
                 }
             }
         }
@@ -76,11 +73,15 @@ export class SkillRunner {
             throw new Error(`Skill validation failed:\n${errors.map(e => `- ${e}`).join('\n')}`);
         }
 
-        log(`Validated ${Object.keys(this.skills).length} skills successfully.`);
+        this.core.host.log('debug', `Validated ${Object.keys(this.skills).length} skills successfully.`);
+    }
+
+    getSkills(): Skill[] {
+        return Object.values(this.skills);
     }
 
     async runSkill(task: Task, userPrompt: string): Promise<void> {
-        console.log(task.message);
+        this.core.host.log('info', task.message);
 
         const profile = this.skills[task.skill];
         if (!profile) {
@@ -94,18 +95,18 @@ export class SkillRunner {
         // Determine which driver to use. 
         let driver;
         if (profile.provider) {
-            console.log(`[DEBUG] Skill ${profile.name} provider: ${profile.provider}`);
+            this.core.host.log('debug', `[DEBUG] Skill ${profile.name} provider: ${profile.provider}`);
             driver = this.core.driverRegistry.get(profile.provider);
             if (!driver) {
                 throw new Error(`Driver '${profile.provider}' not found.`);
             }
         } else {
-            console.log(`[DEBUG] Skill ${profile.name} has no provider, using default`);
+            this.core.host.log('debug', `[DEBUG] Skill ${profile.name} has no provider, using default`);
             driver = this.core.driverRegistry.getDefault();
         }
 
         if (driver) {
-            console.log(`[DEBUG] Resolved driver: ${driver.name}`);
+            this.core.host.log('debug', `[DEBUG] Resolved driver: ${driver.name}`);
         }
 
         if (!driver) {
@@ -120,7 +121,7 @@ export class SkillRunner {
             if (this.core.disk.exists(personaFile)) {
                 personaContext = this.core.disk.readFile(personaFile);
             } else {
-                console.warn(`Persona file not found: ${personaFile}`);
+                this.core.host.log('warn', `Persona file not found: ${personaFile}`);
             }
         }
 
@@ -137,7 +138,7 @@ export class SkillRunner {
                 params: task.params
             });
         } catch (err) {
-            console.error(`An error occurred while executing the skill ${task.skill}: ${err}`);
+            this.core.host.log('error', `An error occurred while executing the skill ${task.skill}: ${err}`);
             throw err;
         }
     }
