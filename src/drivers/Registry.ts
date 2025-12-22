@@ -1,13 +1,18 @@
 import { Driver } from '../models/Driver.js';
 import { Registry } from '../models/Registry.js';
+import { RuntimeHost } from '../interfaces/RuntimeHost.js';
 import path from 'path';
 import fs from 'fs-extra';
 
 export class DriverRegistry extends Registry<Driver> {
     private defaultPlugin: Driver | undefined;
 
+    constructor(protected host: RuntimeHost, protected config: any) {
+        super();
+    }
+
     register(plugin: Driver, isDefault: boolean = false): void {
-        super.register(plugin);
+        this.items.set(plugin.name, plugin);
         if (isDefault) {
             this.defaultPlugin = plugin;
         }
@@ -33,7 +38,6 @@ export class DriverRegistry extends Registry<Driver> {
 
         for (const file of files) {
             if (file.endsWith('.ts') || file.endsWith('.js')) {
-                // Ignore definition files
                 if (file.endsWith('.d.ts')) continue;
 
                 try {
@@ -42,23 +46,23 @@ export class DriverRegistry extends Registry<Driver> {
                         const ExportedClass = module[key];
                         if (typeof ExportedClass === 'function') {
                             try {
-                                const instance = new ExportedClass(this.core);
+                                const instance = new ExportedClass(this.host, this.config);
                                 if (this.isDriver(instance)) {
                                     if (await instance.isSupported()) {
                                         const isDefault = instance.name === 'gemini';
-                                        this.core.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
+                                        this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
                                         this.register(instance, isDefault);
                                     } else {
-                                        this.core.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
+                                        this.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
                                     }
                                 }
                             } catch (e) {
-                                // Ignore classes that fail to instantiate (e.g. abstract classes)
+                                // Ignore classes that fail to instantiate
                             }
                         }
                     }
                 } catch (e) {
-                    this.core.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
+                    this.host.log('error', `Failed to load driver from ${file}: ${(e as Error).message}`);
                 }
             }
         }

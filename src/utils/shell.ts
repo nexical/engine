@@ -1,4 +1,4 @@
-import type { Orchestrator } from '../orchestrator.js';
+import { RuntimeHost } from '../interfaces/RuntimeHost.js';
 import { spawn, spawnSync, SpawnOptions } from 'child_process';
 
 export interface ShellResult {
@@ -12,15 +12,15 @@ export interface ShellOptions extends SpawnOptions {
 }
 
 export class ShellExecutor {
-    constructor(private core: Orchestrator) { }
+    constructor(private host: RuntimeHost) { }
 
     async execute(command: string, args: string[] = [], options: ShellOptions = {}): Promise<ShellResult> {
         return new Promise((resolve, reject) => {
             const log = (msg: string) => {
-                this.core.host.log('debug', msg);
+                this.host.log('debug', msg);
             };
 
-            this.core.host.log('debug', `Executing: ${command} ${args.join(' ')}`);
+            this.host.log('debug', `Executing: ${command} ${args.join(' ')}`);
 
             const spawnOptions: SpawnOptions = {
                 ...options,
@@ -37,7 +37,7 @@ export class ShellExecutor {
                     const chunk = data.toString();
                     stdout += chunk;
                     if (options.streamStdio) {
-                        this.core.host.log('info', chunk);
+                        this.host.log('info', chunk);
                     }
                 });
             }
@@ -47,7 +47,7 @@ export class ShellExecutor {
                     const chunk = data.toString();
                     stderr += chunk;
                     if (options.streamStdio) {
-                        this.core.host.log('error', chunk);
+                        this.host.log('error', chunk);
                     }
                 });
             }
@@ -59,7 +59,7 @@ export class ShellExecutor {
 
             child.on('error', (err: Error) => {
                 const errorMsg = `Command failed: ${err.message}`;
-                this.core.host.log('error', errorMsg);
+                this.host.log('error', errorMsg);
                 reject(err);
             });
         });

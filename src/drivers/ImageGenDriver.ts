@@ -3,6 +3,7 @@ import { z, ZodSafeParseResult } from 'zod';
 import { BaseDriver, SkillSchema } from '../models/Driver.js';
 import { Skill } from '../interfaces/Skill.js';
 import { interpolate } from '../utils/interpolation.js';
+import fs from 'fs-extra';
 
 export const ImageGenSkillSchema = SkillSchema.extend({
     prompt_template: z.string(),
@@ -41,10 +42,10 @@ export class ImageGenDriver extends BaseDriver {
         const aspectRatio = params.aspectRatio || imageGenSkill.aspect_ratio || '1:1';
         const resolution = params.resolution || imageGenSkill.resolution || '1K';
 
-        this.core.host.log('debug', `Generating image with model: ${modelName}`);
-        this.core.host.log('debug', `Prompt: ${prompt}`);
-        this.core.host.log('debug', `Aspect ratio: ${aspectRatio}`);
-        this.core.host.log('debug', `Resolution: ${resolution}`);
+        this.host.log('debug', `Generating image with model: ${modelName}`);
+        this.host.log('debug', `Prompt: ${prompt}`);
+        this.host.log('debug', `Aspect ratio: ${aspectRatio}`);
+        this.host.log('debug', `Resolution: ${resolution}`);
 
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -97,23 +98,23 @@ export class ImageGenDriver extends BaseDriver {
             let outputPath = params.output_path;
             if (!outputPath) {
                 const fileName = `image-${Date.now()}.png`;
-                outputPath = path.join(this.core.config.rootDirectory, fileName);
+                outputPath = path.join(this.config.rootDirectory, fileName);
             } else {
-                outputPath = path.join(this.core.config.rootDirectory, outputPath);
+                outputPath = path.join(this.config.rootDirectory, outputPath);
             }
 
             // Ensure directory exists
-            this.core.disk.ensureDir(path.dirname(outputPath));
+            fs.ensureDirSync(path.dirname(outputPath));
 
             // Write file
             const buffer = Buffer.from(base64Data, 'base64');
-            this.core.disk.writeFile(outputPath, buffer);
+            fs.writeFileSync(outputPath, buffer);
 
-            this.core.host.log('info', `Image saved to: ${outputPath}`);
+            this.host.log('info', `Image saved to: ${outputPath}`);
             return `Image generated and saved to: ${outputPath}`;
 
         } catch (error) {
-            this.core.host.log('error', `Image generation failed: ${(error as Error).message}`);
+            this.host.log('error', `Image generation failed: ${(error as Error).message}`);
             throw error;
         }
     }

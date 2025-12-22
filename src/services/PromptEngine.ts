@@ -1,21 +1,26 @@
 import nunjucks from 'nunjucks';
 import path from 'path';
-import type { Orchestrator } from '../orchestrator.js';
+import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+
+export interface PromptEngineConfig {
+    promptDirectory: string;
+    appDirectory: string;
+}
 
 export class PromptEngine {
     private env: nunjucks.Environment;
 
-    constructor(private core: Orchestrator) {
+    constructor(private config: PromptEngineConfig, private host: RuntimeHost) {
         // Define search paths for templates
         // Priority:
         // 1. Project overrides: <projectPath>/.ai/prompts (Use config.promptDirectory)
-        // 2. Default prompts: <appPath>/../prompts (Relative to models dir)
+        // 2. Default prompts: <appPath>/../prompts (Relative to models dir - legacy, now appDirectory)
         const searchPaths = [
-            this.core.config.promptDirectory,
-            path.join(this.core.config.appDirectory, '../prompts')
+            this.config.promptDirectory,
+            path.join(this.config.appDirectory, '../prompts')
         ];
 
-        this.core.host.log('debug', `Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);
+        this.host.log('debug', `Initializing PromptEngine with search paths: ${searchPaths.join(', ')}`);
 
         const loader = new nunjucks.FileSystemLoader(searchPaths, {
             noCache: true // Useful for development/overrides
@@ -31,10 +36,10 @@ export class PromptEngine {
 
     render(templateName: string, context: any): string {
         try {
-            this.core.host.log('debug', `Rendering template: ${templateName}`);
+            this.host.log('debug', `Rendering template: ${templateName}`);
             return this.env.render(templateName, context);
         } catch (e) {
-            this.core.host.log('error', `Error rendering template ${templateName}: ${(e as Error).message}`);
+            this.host.log('error', `Error rendering template ${templateName}: ${(e as Error).message}`);
             throw e;
         }
     }

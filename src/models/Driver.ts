@@ -1,5 +1,5 @@
 import { z, ZodSafeParseResult } from 'zod';
-import type { Orchestrator } from '../orchestrator.js';
+import { RuntimeHost } from '../interfaces/RuntimeHost.js';
 import { Skill } from '../interfaces/Skill.js';
 import { ShellExecutor } from '../utils/shell.js';
 
@@ -23,8 +23,8 @@ export abstract class BaseDriver implements Driver {
 
     protected shell: ShellExecutor;
 
-    constructor(protected core: Orchestrator) {
-        this.shell = new ShellExecutor(this.core);
+    constructor(protected host: RuntimeHost, protected config: any = {}) {
+        this.shell = new ShellExecutor(host);
     }
 
     abstract isSupported(): Promise<boolean>;
@@ -36,7 +36,7 @@ export abstract class BaseDriver implements Driver {
     async validateSkill(skill: Skill): Promise<boolean> {
         const result = this.parseSchema(skill);
         if (!result.success) {
-            this.core.host.log('warn', `Validation failed for ${this.name} skill '${skill.name}': ${JSON.stringify(z.treeifyError(result.error))}`);
+            this.host.log('warn', `Validation failed for ${this.name} skill '${skill.name}': ${JSON.stringify(z.treeifyError(result.error))}`);
         }
         return result.success;
     }
@@ -64,7 +64,7 @@ export abstract class BaseDriver implements Driver {
     }
 
     protected checkConfig(key: string): any {
-        return (this.core.config as any)[key];
+        return this.config[key];
     }
 }
 

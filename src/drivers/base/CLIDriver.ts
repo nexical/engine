@@ -46,20 +46,20 @@ export abstract class CLIDriver extends BaseDriver {
     protected async executeShell(skill: Skill, args: Array<string>, context: any = {}): Promise<string> {
         const commandBin = this.getExecutable(skill);
 
-        this.core.host.log('debug', `Running CLI skill: ${skill.name}`);
-        this.core.host.log('debug', `Command: ${commandBin} ${args.join(' ')}`);
+        this.host.log('debug', `Running CLI skill: ${skill.name}`);
+        this.host.log('debug', `Command: ${commandBin} ${args.join(' ')}`);
 
         try {
             const result = await this.shell.execute(commandBin, args, {
-                cwd: this.core.config.rootDirectory,
+                cwd: this.config.rootDirectory,
                 // Merge context.env with process.env to preserve standard vars
                 env: { ...process.env, ...(context.env || {}) }
             });
 
-            this.core.host.log('debug', "--- stdout ---");
-            this.core.host.log('info', result.stdout);
-            this.core.host.log('debug', "--- stderr ---");
-            this.core.host.log('error', result.stderr);
+            this.host.log('debug', "--- stdout ---");
+            this.host.log('info', result.stdout);
+            this.host.log('debug', "--- stderr ---");
+            this.host.log('error', result.stderr);
 
             if (result.code !== 0) {
                 throw new Error(`Command exited with code ${result.code}\nStderr: ${result.stderr}`);
@@ -67,7 +67,7 @@ export abstract class CLIDriver extends BaseDriver {
 
             return result.stdout;
         } catch (err) {
-            this.core.host.log('error', `An error occurred while executing the CLI agent: ${(err as Error).message}`);
+            this.host.log('error', `An error occurred while executing the CLI agent: ${(err as Error).message}`);
             throw err;
         }
     }

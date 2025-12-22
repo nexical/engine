@@ -6,7 +6,7 @@ export class GitService {
 
     runCommand(args: string[], cwd?: string): string {
         const result = spawnSync('git', args, {
-            cwd: cwd || this.core.config.rootDirectory,
+            cwd: cwd || this.core.project.rootDirectory,
             encoding: 'utf-8',
         });
 
@@ -33,7 +33,7 @@ export class GitService {
         // But here we probably want to run it in the current working directory of the process
         // if we are initializing a new project.
         // use workingDirectory which is the sandbox root or the project root.
-        this.runCommand(args, this.core.config.rootDirectory);
+        this.runCommand(args, this.core.project.rootDirectory);
     }
 
     addRemote(name: string, url: string): void {

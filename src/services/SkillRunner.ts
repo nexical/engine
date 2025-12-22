@@ -2,34 +2,44 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { Task } from '../models/Task.js';
 import { Skill } from '../interfaces/Skill.js';
-import type { Orchestrator } from '../orchestrator.js';
+import { Project } from '../core/domain/Project.js';
+import { DriverRegistry } from '../drivers/Registry.js';
+import { RuntimeHost } from '../interfaces/RuntimeHost.js';
+import { PromptEngine } from './PromptEngine.js';
+import { FileSystemService } from './FileSystemService.js';
 
 export class SkillRunner {
     private skills: Record<string, Skill> = {};
+    private disk: FileSystemService;
 
     constructor(
-        private core: Orchestrator
+        private project: Project,
+        private driverRegistry: DriverRegistry,
+        private promptEngine: PromptEngine,
+        private host: RuntimeHost
     ) {
+        this.disk = new FileSystemService();
         this.loadYamlSkills();
     }
 
     private loadYamlSkills(): void {
-        if (!this.core.disk.isDirectory(this.core.config.skillsDirectory)) {
+        const skillsDir = this.project.paths.skills;
+        if (!this.disk.isDirectory(skillsDir)) {
             return;
         }
 
-        const files = this.core.disk.listFiles(this.core.config.skillsDirectory);
+        const files = this.disk.listFiles(skillsDir);
         for (const filename of files) {
             if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml')) {
-                const filePath = path.join(this.core.config.skillsDirectory, filename);
-                const content = this.core.disk.readFile(filePath);
+                const filePath = path.join(skillsDir, filename);
+                const content = this.disk.readFile(filePath);
                 try {
                     const profile = yaml.load(content) as Skill;
                     if (profile && profile.name) {
                         this.skills[profile.name] = profile;
                     }
                 } catch (e) {
-                    this.core.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
+                    this.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
                 }
             }
         }
@@ -42,13 +52,13 @@ export class SkillRunner {
             try {
                 let driver;
                 if (skill.provider) {
-                    driver = this.core.driverRegistry.get(skill.provider);
+                    driver = this.driverRegistry.get(skill.provider);
                     if (!driver) {
                         errors.push(`Skill '${name}' requires missing driver '${skill.provider}'.`);
                         continue;
                     }
                 } else {
-                    driver = this.core.driverRegistry.getDefault();
+                    driver = this.driverRegistry.getDefault();
                     if (!driver) {
                         errors.push(`Skill '${name}' needs a default driver but none is available.`);
                         continue;
@@ -73,7 +83,7 @@ export class SkillRunner {
             throw new Error(`Skill validation failed:\n${errors.map(e => `- ${e}`).join('\n')}`);
         }
 
-        this.core.host.log('debug', `Validated ${Object.keys(this.skills).length} skills successfully.`);
+        this.host.log('debug', `Validated ${Object.keys(this.skills).length} skills successfully.`);
     }
 
     getSkills(): Skill[] {
@@ -81,7 +91,7 @@ export class SkillRunner {
     }
 
     async runSkill(task: Task, userPrompt: string): Promise<void> {
-        this.core.host.log('info', task.message);
+        this.host.log('info', task.message);
 
         const profile = this.skills[task.skill];
         if (!profile) {
@@ -95,18 +105,18 @@ export class SkillRunner {
         // Determine which driver to use. 
         let driver;
         if (profile.provider) {
-            this.core.host.log('debug', `[DEBUG] Skill ${profile.name} provider: ${profile.provider}`);
-            driver = this.core.driverRegistry.get(profile.provider);
+            this.host.log('debug', `[DEBUG] Skill ${profile.name} provider: ${profile.provider}`);
+            driver = this.driverRegistry.get(profile.provider);
             if (!driver) {
                 throw new Error(`Driver '${profile.provider}' not found.`);
             }
         } else {
-            this.core.host.log('debug', `[DEBUG] Skill ${profile.name} has no provider, using default`);
-            driver = this.core.driverRegistry.getDefault();
+            this.host.log('debug', `[DEBUG] Skill ${profile.name} has no provider, using default`);
+            driver = this.driverRegistry.getDefault();
         }
 
         if (driver) {
-            this.core.host.log('debug', `[DEBUG] Resolved driver: ${driver.name}`);
+            this.host.log('debug', `[DEBUG] Resolved driver: ${driver.name}`);
         }
 
         if (!driver) {
@@ -117,15 +127,16 @@ export class SkillRunner {
         let personaContext = '';
 
         if (task.persona) {
-            const personaFile = path.join(this.core.config.personasDirectory, `${task.persona}.md`);
-            if (this.core.disk.exists(personaFile)) {
-                personaContext = this.core.disk.readFile(personaFile);
+            // Updated to use project paths
+            const personaFile = path.join(this.project.paths.personas, `${task.persona}.md`);
+            if (this.disk.exists(personaFile)) {
+                personaContext = this.disk.readFile(personaFile);
             } else {
-                this.core.host.log('warn', `Persona file not found: ${personaFile}`);
+                this.host.log('warn', `Persona file not found: ${personaFile}`);
             }
         }
 
-        userPromptWithPersona = this.core.promptEngine.render(this.core.config.skillPromptFile, {
+        userPromptWithPersona = this.promptEngine.render(this.project.paths.skillPrompt, {
             user_prompt: userPrompt,
             persona_context: personaContext
         });
@@ -138,7 +149,7 @@ export class SkillRunner {
                 params: task.params
             });
         } catch (err) {
-            this.core.host.log('error', `An error occurred while executing the skill ${task.skill}: ${err}`);
+            this.host.log('error', `An error occurred while executing the skill ${task.skill}: ${err}`);
             throw err;
         }
     }

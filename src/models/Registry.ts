@@ -1,9 +1,7 @@
-import type { Orchestrator } from '../orchestrator.js';
-
 export class Registry<T extends { name: string }> {
     protected items: Map<string, T> = new Map();
 
-    constructor(protected core: Orchestrator) { }
+    constructor() { }
 
     register(item: T): void {
         if (this.items.has(item.name)) {

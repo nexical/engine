@@ -14,6 +14,7 @@ export class EngineState {
         pending: string[];
     };
     public last_signal?: Signal;
+    public user_prompt: string = "";
 
     constructor(session_id: string) {
         this.session_id = session_id;
@@ -24,6 +25,7 @@ export class EngineState {
             failed: [],
             pending: []
         };
+        this.user_prompt = "";
     }
 
     updateStatus(status: OrchestratorStatus): void {
@@ -54,8 +56,11 @@ export class EngineState {
         state.status = data.status;
         state.current_plan = data.current_plan;
         state.loop_count = data.loop_count;
-        state.tasks = data.tasks || { completed: [], failed: [], pending: [] };
+        if (data.tasks) {
+            state.tasks = data.tasks;
+        }
         state.last_signal = data.last_signal;
+        state.user_prompt = data.user_prompt || "";
         return state;
     }
 
