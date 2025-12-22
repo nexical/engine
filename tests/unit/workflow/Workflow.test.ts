@@ -48,7 +48,8 @@ describe('Workflow Engine', () => {
             getArchitecture: jest.fn<() => Promise<any>>().mockResolvedValue({ content: 'arch' }),
             loadPlan: jest.fn<() => Promise<any>>().mockResolvedValue({ plan_name: 'test', tasks: [] }),
             detectSignal: jest.fn<() => Promise<any>>().mockResolvedValue(null),
-            clearSignals: jest.fn<() => Promise<void>>()
+            clearSignals: jest.fn<() => Promise<void>>(),
+            saveState: jest.fn<() => Promise<void>>().mockResolvedValue()
         } as any;
 
         state = new EngineState('test-session');

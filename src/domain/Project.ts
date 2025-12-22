@@ -1,13 +1,12 @@
 import path from 'path';
 import { FileSystemService } from '../services/FileSystemService.js';
-import { ProjectProfile } from './ProjectProfile.js';
-import { fileURLToPath } from 'url';
+import yaml from 'js-yaml';
 
 export class Project {
     public readonly rootDirectory: string;
     public readonly paths: ProjectPaths;
     private disk: FileSystemService;
-    private profile: ProjectProfile | null = null;
+    private profile: ProjectProfile | null = null; // Use local type
 
     constructor(rootDirectory: string) {
         this.rootDirectory = rootDirectory;
@@ -25,9 +24,22 @@ export class Project {
 
     public getConfig(): ProjectProfile {
         if (!this.profile) {
-            this.profile = ProjectProfile.load(this.paths.config);
+            this.profile = this.loadProfile(this.paths.config);
         }
         return this.profile;
+    }
+
+    private loadProfile(path: string): ProjectProfile {
+        if (!this.disk.exists(path)) {
+            return {};
+        }
+        try {
+            const content = this.disk.readFile(path);
+            return yaml.load(content) as ProjectProfile;
+        } catch (e) {
+            console.error(`Failed to load project profile from ${path}:`, e);
+            throw e;
+        }
     }
 
     private ensureStructure(): void {
@@ -93,4 +105,8 @@ class ProjectPaths {
         this.signals = path.join(this.ai, 'signals');
         this.archive = path.join(this.ai, 'archive');
     }
+}
+
+export interface ProjectProfile {
+    [key: string]: any;
 }
