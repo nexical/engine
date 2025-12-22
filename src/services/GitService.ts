@@ -1,16 +1,16 @@
-import type { Orchestrator } from '../orchestrator.js';
+import { RuntimeHost } from '../domain/RuntimeHost.js';
 import { ShellExecutor } from '../utils/shell.js';
 
 export class GitService {
     private shell: ShellExecutor;
 
-    constructor(private core: Orchestrator) {
-        this.shell = new ShellExecutor(this.core.host);
+    constructor(private host: RuntimeHost, private rootDirectory: string) {
+        this.shell = new ShellExecutor(this.host);
     }
 
     runCommand(args: string[], cwd?: string): string {
         const result = this.shell.executeSync('git', args, {
-            cwd: cwd || this.core.project.rootDirectory
+            cwd: cwd || this.rootDirectory
         });
 
         if (result.code !== 0) {
@@ -30,7 +30,7 @@ export class GitService {
         if (dir) {
             args.push(dir);
         }
-        this.runCommand(args, this.core.project.rootDirectory);
+        this.runCommand(args, this.rootDirectory);
     }
 
     addRemote(name: string, url: string): void {

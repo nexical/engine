@@ -11,7 +11,7 @@ export const CLISkillSchema = SkillSchema.extend({
 
 export type CLISkill = z.infer<typeof CLISkillSchema>;
 
-export abstract class CLIDriver extends BaseDriver {
+export abstract class CLIDriver<TContext = any> extends BaseDriver<TContext, string> {
 
     async isSupported(): Promise<boolean> {
         return false;

@@ -1,6 +1,6 @@
 import { AICLIDriver, AISkill } from './base/AICLIDriver.js';
 
-export class GeminiDriver extends AICLIDriver {
+export class GeminiDriver extends AICLIDriver<any> {
     name = 'gemini';
     description = 'Executes skills using the Gemini CLI.';
 

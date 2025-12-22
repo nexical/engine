@@ -9,7 +9,7 @@ export const AISkillSchema = CLISkillSchema.extend({
 
 export type AISkill = z.infer<typeof AISkillSchema>;
 
-export abstract class AICLIDriver extends CLIDriver {
+export abstract class AICLIDriver<TContext = any> extends CLIDriver<TContext> {
 
     async isSupported(): Promise<boolean> {
         return false;

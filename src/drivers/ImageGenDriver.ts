@@ -13,7 +13,7 @@ export const ImageGenSkillSchema = SkillSchema.extend({
 
 export type ImageGenSkill = z.infer<typeof ImageGenSkillSchema>;
 
-export class ImageGenDriver extends BaseDriver {
+export class ImageGenDriver extends BaseDriver<any, string> {
     name = 'image-gen';
     description = 'Generates images using AI SDK and saves them to a file.';
 

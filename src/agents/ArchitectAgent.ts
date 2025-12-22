@@ -3,7 +3,7 @@ import { IWorkspace } from '../domain/Workspace.js';
 import { Architecture } from '../domain/Architecture.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
-import { IDriverRegistry } from '../drivers/Registry.js';
+import { IDriverRegistry } from '../drivers/DriverRegistry.js';
 import { IEvolutionService } from '../services/EvolutionService.js';
 
 export class ArchitectAgent {
