@@ -1,10 +1,10 @@
 # @nexical/engine
 
-The Core AI orchestration engine for Nexical.
+The Core AI orchestration engine for Astrical.
 
 ## Overview
 
-The `@nexical/engine` library constitutes the core autonomy loop for the agentic system. It implements a state-driven orchestrator that manages the lifecycle of a task from high-level architecture to granular execution using a cycle of **Architecting**, **Planning**, and **Executing**.
+The `@astrical/engine` library constitutes the core autonomy loop for the agentic system. It implements a state-driven orchestrator that manages the lifecycle of a task from high-level architecture to granular execution using a cycle of **Architecting**, **Planning**, and **Executing**.
 
 ## Key Concepts
 
@@ -22,13 +22,13 @@ The `@nexical/engine` library constitutes the core autonomy loop for the agentic
 ### Installation
 
 ```bash
-npm install @nexical/engine
+npm install @astrical/engine
 ```
 
 ### Basic Example
 
 ```typescript
-import { Orchestrator, RuntimeHost } from '@nexical/engine';
+import { Orchestrator, RuntimeHost } from '@astrical/engine';
 
 // 1. Implement RuntimeHost
 const myHost: RuntimeHost = {

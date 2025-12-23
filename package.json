@@ -10,7 +10,7 @@
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",
     "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
     "test:integration": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
-    "test": "npm run build && npm run test:unit && npm run test:integration"
+    "test": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit && NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
