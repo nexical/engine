@@ -1,23 +1,23 @@
+import { IDriverContext } from '../domain/Driver.js';
 import { AICLIDriver, AISkill } from './base/AICLIDriver.js';
-import { DriverContext } from '../domain/Driver.js';
 
-export class GeminiDriver extends AICLIDriver<DriverContext> {
-    name = 'gemini';
-    description = 'Executes skills using the Gemini CLI.';
+export class GeminiDriver extends AICLIDriver<IDriverContext> {
+  name = 'gemini';
+  description = 'Executes skills using the Gemini CLI.';
 
-    async isSupported(): Promise<boolean> {
-        return this.checkExecutable('gemini');
+  async isSupported(): Promise<boolean> {
+    return await this.checkExecutable('gemini');
+  }
+
+  protected getExecutable(_skill: AISkill): string {
+    return 'gemini';
+  }
+
+  protected getArguments(skill: AISkill): string[] {
+    let args = ['prompt', '{prompt}', '--yolo'];
+    if (skill.args) {
+      args = [...args, ...skill.args];
     }
-
-    protected getExecutable(skill: AISkill): string {
-        return 'gemini';
-    }
-
-    protected getArguments(skill: AISkill): string[] {
-        let args = ['prompt', '{prompt}', '--yolo'];
-        if (skill.args) {
-            args = [...args, ...skill.args];
-        }
-        return args;
-    }
+    return args;
+  }
 }

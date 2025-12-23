@@ -1,86 +1,90 @@
-import { RuntimeHost } from '../domain/RuntimeHost.js';
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { ShellExecutor } from '../utils/shell.js';
 
 export class GitService {
-    private shell: ShellExecutor;
+  private shell: ShellExecutor;
 
-    constructor(private host: RuntimeHost, private rootDirectory: string) {
-        this.shell = new ShellExecutor(this.host);
+  constructor(
+    private host: IRuntimeHost,
+    private rootDirectory: string,
+  ) {
+    this.shell = new ShellExecutor(this.host);
+  }
+
+  runCommand(args: string[], cwd?: string): string {
+    const result = this.shell.executeSync('git', args, {
+      cwd: cwd || this.rootDirectory,
+    });
+
+    if (result.code !== 0) {
+      throw new Error(`Git command failed: git ${args.join(' ')}\n${result.stderr}`);
     }
 
-    runCommand(args: string[], cwd?: string): string {
-        const result = this.shell.executeSync('git', args, {
-            cwd: cwd || this.rootDirectory
-        });
+    return result.stdout.trim();
+  }
 
-        if (result.code !== 0) {
-            throw new Error(`Git command failed: git ${args.join(' ')}\n${result.stderr}`);
-        }
+  init(cwd?: string): void {
+    this.runCommand(['init'], cwd);
+  }
 
-        return result.stdout.trim();
+  async clone(url: string, dir?: string): Promise<void> {
+    const authUrl = url;
+    const args = ['clone', authUrl];
+    if (dir) {
+      args.push(dir);
     }
+    this.runCommand(args, this.rootDirectory);
+    await Promise.resolve();
+  }
 
-    init(cwd?: string): void {
-        this.runCommand(['init'], cwd);
-    }
+  addRemote(name: string, url: string): void {
+    this.runCommand(['remote', 'add', name, url]);
+  }
 
-    async clone(url: string, dir?: string): Promise<void> {
-        let authUrl = url;
-        const args = ['clone', authUrl];
-        if (dir) {
-            args.push(dir);
-        }
-        this.runCommand(args, this.rootDirectory);
+  checkout(branch: string, create: boolean = false): void {
+    const args = ['checkout'];
+    if (create) {
+      args.push('-b');
     }
+    args.push(branch);
+    this.runCommand(args);
+  }
 
-    addRemote(name: string, url: string): void {
-        this.runCommand(['remote', 'add', name, url]);
-    }
+  merge(branch: string): void {
+    this.runCommand(['merge', branch]);
+  }
 
-    checkout(branch: string, create: boolean = false): void {
-        const args = ['checkout'];
-        if (create) {
-            args.push('-b');
-        }
-        args.push(branch);
-        this.runCommand(args);
-    }
+  pull(remote: string = 'origin', branch: string = 'main'): void {
+    this.runCommand(['pull', remote, branch]);
+  }
 
-    merge(branch: string): void {
-        this.runCommand(['merge', branch]);
-    }
+  add(files: string | string[]): void {
+    const fileList = Array.isArray(files) ? files : [files];
+    this.runCommand(['add', ...fileList]);
+  }
 
-    pull(remote: string = 'origin', branch: string = 'main'): void {
-        this.runCommand(['pull', remote, branch]);
-    }
+  commit(message: string): void {
+    this.runCommand(['commit', '-m', message]);
+  }
 
-    add(files: string | string[]): void {
-        const fileList = Array.isArray(files) ? files : [files];
-        this.runCommand(['add', ...fileList]);
-    }
+  push(remote: string = 'origin', branch: string = 'main'): void {
+    this.runCommand(['push', remote, branch]);
+  }
 
-    commit(message: string): void {
-        this.runCommand(['commit', '-m', message]);
-    }
+  status(): string {
+    return this.runCommand(['status', '--porcelain']);
+  }
 
-    push(remote: string = 'origin', branch: string = 'main'): void {
-        this.runCommand(['push', remote, branch]);
-    }
+  getCurrentBranch(): string {
+    return this.runCommand(['rev-parse', '--abbrev-ref', 'HEAD']);
+  }
 
-    status(): string {
-        return this.runCommand(['status', '--porcelain']);
-    }
+  deleteBranch(branch: string, force: boolean = false): void {
+    const args = ['branch', force ? '-D' : '-d', branch];
+    this.runCommand(args);
+  }
 
-    getCurrentBranch(): string {
-        return this.runCommand(['rev-parse', '--abbrev-ref', 'HEAD']);
-    }
-
-    deleteBranch(branch: string, force: boolean = false): void {
-        const args = ['branch', force ? '-D' : '-d', branch];
-        this.runCommand(args);
-    }
-
-    pushDelete(remote: string, branch: string): void {
-        this.runCommand(['push', remote, '--delete', branch]);
-    }
+  pushDelete(remote: string, branch: string): void {
+    this.runCommand(['push', remote, '--delete', branch]);
+  }
 }

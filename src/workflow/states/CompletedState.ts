@@ -1,14 +1,14 @@
-import { State } from './State.js';
-import { Signal, SignalType } from '../Signal.js';
 import { EngineState } from '../../domain/State.js';
+import { Signal } from '../Signal.js';
+import { State } from './State.js';
 
 export class CompletedState extends State {
-    get name(): string {
-        return 'COMPLETED';
-    }
+  get name(): string {
+    return 'COMPLETED';
+  }
 
-    async run(state: EngineState): Promise<Signal> {
-        // Nothing to do
-        return Signal.COMPLETE;
-    }
+  async run(_state: EngineState): Promise<Signal> {
+    // Nothing to do
+    return await Promise.resolve(Signal.COMPLETE);
+  }
 }

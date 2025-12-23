@@ -1,102 +1,111 @@
 import { z, ZodSafeParseResult } from 'zod';
-import { RuntimeHost } from './RuntimeHost.js';
+
+import { FileSystemService } from '../services/FileSystemService.js';
 import { ShellExecutor } from '../utils/shell.js';
-
-export interface Skill {
-    name: string;
-    description?: string;
-    [key: string]: unknown;
-}
-
+import { IFileSystem } from './IFileSystem.js';
 import { Result } from './Result.js';
+import { IRuntimeHost } from './RuntimeHost.js';
 
-export interface DriverContext {
-    userPrompt: string;
-    taskId?: string;
-    taskPrompt?: string;
-    params?: Record<string, unknown>;
-    env?: Record<string, string>;
+export interface ISkill {
+  name: string;
+  description?: string;
+  provider?: string;
+  dependencies?: string[];
+  [key: string]: unknown;
 }
 
-export interface Driver<TContext = DriverContext, TResult = string> {
-    name: string;
-    description: string;
-    isSupported(): Promise<boolean>;
-    validateSkill(skill: Skill): Promise<boolean>;
-    execute(skill: Skill, context?: TContext): Promise<Result<TResult, Error>>;
+export interface IDriverContext {
+  userPrompt: string;
+  taskId?: string;
+  taskPrompt?: string;
+  params?: Record<string, unknown>;
+  env?: Record<string, string>;
 }
 
-export const SkillSchema = z.object({
+export interface IDriver<TContext = IDriverContext, TResult = string> {
+  name: string;
+  description: string;
+  isSupported(): Promise<boolean>;
+  validateSkill(skill: ISkill): Promise<boolean>;
+  execute(skill: ISkill, context?: TContext): Promise<Result<TResult, Error>>;
+}
+
+export const SkillSchema = z
+  .object({
     name: z.string(),
     description: z.string().optional(),
     provider: z.string().optional(),
-    dependencies: z.array(z.string()).optional()
-}).loose();
+    dependencies: z.array(z.string()).optional(),
+  })
+  .passthrough();
 
-export interface DriverConfig {
-    rootDirectory: string;
-    defaultDriver?: string;
-    [key: string]: unknown;
+export interface IDriverConfig {
+  rootDirectory: string;
+  defaultDriver?: string;
+  [key: string]: unknown;
 }
 
-import { IFileSystem } from './IFileSystem.js';
-import { FileSystemService } from '../services/FileSystemService.js';
+export abstract class BaseDriver<TContext = IDriverContext, TResult = string> implements IDriver<TContext, TResult> {
+  abstract name: string;
+  abstract description: string;
 
-export abstract class BaseDriver<TContext = DriverContext, TResult = string> implements Driver<TContext, TResult> {
-    abstract name: string;
-    abstract description: string;
+  protected shell: ShellExecutor;
+  protected fileSystem: IFileSystem;
 
-    protected shell: ShellExecutor;
-    protected fileSystem: IFileSystem;
+  constructor(
+    protected host: IRuntimeHost,
+    protected config: IDriverConfig = { rootDirectory: process.cwd() },
+    fileSystem?: IFileSystem,
+  ) {
+    this.shell = new ShellExecutor(host);
+    this.fileSystem = fileSystem || new FileSystemService(host);
+  }
 
-    constructor(protected host: RuntimeHost, protected config: DriverConfig = { rootDirectory: process.cwd() }, fileSystem?: IFileSystem) {
-        this.shell = new ShellExecutor(host);
-        this.fileSystem = fileSystem || new FileSystemService(host);
+  abstract isSupported(): Promise<boolean>;
+
+  protected parseSchema(skill: ISkill): ZodSafeParseResult<ISkill> {
+    return SkillSchema.safeParse(skill);
+  }
+
+  async validateSkill(skill: ISkill): Promise<boolean> {
+    const result = await Promise.resolve(this.parseSchema(skill));
+    if (!result.success) {
+      this.host.log(
+        'warn',
+        `Validation failed for ${this.name} skill '${skill.name}': ${JSON.stringify(z.treeifyError(result.error))}`,
+      );
     }
+    return result.success;
+  }
 
-    abstract isSupported(): Promise<boolean>;
+  abstract run(skill: ISkill, context?: TContext): Promise<TResult>;
 
-    protected parseSchema(skill: Skill): ZodSafeParseResult<Skill> {
-        return SkillSchema.safeParse(skill);
+  async execute(skill: ISkill, context?: TContext): Promise<Result<TResult, Error>> {
+    if (!(await this.validateSkill(skill))) {
+      return Result.fail(new Error(`Invalid skill for ${this.name} driver: ${skill.name}`));
     }
-
-    async validateSkill(skill: Skill): Promise<boolean> {
-        const result = this.parseSchema(skill);
-        if (!result.success) {
-            this.host.log('warn', `Validation failed for ${this.name} skill '${skill.name}': ${JSON.stringify(z.treeifyError(result.error))}`);
-        }
-        return result.success;
+    try {
+      const output = await this.run(skill, context);
+      return Result.ok(output);
+    } catch (e) {
+      return Result.fail(e instanceof Error ? e : new Error(String(e)));
     }
+  }
 
-    abstract run(skill: Skill, context?: TContext): Promise<TResult>;
-
-    async execute(skill: Skill, context?: TContext): Promise<Result<TResult, Error>> {
-        if (!await this.validateSkill(skill)) {
-            return Result.fail(new Error(`Invalid skill for ${this.name} driver: ${skill.name}`));
-        }
-        try {
-            const output = await this.run(skill, context);
-            return Result.ok(output);
-        } catch (e) {
-            return Result.fail(e instanceof Error ? e : new Error(String(e)));
-        }
+  protected async checkExecutable(name: string): Promise<boolean> {
+    try {
+      await this.shell.execute('which', [name]);
+      return true;
+    } catch {
+      return false;
     }
+  }
 
-    protected async checkExecutable(name: string): Promise<boolean> {
-        try {
-            await this.shell.execute('which', [name]);
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
+  protected checkEnvironment(key: string): boolean {
+    return !!process.env[key];
+  }
 
-    protected checkEnvironment(key: string): boolean {
-        return !!process.env[key];
-    }
-
-    protected checkConfig(key: string): unknown {
-        return this.config[key];
-    }
+  protected checkConfig(key: string): unknown {
+    return this.config[key];
+  }
 }
-

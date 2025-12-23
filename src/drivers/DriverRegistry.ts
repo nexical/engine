@@ -1,111 +1,123 @@
-import { Driver } from '../domain/Driver.js';
-import { Registry } from '../domain/Registry.js';
-import { RuntimeHost } from '../domain/RuntimeHost.js';
-import { IFileSystem } from '../domain/IFileSystem.js';
-import { FileSystemService } from '../services/FileSystemService.js';
-import { SystemError } from '../errors/SystemError.js';
 import path from 'path';
 
-export interface IDriverRegistry extends Registry<Driver> {
-    register(plugin: Driver, isDefault?: boolean): void;
-    getDefault(): Driver | undefined;
-    load(dir: string): Promise<void>;
+import { IDriver } from '../domain/Driver.js';
+import { IFileSystem } from '../domain/IFileSystem.js';
+import { Registry } from '../domain/Registry.js';
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
+import { SystemError } from '../errors/SystemError.js';
+import { FileSystemService } from '../services/FileSystemService.js';
+
+export interface IDriverRegistry extends Registry<IDriver> {
+  register(plugin: IDriver, isDefault?: boolean): void;
+  getDefault(): IDriver | undefined;
+  load(dir: string): Promise<void>;
 }
 
-export class DriverRegistry extends Registry<Driver> implements IDriverRegistry {
-    private defaultPlugin: Driver | undefined;
-    private fileSystem: IFileSystem;
+export class DriverRegistry extends Registry<IDriver> implements IDriverRegistry {
+  private defaultPlugin: IDriver | undefined;
+  private fileSystem: IFileSystem;
 
-    constructor(protected host: RuntimeHost, protected config: any, fileSystem?: IFileSystem) {
-        super();
-        this.fileSystem = fileSystem || new FileSystemService(host);
+  constructor(
+    protected host: IRuntimeHost,
+    protected config: Record<string, unknown>,
+    fileSystem?: IFileSystem,
+  ) {
+    super();
+    this.fileSystem = fileSystem || new FileSystemService(host);
+  }
+
+  register(plugin: IDriver, isDefault: boolean = false): void {
+    this.items.set(plugin.name, plugin);
+    if (isDefault) {
+      this.defaultPlugin = plugin;
+    }
+  }
+
+  getDefault(): IDriver | undefined {
+    return this.defaultPlugin;
+  }
+
+  async load(dir: string): Promise<void> {
+    if (!this.fileSystem.isDirectory(dir)) {
+      return;
     }
 
-    register(plugin: Driver, isDefault: boolean = false): void {
-        this.items.set(plugin.name, plugin);
-        if (isDefault) {
-            this.defaultPlugin = plugin;
-        }
-    }
+    const files = this.findDriversRecursive(dir);
 
-    getDefault(): Driver | undefined {
-        return this.defaultPlugin;
-    }
+    for (const file of files) {
+      if (file.endsWith('.d.ts') || file.endsWith('.map')) {
+        continue;
+      }
 
-    async load(dir: string): Promise<void> {
-        if (!this.fileSystem.isDirectory(dir)) {
-            return;
-        }
-
-        const files = this.findDriversRecursive(dir);
-
-        for (const file of files) {
-            if (file.endsWith('.d.ts') || file.endsWith('.map')) {
-                continue;
-            }
-
+      try {
+        const module = (await import(file)) as Record<string, unknown>;
+        let loaded = false;
+        for (const key in module) {
+          const ExportedClass = module[key];
+          if (typeof ExportedClass === 'function' && ExportedClass.prototype) {
             try {
-                const module = await import(file);
-                let loaded = false;
-                for (const key in module) {
-                    const ExportedClass = module[key];
-                    if (typeof ExportedClass === 'function') {
-                        try {
-                            const instance = new ExportedClass(this.host, this.config, this.fileSystem);
-                            if (this.isDriver(instance)) {
-                                if (await instance.isSupported()) {
-                                    const configuredDefault = this.config.defaultDriver || 'gemini';
-                                    const isDefault = instance.name === configuredDefault;
-                                    this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
-                                    this.register(instance, isDefault);
-                                    loaded = true;
-                                } else {
-                                    this.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
-                                }
-                            }
-                        } catch (e) {
-                            // Non-driver class instantiation failure is expected
-                        }
-                    }
-                }
+              // Create a temporary class that can be instantiated with custom args
+              type DriverConstructor = new (
+                host: IRuntimeHost,
+                config: Record<string, unknown>,
+                fs: IFileSystem,
+              ) => unknown;
+              const Ctor = ExportedClass as DriverConstructor;
+              const instance = new Ctor(this.host, this.config, this.fileSystem);
 
-                if (!loaded && file.match(/Driver\.(ts|js)$/)) {
-                    this.host.log('warn', `No valid driver found in ${file}`);
+              if (this.isDriver(instance)) {
+                if (await instance.isSupported()) {
+                  const configuredDefault = (this.config.defaultDriver as string) || 'gemini';
+                  const isDefault = instance.name === configuredDefault;
+                  this.host.log('debug', `Registering driver: ${instance.name} (Default: ${isDefault})`);
+                  this.register(instance, isDefault);
+                  loaded = true;
+                } else {
+                  this.host.log('debug', `Driver '${instance.name}' is not supported by current environment.`);
                 }
-
-            } catch (e) {
-                const errorMessage = (e as Error).message;
-                const error = SystemError.io(`Failed to load driver from ${file}: ${errorMessage}`, file);
-                this.host.log('error', error.message);
-
-                // Track load failures in evolution if it's a critical driver
-                if (file.includes('GeminiDriver') || file.includes('ImageGenDriver')) {
-                    this.host.log('error', `CRITICAL DRIVER LOAD FAILURE: ${file}`);
-                }
+              }
+            } catch {
+              // Non-driver class instantiation failure is expected
             }
+          }
         }
-    }
 
-    private findDriversRecursive(dir: string): string[] {
-        const result: string[] = [];
-        if (!this.fileSystem.isDirectory(dir)) return result;
-
-        const items = this.fileSystem.listFiles(dir);
-        for (const item of items) {
-            // IFileSystem.listFiles returns filenames, we need to join them
-            const fullPath = path.join(dir, item);
-
-            if (this.fileSystem.isDirectory(fullPath)) {
-                result.push(...this.findDriversRecursive(fullPath));
-            } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
-                result.push(fullPath);
-            }
+        if (!loaded && file.match(/Driver\.(ts|js)$/)) {
+          this.host.log('warn', `No valid driver found in ${file}`);
         }
-        return result;
-    }
+      } catch (e) {
+        const errorMessage = (e as Error).message;
+        const error = SystemError.io(`Failed to load driver from ${file}: ${errorMessage}`, file);
+        this.host.log('error', error.message);
 
-    private isDriver(obj: any): obj is Driver {
-        return obj && typeof obj.name === 'string' && typeof obj.execute === 'function' && typeof obj.isSupported === 'function';
+        // Track load failures in evolution if it's a critical driver
+        if (file.includes('GeminiDriver') || file.includes('ImageGenDriver')) {
+          this.host.log('error', `CRITICAL DRIVER LOAD FAILURE: ${file}`);
+        }
+      }
     }
+  }
+
+  private findDriversRecursive(dir: string): string[] {
+    const result: string[] = [];
+    if (!this.fileSystem.isDirectory(dir)) return result;
+
+    const items = this.fileSystem.listFiles(dir);
+    for (const item of items) {
+      // IFileSystem.listFiles returns filenames, we need to join them
+      const fullPath = path.join(dir, item);
+
+      if (this.fileSystem.isDirectory(fullPath)) {
+        result.push(...this.findDriversRecursive(fullPath));
+      } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
+        result.push(fullPath);
+      }
+    }
+    return result;
+  }
+
+  private isDriver(obj: unknown): obj is IDriver {
+    const d = obj as IDriver;
+    return d && typeof d.name === 'string' && typeof d.execute === 'function' && typeof d.isSupported === 'function';
+  }
 }
-
