@@ -1,16 +1,40 @@
 import { jest } from '@jest/globals';
 
+import { IDriver } from '../../../src/domain/Driver.js';
+import { IProject } from '../../../src/domain/Project.js';
 import { Result } from '../../../src/domain/Result.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { Task } from '../../../src/domain/Task.js';
+import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
+import { PromptEngine } from '../../../src/services/PromptEngine.js';
+import { SkillRunner as SkillRunnerClass } from '../../../src/services/SkillRunner.js';
+
+// Mock functions
+// Mock functions
+const mockRegistryGet = jest.fn<DriverRegistry['get']>();
+const mockRegistryGetDefault = jest.fn<DriverRegistry['getDefault']>();
+const mockPromptRender = jest.fn<PromptEngine['render']>();
+const mockFsIsDirectory = jest.fn<IProject['fileSystem']['isDirectory']>();
+const mockFsListFiles = jest.fn<IProject['fileSystem']['listFiles']>();
+const mockFsReadFile = jest.fn<IProject['fileSystem']['readFile']>();
+const mockFsExists = jest.fn<IProject['fileSystem']['exists']>();
+const mockHostLog = jest.fn<IRuntimeHost['log']>();
+const mockHostStatus = jest.fn<IRuntimeHost['status']>();
+const mockHostAsk = jest.fn<IRuntimeHost['ask']>();
+const mockHostEmit = jest.fn<IRuntimeHost['emit']>();
+const mockDriverIsSupported = jest.fn<IDriver['isSupported']>();
+const mockDriverValidateSkill = jest.fn<IDriver['validateSkill']>();
+const mockDriverExecute = jest.fn<IDriver['execute']>();
 
 // Mocks
 const mockDriverRegistry = {
-  get: jest.fn(),
-  getDefault: jest.fn(),
-};
+  get: mockRegistryGet,
+  getDefault: mockRegistryGetDefault,
+} as unknown as jest.Mocked<DriverRegistry>;
 
 const mockPromptEngine = {
-  render: jest.fn(),
-};
+  render: mockPromptRender,
+} as unknown as jest.Mocked<PromptEngine>;
 
 const mockProject = {
   paths: {
@@ -19,34 +43,37 @@ const mockProject = {
     skillPrompt: 'skill_prompt.j2',
   },
   fileSystem: {
-    isDirectory: jest.fn(),
-    listFiles: jest.fn(),
-    readFile: jest.fn(),
-    exists: jest.fn(),
+    isDirectory: mockFsIsDirectory,
+    listFiles: mockFsListFiles,
+    readFile: mockFsReadFile,
+    exists: mockFsExists,
   },
-};
+} as unknown as jest.Mocked<IProject>;
 
 const mockHost = {
-  log: jest.fn(),
-};
+  log: mockHostLog,
+  status: mockHostStatus,
+  ask: mockHostAsk,
+  emit: mockHostEmit,
+} as unknown as jest.Mocked<IRuntimeHost>;
 
 const mockYaml = {
-  load: jest.fn(),
-};
+  load: jest.fn<() => unknown>(),
+} as unknown as { load: jest.Mock };
 
 const MockSkillSchema = {
-  parse: jest.fn(),
-};
+  parse: jest.fn<() => unknown>(),
+} as unknown as { parse: jest.Mock };
 
 const mockDriver = {
   name: 'mock-driver',
-  isSupported: jest.fn(),
-  validateSkill: jest.fn(),
-  execute: jest.fn(),
-};
+  isSupported: mockDriverIsSupported,
+  validateSkill: mockDriverValidateSkill,
+  execute: mockDriverExecute,
+} as unknown as jest.Mocked<IDriver>;
 
 jest.unstable_mockModule('path', () => ({
-  default: { join: (...args: string[]) => args.join('/') },
+  default: { join: (...args: string[]): string => args.join('/') },
 }));
 
 jest.unstable_mockModule('js-yaml', () => ({
@@ -65,7 +92,7 @@ jest.unstable_mockModule('../../../src/drivers/DriverRegistry.js', () => ({
 let SkillRunner: typeof import('../../../src/services/SkillRunner.js').SkillRunner;
 
 describe('SkillRunner', () => {
-  let runner: InstanceType<typeof SkillRunner>;
+  let runner: SkillRunnerClass;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -73,26 +100,26 @@ describe('SkillRunner', () => {
     ({ SkillRunner } = await import('../../../src/services/SkillRunner.js'));
 
     // Default happy path setup
-    mockProject.fileSystem.isDirectory.mockReturnValue(true);
-    mockProject.fileSystem.listFiles.mockReturnValue(['test.skill.yaml']);
-    mockProject.fileSystem.readFile.mockReturnValue('yaml content');
+    mockFsIsDirectory.mockReturnValue(true);
+    mockFsListFiles.mockReturnValue(['test.skill.yaml']);
+    mockFsReadFile.mockReturnValue('yaml content');
 
     mockYaml.load.mockReturnValue({ name: 'test-skill', provider: 'mock-driver' });
     MockSkillSchema.parse.mockReturnValue({ name: 'test-skill', provider: 'mock-driver' });
 
-    mockDriverRegistry.get.mockReturnValue(mockDriver);
-    mockDriverRegistry.getDefault.mockReturnValue(mockDriver);
-    mockDriver.isSupported.mockResolvedValue(true);
-    mockDriver.validateSkill.mockResolvedValue(true);
+    mockRegistryGet.mockReturnValue(mockDriver);
+    mockRegistryGetDefault.mockReturnValue(mockDriver);
+    mockDriverIsSupported.mockResolvedValue(true);
+    mockDriverValidateSkill.mockResolvedValue(true);
 
-    mockDriver.execute.mockResolvedValue(Result.ok('success'));
+    mockDriverExecute.mockResolvedValue(Result.ok('success'));
 
-    runner = new SkillRunner(mockProject as any, mockDriverRegistry as any, mockPromptEngine as any, mockHost as any);
+    runner = new SkillRunner(mockProject, mockDriverRegistry, mockPromptEngine, mockHost);
   });
 
   describe('init', () => {
     it('should load skills from yaml and yml', async () => {
-      mockProject.fileSystem.listFiles.mockReturnValue(['test.skill.yaml', 'other.skill.yml']);
+      mockFsListFiles.mockReturnValue(['test.skill.yaml', 'other.skill.yml']);
       mockYaml.load
         .mockReturnValueOnce({ name: 'skill1', provider: 'mock-driver' })
         .mockReturnValueOnce({ name: 'skill2', provider: 'mock-driver' });
@@ -101,22 +128,22 @@ describe('SkillRunner', () => {
         .mockReturnValueOnce({ name: 'skill2', provider: 'mock-driver' });
 
       await runner.init();
-      expect(mockProject.fileSystem.listFiles).toHaveBeenCalledWith('/skills');
+      expect(mockFsListFiles).toHaveBeenCalledWith('/skills');
       expect(mockYaml.load).toHaveBeenCalledTimes(2);
       expect(runner.getSkills()).toHaveLength(2);
     });
 
     it('should skip non-skill files', async () => {
-      mockProject.fileSystem.listFiles.mockReturnValue(['test.txt', 'readme.md']);
+      mockFsListFiles.mockReturnValue(['test.txt', 'readme.md']);
       await runner.init();
       expect(mockYaml.load).not.toHaveBeenCalled();
       expect(runner.getSkills()).toHaveLength(0);
     });
 
     it('should skip if skills dir missing', async () => {
-      mockProject.fileSystem.isDirectory.mockReturnValue(false);
+      mockFsIsDirectory.mockReturnValue(false);
       await runner.init();
-      expect(mockProject.fileSystem.listFiles).not.toHaveBeenCalled();
+      expect(mockFsListFiles).not.toHaveBeenCalled();
     });
 
     it('should handle skill loading errors', async () => {
@@ -124,7 +151,7 @@ describe('SkillRunner', () => {
         throw new Error('parse error');
       });
       await runner.init();
-      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
+      expect(mockHostLog).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
     });
   });
 
@@ -135,23 +162,23 @@ describe('SkillRunner', () => {
 
     it('should validate successfully', async () => {
       await runner.validateAvailableSkills();
-      expect(mockHost.log).toHaveBeenCalledWith('debug', expect.stringContaining('Validated 1 skills'));
+      expect(mockHostLog).toHaveBeenCalledWith('debug', expect.stringContaining('Validated 1 skills'));
     });
 
     it('should validate successfully with default driver', async () => {
       MockSkillSchema.parse.mockReturnValue({ name: 'no-provider-skill' });
       await runner.init();
       await runner.validateAvailableSkills();
-      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
+      expect(mockRegistryGetDefault).toHaveBeenCalled();
     });
 
     it('should throw if any skill fails validation', async () => {
-      mockDriver.validateSkill.mockResolvedValue(false);
+      mockDriverValidateSkill.mockResolvedValue(false);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
     });
 
     it('should fail if driver missing', async () => {
-      mockDriverRegistry.get.mockReturnValue(undefined);
+      mockRegistryGet.mockReturnValue(undefined);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
     });
 
@@ -159,7 +186,7 @@ describe('SkillRunner', () => {
       MockSkillSchema.parse.mockReturnValue({ name: 'test-skill' }); // no provider
       await runner.init(); // reload
 
-      mockDriverRegistry.getDefault.mockReturnValue(undefined);
+      mockRegistryGetDefault.mockReturnValue(undefined);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('needs a default driver but none is available.');
     });
 
@@ -168,17 +195,17 @@ describe('SkillRunner', () => {
       // But if getDefault() returns undefined, it hits line 68.
       MockSkillSchema.parse.mockReturnValue({ name: 'skill-no-driver' });
       await runner.init();
-      mockDriverRegistry.getDefault.mockReturnValue(undefined);
+      mockRegistryGetDefault.mockReturnValue(undefined);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('needs a default driver');
     });
 
     it('should fail if driver not supported', async () => {
-      mockDriver.isSupported.mockResolvedValue(false);
+      mockDriverIsSupported.mockResolvedValue(false);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
     });
 
     it('should handle driver errors during validation', async () => {
-      mockDriver.validateSkill.mockImplementation(() => {
+      mockDriverValidateSkill.mockImplementation(() => {
         throw new Error('validation crash');
       });
       await expect(runner.validateAvailableSkills()).rejects.toThrow('validation crash');
@@ -188,26 +215,29 @@ describe('SkillRunner', () => {
   describe('runSkill', () => {
     beforeEach(async () => {
       await runner.init();
-      mockPromptEngine.render.mockReturnValue('rendered prompt');
+      mockPromptRender.mockReturnValue('rendered prompt');
     });
 
     it('should run skill successfully', async () => {
-      await runner.runSkill({ id: '1', skill: 'test-skill', description: 'desc', params: {} } as any, 'prompt');
-      expect(mockDriver.execute).toHaveBeenCalled();
+      const task = { id: '1', skill: 'test-skill', description: 'desc', params: {} } as unknown as Task;
+      await runner.runSkill(task, 'prompt');
+      expect(mockDriverExecute).toHaveBeenCalled();
     });
 
     it('should fail if skill not found', async () => {
-      await expect(runner.runSkill({ skill: 'unknown' } as any, 'prompt')).rejects.toThrow('not found');
+      const task = { skill: 'unknown' } as unknown as Task;
+      await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('not found');
     });
 
     it('should load persona if present', async () => {
-      mockProject.fileSystem.exists.mockReturnValue(true);
-      mockProject.fileSystem.readFile.mockReturnValue('persona content');
+      mockFsExists.mockReturnValue(true);
+      mockFsReadFile.mockReturnValue('persona content');
 
-      await runner.runSkill({ skill: 'test-skill', persona: 'coder' } as any, 'prompt');
+      const task = { skill: 'test-skill', persona: 'coder' } as unknown as Task;
+      await runner.runSkill(task, 'prompt');
 
-      expect(mockProject.fileSystem.readFile).toHaveBeenCalledWith('/personas/coder.md');
-      expect(mockPromptEngine.render).toHaveBeenCalledWith(
+      expect(mockFsReadFile).toHaveBeenCalledWith('/personas/coder.md');
+      expect(mockPromptRender).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({ persona_context: 'persona content' }),
       );
@@ -216,37 +246,39 @@ describe('SkillRunner', () => {
     it('should warn if persona missing', async () => {
       mockProject.fileSystem.exists.mockReturnValue(false);
 
-      await runner.runSkill({ skill: 'test-skill', persona: 'coder' } as any, 'prompt');
+      const task = { skill: 'test-skill', persona: 'coder' } as unknown as Task;
+      await runner.runSkill(task, 'prompt');
 
-      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Persona file not found'));
+      expect(mockHostLog).toHaveBeenCalledWith('warn', expect.stringContaining('Persona file not found'));
     });
 
     it('should use default driver if none specified', async () => {
       MockSkillSchema.parse.mockReturnValue({ name: 'test-skill' });
       await runner.init();
-
-      await runner.runSkill({ skill: 'test-skill' } as any, 'prompt');
-      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
+      const task = { skill: 'test-skill' } as unknown as Task;
+      await runner.runSkill(task, 'prompt');
+      expect(mockRegistryGetDefault).toHaveBeenCalled();
     });
 
     it('should throw if no driver found execution', async () => {
-      mockDriverRegistry.get.mockReturnValue(undefined);
-      await expect(runner.runSkill({ skill: 'test-skill' } as any, 'prompt')).rejects.toThrow(/Driver '.*' not found/);
+      mockRegistryGet.mockReturnValue(undefined);
+      const task = { skill: 'test-skill' } as unknown as Task;
+      await expect(runner.runSkill(task, 'prompt')).rejects.toThrow(/Driver '.*' not found/);
     });
 
     it('should throw if no default driver found during execution', async () => {
       MockSkillSchema.parse.mockReturnValue({ name: 'test-skill' }); // no provider
       await runner.init();
 
-      mockDriverRegistry.getDefault.mockReturnValue(undefined);
-      await expect(runner.runSkill({ skill: 'test-skill' } as any, 'prompt')).rejects.toThrow(
-        'No driver found for execution.',
-      );
+      mockRegistryGetDefault.mockReturnValue(undefined);
+      const task = { skill: 'test-skill' } as unknown as Task;
+      await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('No driver found for execution.');
     });
 
     it('should throw if driver execute returns failure', async () => {
-      (mockDriver.execute as jest.Mock).mockReturnValue(Promise.resolve(Result.fail(new Error('execution failed'))));
-      await expect(runner.runSkill({ skill: 'test-skill' } as any, 'prompt')).rejects.toThrow('execution failed');
+      mockDriverExecute.mockReturnValue(Promise.resolve(Result.fail(new Error('execution failed'))));
+      const task = { skill: 'test-skill' } as unknown as Task;
+      await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('execution failed');
     });
   });
 });

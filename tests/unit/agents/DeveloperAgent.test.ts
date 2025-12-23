@@ -55,7 +55,7 @@ describe('DeveloperAgent', () => {
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill.bind(mockSkillRunner)).toHaveBeenCalledTimes(2);
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledTimes(2);
       expect(state.tasks.completed).toContain('1');
       expect(state.tasks.completed).toContain('2');
     });
@@ -70,7 +70,7 @@ describe('DeveloperAgent', () => {
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill.bind(mockSkillRunner)).toHaveBeenCalledTimes(1);
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledTimes(1);
       expect(state.tasks.completed).toContain('2');
     });
 
@@ -99,8 +99,8 @@ describe('DeveloperAgent', () => {
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill.bind(mockSkillRunner)).not.toHaveBeenCalled();
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('warn', expect.stringContaining('Skipping task 2'));
+      expect(mockSkillRunner.runSkill).not.toHaveBeenCalled();
+      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Skipping task 2'));
     });
 
     it('should execute task if dependencies are fulfilled', async () => {
@@ -112,7 +112,7 @@ describe('DeveloperAgent', () => {
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill.bind(mockSkillRunner)).toHaveBeenCalledWith(
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledWith(
         expect.objectContaining({ id: '2' }) as unknown,
         expect.anything(),
       );
@@ -129,8 +129,8 @@ describe('DeveloperAgent', () => {
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill.bind(mockSkillRunner)).not.toHaveBeenCalled();
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('info', 'All tasks in plan are already completed.');
+      expect(mockSkillRunner.runSkill).not.toHaveBeenCalled();
+      expect(mockHost.log).toHaveBeenCalledWith('info', 'All tasks in plan are already completed.');
     });
   });
 });

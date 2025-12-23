@@ -113,7 +113,7 @@ describe('BaseDriver', () => {
       const skill = {} as ISkill; // Invalid, no name
       const parsed = await driver.validateSkill(skill);
       expect(parsed).toBe(false);
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('warn', expect.stringContaining('Validation failed'));
+      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Validation failed'));
     });
 
     it('should not run if validation fails', async () => {

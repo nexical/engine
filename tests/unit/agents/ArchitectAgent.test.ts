@@ -73,11 +73,11 @@ describe('ArchitectAgent', () => {
 
       const result = await agent.design('user request');
 
-      expect(mockPromptEngine.render.bind(mockPromptEngine)).toHaveBeenCalled();
-      expect(mockDriverRegistry.get.bind(mockDriverRegistry)).toHaveBeenCalledWith('test_driver');
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalled();
-      expect(mockWorkspace.getArchitecture.bind(mockWorkspace)).toHaveBeenCalledWith('current');
-      expect(mockWorkspace.archiveArtifacts.bind(mockWorkspace)).toHaveBeenCalled();
+      expect(mockPromptEngine.render).toHaveBeenCalled();
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('test_driver');
+      expect(mockDriver.execute).toHaveBeenCalled();
+      expect(mockWorkspace.getArchitecture).toHaveBeenCalledWith('current');
+      expect(mockWorkspace.archiveArtifacts).toHaveBeenCalled();
       expect(result).toBe(mockArchitecture);
     });
 
@@ -104,8 +104,8 @@ describe('ArchitectAgent', () => {
 
       await agent.design('req');
 
-      expect(mockDriverRegistry.get.bind(mockDriverRegistry)).toHaveBeenCalledWith('gemini');
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalledWith(
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('gemini');
+      expect(mockDriver.execute).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'architect' }),
         expect.anything(),
       );
@@ -121,8 +121,8 @@ describe('ArchitectAgent', () => {
 
       await agent.design('req');
 
-      expect(mockDriverRegistry.getDefault.bind(mockDriverRegistry)).toHaveBeenCalled();
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalled();
+      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
+      expect(mockDriver.execute).toHaveBeenCalled();
     });
   });
 });

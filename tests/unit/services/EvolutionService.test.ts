@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals';
 
-// Mock yaml
-const mockLoad = jest.fn();
-const mockDump = jest.fn();
+// Standalone mock variables for js-yaml to avoid unbound-method errors
+const mockLoad = jest.fn<(...args: unknown[]) => unknown>();
+const mockDump = jest.fn<(...args: unknown[]) => unknown>();
 
 jest.unstable_mockModule('js-yaml', () => ({
   load: mockLoad,
@@ -10,48 +10,92 @@ jest.unstable_mockModule('js-yaml', () => ({
   default: { load: mockLoad, dump: mockDump },
 }));
 
-const { EvolutionService, EvolutionEntrySchema } = await import('../../../src/services/EvolutionService.js');
-const { Signal, SignalType } = await import('../../../src/workflow/Signal.js');
-const { Project } = await import('../../../src/domain/Project.js');
-const { FileSystemService } = await import('../../../src/services/FileSystemService.js');
+// EvolutionService and EvolutionEntrySchema are imported dynamically in beforeEach for mocking.
+import { IFileSystem } from '../../../src/domain/IFileSystem.js';
+import { IProject } from '../../../src/domain/Project.js';
+import type { EvolutionService as EvolutionServiceClass } from '../../../src/services/EvolutionService.js';
+import { Signal, SignalType } from '../../../src/workflow/Signal.js';
+
+// Standalone mock variables for other dependencies
+const mockExists = jest.fn<IFileSystem['exists']>();
+const mockReadFile = jest.fn<IFileSystem['readFile']>();
+const mockWriteFileAtomic = jest.fn<IFileSystem['writeFileAtomic']>();
+const mockEnsureDir = jest.fn<IFileSystem['ensureDir']>();
+const mockCopy = jest.fn<IFileSystem['copy']>();
+const mockDeleteFile = jest.fn<IFileSystem['deleteFile']>();
+const mockAcquireLock = jest.fn<IFileSystem['acquireLock']>();
+const mockIsDirectory = jest.fn<IFileSystem['isDirectory']>();
+const mockListFiles = jest.fn<IFileSystem['listFiles']>();
+
+const mockGetConfig = jest.fn<IProject['getConfig']>();
+const mockGetConstraints = jest.fn<IProject['getConstraints']>();
 
 describe('EvolutionService', () => {
-  let service: InstanceType<typeof EvolutionService>;
-  let mockProject: any;
-  let mockFileSystem: any;
+  let service: EvolutionServiceClass;
+  let mockProject: jest.Mocked<IProject>;
+  let mockFileSystem: jest.Mocked<IFileSystem>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { EvolutionService } = await import('../../../src/services/EvolutionService.js');
+
     mockLoad.mockReset();
     mockDump.mockReset();
-
-    mockProject = {
-      paths: { log: 'evolution.yml' },
-    };
+    mockExists.mockReset();
+    mockReadFile.mockReset();
+    mockWriteFileAtomic.mockReset();
+    mockEnsureDir.mockReset();
+    mockCopy.mockReset();
+    mockDeleteFile.mockReset();
+    mockAcquireLock.mockReset();
+    mockIsDirectory.mockReset();
+    mockListFiles.mockReset();
+    mockGetConfig.mockReset();
+    mockGetConstraints.mockReset();
 
     mockFileSystem = {
-      exists: jest.fn(),
-      readFile: jest.fn(),
-      writeFileAtomic: jest.fn(),
-    };
+      exists: mockExists,
+      readFile: mockReadFile,
+      writeFileAtomic: mockWriteFileAtomic,
+      ensureDir: mockEnsureDir,
+      copy: mockCopy,
+      deleteFile: mockDeleteFile,
+      acquireLock: mockAcquireLock,
+      isDirectory: mockIsDirectory,
+      listFiles: mockListFiles,
+    } as unknown as jest.Mocked<IFileSystem>;
+
+    mockProject = {
+      paths: {
+        log: 'evolution.yml',
+        architectureCurrent: '',
+        planCurrent: '',
+        archive: '',
+        signals: '',
+        state: '',
+      },
+      getConfig: mockGetConfig,
+      getConstraints: mockGetConstraints,
+      fileSystem: mockFileSystem,
+    } as unknown as jest.Mocked<IProject>;
 
     service = new EvolutionService(mockProject, mockFileSystem);
   });
 
   it('should record failure', async () => {
-    mockFileSystem.exists.mockReturnValue(false); // No existing log
+    mockExists.mockReturnValue(false); // No existing log
     const signal = new Signal(SignalType.FAIL, 'error');
 
     await service.recordFailure('state', signal);
 
-    expect(mockFileSystem.writeFileAtomic).toHaveBeenCalled();
-    const args = mockFileSystem.writeFileAtomic.mock.calls[0];
-    expect(args[0]).toBe('evolution.yml');
+    expect(mockWriteFileAtomic).toHaveBeenCalled();
+    const calls = mockWriteFileAtomic.mock.calls as [string, string][];
+    expect(calls[0][0]).toBe('evolution.yml');
     expect(mockDump).toHaveBeenCalled();
   });
 
   it('should get log summary for multiple entries with and without feedback', () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockReturnValue('content');
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue('content');
     mockLoad.mockReturnValue([
       { timestamp: '1', state: 'S1', signal_type: 'T1', reason: 'R1', feedback: 'F1' },
       { timestamp: '2', state: 'S2', signal_type: 'T2', reason: 'R2' },
@@ -65,13 +109,14 @@ describe('EvolutionService', () => {
   });
 
   it('should handle missing log for summary', () => {
-    mockFileSystem.exists.mockReturnValue(false);
+    mockExists.mockReturnValue(false);
     const summary = service.getLogSummary();
     expect(summary).toBe('No historical failures recorded.');
   });
+
   it('should handle corrupted log file during recordFailure', async () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockReturnValue('invalid yaml content');
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue('invalid yaml content');
     mockLoad.mockReturnValue({ invalid: 'schema' }); // Returns object instead of array
 
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -80,17 +125,13 @@ describe('EvolutionService', () => {
     await service.recordFailure('state', signal);
 
     expect(consoleSpy).toHaveBeenCalledWith('Evolution log corrupted or invalid:', expect.anything());
-    // Should still overwrite with new entry (or whatever the logic is)
-    // Code says: if (result.success) logs = result.data; else log error.
-    // Then logs.push(newEntry); write dump(logs).
-    // Since logs was init to [], it will write [newEntry].
-    expect(mockFileSystem.writeFileAtomic).toHaveBeenCalled();
+    expect(mockWriteFileAtomic).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
   it('should handle read error in recordFailure', async () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockImplementation(() => {
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockImplementation(() => {
       throw new Error('Read failed');
     });
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -99,21 +140,20 @@ describe('EvolutionService', () => {
     await service.recordFailure('state', signal);
 
     expect(consoleSpy).toHaveBeenCalledWith('Failed to load evolution log:', expect.anything());
-    // Should still proceed to write new entry
-    expect(mockFileSystem.writeFileAtomic).toHaveBeenCalled();
+    expect(mockWriteFileAtomic).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
   it('should append to existing valid log', async () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockReturnValue('content');
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue('content');
     const existingLog = [{ timestamp: 'old', state: 'old', signal_type: 'old', reason: 'old' }];
     mockLoad.mockReturnValue(existingLog);
 
     const signal = new Signal(SignalType.FAIL, 'new');
     await service.recordFailure('new_state', signal);
 
-    expect(mockFileSystem.writeFileAtomic).toHaveBeenCalled();
+    expect(mockWriteFileAtomic).toHaveBeenCalled();
     expect(mockDump).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({ state: 'old' }),
@@ -123,7 +163,7 @@ describe('EvolutionService', () => {
   });
 
   it('should include feedback and tasks in failure record', async () => {
-    mockFileSystem.exists.mockReturnValue(false);
+    mockExists.mockReturnValue(false);
     const signal = new Signal(SignalType.RETRY, 'retry me', { feedback: 'user feedback' });
 
     await service.recordFailure('state', signal, ['task1']);
@@ -139,8 +179,8 @@ describe('EvolutionService', () => {
   });
 
   it('should return correct summary for empty logs', () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockReturnValue('[]');
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue('[]');
     mockLoad.mockReturnValue([]);
 
     const summary = service.getLogSummary();
@@ -148,8 +188,8 @@ describe('EvolutionService', () => {
   });
 
   it('should return error string if log schema is invalid in summary', () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockReturnValue('content');
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue('content');
     mockLoad.mockReturnValue([{ invalid: 'entry' }]);
 
     const summary = service.getLogSummary();
@@ -157,8 +197,8 @@ describe('EvolutionService', () => {
   });
 
   it('should return error string if read fails in summary', () => {
-    mockFileSystem.exists.mockReturnValue(true);
-    mockFileSystem.readFile.mockImplementation(() => {
+    mockExists.mockReturnValue(true);
+    mockReadFile.mockImplementation(() => {
       throw new Error('Read failed');
     });
 

@@ -1,7 +1,7 @@
 import { NexicalError } from '../../../src/errors/NexicalError.js';
 
 class TestError extends NexicalError {
-  constructor(message: string, code: string, metadata?: Record<string, any>) {
+  constructor(message: string, code: string, metadata?: Record<string, unknown>) {
     if (metadata) {
       super(message, code, metadata);
     } else {

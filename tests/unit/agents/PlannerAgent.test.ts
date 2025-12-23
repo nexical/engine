@@ -86,10 +86,10 @@ describe('PlannerAgent', () => {
 
       const result = await agent.plan(mockArch, 'user request');
 
-      expect(mockPromptEngine.render.bind(mockPromptEngine)).toHaveBeenCalled();
-      expect(mockDriverRegistry.get.bind(mockDriverRegistry)).toHaveBeenCalledWith('test_driver');
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalled();
-      expect(mockWorkspace.loadPlan.bind(mockWorkspace)).toHaveBeenCalled();
+      expect(mockPromptEngine.render).toHaveBeenCalled();
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('test_driver');
+      expect(mockDriver.execute).toHaveBeenCalled();
+      expect(mockWorkspace.loadPlan).toHaveBeenCalled();
       expect(result).toBe(mockPlan);
     });
 
@@ -111,8 +111,8 @@ describe('PlannerAgent', () => {
 
       await agent.plan(mockArch, 'req');
 
-      expect(mockDriverRegistry.get.bind(mockDriverRegistry)).toHaveBeenCalledWith('gemini');
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalledWith(
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('gemini');
+      expect(mockDriver.execute).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'planner' }) as unknown,
         expect.anything(),
       );
@@ -129,8 +129,8 @@ describe('PlannerAgent', () => {
 
       await agent.plan(mockArch, 'req');
 
-      expect(mockDriverRegistry.getDefault.bind(mockDriverRegistry)).toHaveBeenCalled();
-      expect(mockDriver.execute.bind(mockDriver)).toHaveBeenCalled();
+      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
+      expect(mockDriver.execute).toHaveBeenCalled();
     });
 
     it('should throw if no driver available', async () => {

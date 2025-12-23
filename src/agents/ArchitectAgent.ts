@@ -47,7 +47,9 @@ export class ArchitectAgent {
     });
 
     if (result.isFail()) {
-      throw new Error(`Failed to generate architecture: ${JSON.stringify(result.error())}`);
+      throw new Error(
+        `Failed to generate architecture: ${result.error() instanceof Error ? (result.error() as Error).message : String(result.error())}`,
+      );
     }
 
     // After execution, we reload from disk to return the object.

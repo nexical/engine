@@ -1,25 +1,35 @@
 import { jest } from '@jest/globals';
 
+// Standalone mock variables for ShellExecutor to avoid unbound-method and Jest matcher errors
+const mockExecuteSync = jest.fn<(...args: unknown[]) => unknown>();
 const mockShell = {
-  executeSync: jest.fn(),
+  executeSync: mockExecuteSync,
 };
 
-const MockShellExecutor = jest.fn().mockReturnValue(mockShell);
+const MockShellExecutor = jest.fn<(...args: unknown[]) => unknown>().mockReturnValue(mockShell);
 
 jest.unstable_mockModule('../../../src/utils/shell.js', () => ({
   ShellExecutor: MockShellExecutor,
 }));
 
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import type { GitService as GitServiceClass } from '../../../src/services/GitService.js';
+
 const { GitService } = await import('../../../src/services/GitService.js');
 
 describe('GitService', () => {
-  let service: InstanceType<typeof GitService>;
-  let mockHost: any;
+  let service: GitServiceClass;
+  let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHost = { log: jest.fn() };
-    mockShell.executeSync.mockReturnValue({ code: 0, stdout: '', stderr: '' });
+    mockHost = {
+      log: jest.fn<IRuntimeHost['log']>(),
+      status: jest.fn<IRuntimeHost['status']>(),
+      ask: jest.fn<IRuntimeHost['ask']>(),
+      emit: jest.fn<IRuntimeHost['emit']>(),
+    };
+    mockExecuteSync.mockReturnValue({ code: 0, stdout: '', stderr: '' });
     service = new GitService(mockHost, '/root');
   });
 
@@ -29,105 +39,101 @@ describe('GitService', () => {
 
   it('should init repo', () => {
     service.init();
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['init'], expect.objectContaining({ cwd: '/root' }));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['init'], expect.objectContaining({ cwd: '/root' }));
   });
 
   it('should clone repo', async () => {
     await service.clone('http://repo.git', 'dir');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['clone', 'http://repo.git', 'dir'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['clone', 'http://repo.git', 'dir'], expect.any(Object));
   });
 
   it('should clone repo without dir', async () => {
     await service.clone('http://repo.git');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['clone', 'http://repo.git'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['clone', 'http://repo.git'], expect.any(Object));
   });
 
   it('should checkout branch', () => {
     service.checkout('main');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['checkout', 'main'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['checkout', 'main'], expect.any(Object));
   });
 
   it('should create and checkout branch', () => {
     service.checkout('feat', true);
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['checkout', '-b', 'feat'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['checkout', '-b', 'feat'], expect.any(Object));
   });
 
   it('should commit', () => {
     service.commit('message');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['commit', '-m', 'message'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['commit', '-m', 'message'], expect.any(Object));
   });
 
   it('should throw on command failure', () => {
-    mockShell.executeSync.mockReturnValue({ code: 1, stdout: '', stderr: 'error' });
+    mockExecuteSync.mockReturnValue({ code: 1, stdout: '', stderr: 'error' });
     expect(() => service.commit('msg')).toThrow('Git command failed');
   });
 
   it('should return status', () => {
-    mockShell.executeSync.mockReturnValue({ code: 0, stdout: ' M file.ts ', stderr: '' });
+    mockExecuteSync.mockReturnValue({ code: 0, stdout: ' M file.ts ', stderr: '' });
     expect(service.status()).toBe('M file.ts');
   });
 
   it('should get current branch', () => {
-    mockShell.executeSync.mockReturnValue({ code: 0, stdout: 'main\n', stderr: '' });
+    mockExecuteSync.mockReturnValue({ code: 0, stdout: 'main\n', stderr: '' });
     expect(service.getCurrentBranch()).toBe('main');
   });
 
   it('should add remote', () => {
     service.addRemote('origin', 'url');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['remote', 'add', 'origin', 'url'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['remote', 'add', 'origin', 'url'], expect.any(Object));
   });
 
   it('should merge branch', () => {
     service.merge('feature');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['merge', 'feature'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['merge', 'feature'], expect.any(Object));
   });
 
   it('should pull', () => {
     service.pull('origin', 'main');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['pull', 'origin', 'main'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['pull', 'origin', 'main'], expect.any(Object));
   });
 
   it('should pull with defaults', () => {
     service.pull();
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['pull', 'origin', 'main'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['pull', 'origin', 'main'], expect.any(Object));
   });
 
   it('should add files', () => {
     service.add('file.ts');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['add', 'file.ts'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['add', 'file.ts'], expect.any(Object));
   });
 
   it('should add multiple files', () => {
     service.add(['file1.ts', 'file2.ts']);
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['add', 'file1.ts', 'file2.ts'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['add', 'file1.ts', 'file2.ts'], expect.any(Object));
   });
 
   it('should push', () => {
     service.push('origin', 'main');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['push', 'origin', 'main'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['push', 'origin', 'main'], expect.any(Object));
   });
 
   it('should push with defaults', () => {
     service.push();
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['push', 'origin', 'main'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['push', 'origin', 'main'], expect.any(Object));
   });
 
   it('should delete branch', () => {
     service.deleteBranch('feature');
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['branch', '-d', 'feature'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['branch', '-d', 'feature'], expect.any(Object));
   });
 
   it('should force delete branch', () => {
     service.deleteBranch('feature', true);
-    expect(mockShell.executeSync).toHaveBeenCalledWith('git', ['branch', '-D', 'feature'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['branch', '-D', 'feature'], expect.any(Object));
   });
 
   it('should delete remote branch', () => {
     service.pushDelete('origin', 'feature');
-    expect(mockShell.executeSync).toHaveBeenCalledWith(
-      'git',
-      ['push', 'origin', '--delete', 'feature'],
-      expect.any(Object),
-    );
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['push', 'origin', '--delete', 'feature'], expect.any(Object));
   });
 });

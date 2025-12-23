@@ -1,20 +1,28 @@
 import { jest } from '@jest/globals';
 
-const mockCreateServices = jest.fn<() => Promise<IEngineServices>>();
-
+// 1. Setup the mock module
 jest.unstable_mockModule('../../src/services/ServiceFactory.js', () => ({
   ServiceFactory: {
-    createServices: mockCreateServices,
+    createServices: jest.fn(),
   },
 }));
 
+// 2. Import the mocked module and other dependencies
+const { ServiceFactory } = await import('../../src/services/ServiceFactory.js');
+const mockCreateServices = ServiceFactory.createServices as jest.Mock<typeof ServiceFactory.createServices>;
+
+import type { Brain } from '../../src/agents/Brain.js';
+import type { Orchestrator } from '../../src/orchestrator.js';
+const { Orchestrator: OrchestratorValue } = await import('../../src/orchestrator.js');
+
+import { IProject } from '../../src/domain/Project.js';
 import { IRuntimeHost } from '../../src/domain/RuntimeHost.js';
-import { Orchestrator } from '../../src/orchestrator.js';
-import { IEngineServices, ServiceFactory } from '../../src/services/ServiceFactory.js';
+import { IWorkspace } from '../../src/domain/Workspace.js';
+import { IEngineServices } from '../../src/services/ServiceFactory.js';
 
 describe('Orchestrator', () => {
   let mockHost: jest.Mocked<IRuntimeHost>;
-  let orchestrator: Orchestrator;
+  let orchestrator: InstanceType<typeof Orchestrator>;
   const rootDir = '/test/root';
 
   beforeEach(() => {
@@ -25,7 +33,7 @@ describe('Orchestrator', () => {
       ask: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
 
-    orchestrator = new Orchestrator(rootDir, mockHost);
+    orchestrator = new OrchestratorValue(rootDir, mockHost);
   });
 
   afterEach(() => {
@@ -50,7 +58,7 @@ describe('Orchestrator', () => {
 
       await orchestrator.init();
 
-      expect(mockCreateServices.bind(ServiceFactory)).toHaveBeenCalledWith(
+      expect(mockCreateServices).toHaveBeenCalledWith(
         rootDir,
         expect.objectContaining({
           emit: expect.anything() as unknown,
@@ -88,9 +96,16 @@ describe('Orchestrator', () => {
     beforeEach(async () => {
       mockSession = { start: jest.fn() };
       const mockServices = {
-        project: {},
-        brain: {},
-        workspace: {},
+        project: {
+          fileSystem: {
+            ensureDir: jest.fn(),
+          },
+          paths: {},
+          getConfig: jest.fn(),
+          getConstraints: jest.fn(),
+        } as unknown as jest.Mocked<IProject>,
+        brain: {} as unknown as jest.Mocked<Brain>,
+        workspace: {} as unknown as jest.Mocked<IWorkspace>,
         session: mockSession,
         container: {},
       } as unknown as IEngineServices;
@@ -100,12 +115,12 @@ describe('Orchestrator', () => {
 
     it('start should call session.start with interactive true by default and trim prompt', async () => {
       await orchestrator.start('  test prompt  ');
-      expect(mockSession.start.bind(mockSession)).toHaveBeenCalledWith('test prompt', true);
+      expect(mockSession.start).toHaveBeenCalledWith('test prompt', true);
     });
 
     it('execute should call session.start with interactive false', async () => {
       await orchestrator.execute('test prompt');
-      expect(mockSession.start.bind(mockSession)).toHaveBeenCalledWith('test prompt', false);
+      expect(mockSession.start).toHaveBeenCalledWith('test prompt', false);
     });
   });
   it('should bubble events from host to orchestrator', () => {
@@ -113,6 +128,7 @@ describe('Orchestrator', () => {
     orchestrator.on('test-event', spy);
     orchestrator.host.emit('test-event', 'data');
     expect(spy).toHaveBeenCalledWith('data');
-    expect(mockHost.emit.bind(mockHost)).toHaveBeenCalledWith('test-event', 'data');
+
+    expect(mockHost.emit).toHaveBeenCalledWith('test-event', 'data');
   });
 });

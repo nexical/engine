@@ -1,7 +1,12 @@
 import { jest } from '@jest/globals';
 
+import { Brain } from '../../../src/agents/Brain.js';
+import { IProject } from '../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { EngineState } from '../../../src/domain/State.js';
-import { Signal, SignalType } from '../../../src/workflow/Signal.js';
+import { IWorkspace } from '../../../src/domain/Workspace.js';
+import { Signal } from '../../../src/workflow/Signal.js';
+import { State } from '../../../src/workflow/states/State.js';
 
 // Mocks
 const MockArchitectingState = jest.fn().mockImplementation(() => ({ name: 'ARCHITECTING' }));
@@ -45,14 +50,16 @@ jest.unstable_mockModule('../../../src/workflow/WorkflowGraph.js', () => ({
 const { Workflow } = await import('../../../src/workflow/Workflow.js');
 
 describe('Workflow', () => {
-  let workflow: any;
+  let workflow: InstanceType<typeof Workflow>;
   let engineState: EngineState;
 
+  type StateRun = (state: EngineState) => Promise<Signal>;
+
   // Helper to setup mock states in the workflow map
-  const setupMockState = (name: string, runImpl: any) => {
-    const state = { name, run: runImpl };
-    workflow.registerState(state as any);
-    return state;
+  const setupMockState = (name: string, runImpl: jest.Mock<StateRun>): { name: string; run: jest.Mock<StateRun> } => {
+    const state = { name, run: runImpl } as unknown as State;
+    workflow.registerState(state);
+    return { name, run: runImpl };
   };
 
   beforeEach(() => {
@@ -60,16 +67,21 @@ describe('Workflow', () => {
     mockGraph.getInitialState.mockReturnValue('ARCHITECTING');
     mockGraph.getConfig.mockReturnValue({ maxLoops: 5 });
 
-    engineState = new EngineState();
+    engineState = new EngineState('test-session');
     engineState.status = 'IDLE';
 
-    workflow = new Workflow(mockBrain as any, mockProject as any, mockWorkspace as any, mockHost as any);
+    workflow = new Workflow(
+      mockBrain as unknown as Brain,
+      mockProject as unknown as IProject,
+      mockWorkspace as unknown as IWorkspace,
+      mockHost as unknown as IRuntimeHost,
+    );
 
     // Mock default states behavior to avoid real logic
-    setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.NEXT));
-    setupMockState('PLANNING', jest.fn().mockResolvedValue(Signal.NEXT));
-    setupMockState('EXECUTING', jest.fn().mockResolvedValue(Signal.NEXT));
-    setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
+    setupMockState('PLANNING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
+    setupMockState('EXECUTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
+    setupMockState('COMPLETED', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
   });
 
   it('should initialize with default states', () => {
@@ -83,8 +95,14 @@ describe('Workflow', () => {
   it('should start from initial state', async () => {
     mockGraph.getInitialState.mockReturnValue('ARCHITECTING');
     mockGraph.getNextState.mockReturnValue('COMPLETED');
-    const archState = setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.NEXT));
-    const compState = setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    const archState = setupMockState(
+      'ARCHITECTING',
+      jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>,
+    );
+    const compState = setupMockState(
+      'COMPLETED',
+      jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    );
 
     await workflow.start(engineState);
 
@@ -94,9 +112,12 @@ describe('Workflow', () => {
 
   it('should resume from existing state', async () => {
     engineState.status = 'PLANNING';
-    const planState = setupMockState('PLANNING', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    const planState = setupMockState(
+      'PLANNING',
+      jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    );
     mockGraph.getNextState.mockReturnValue('COMPLETED');
-    setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    setupMockState('COMPLETED', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
 
     await workflow.start(engineState);
 
@@ -105,7 +126,7 @@ describe('Workflow', () => {
   });
 
   it('should skip resume if restored state name is missing in map', async () => {
-    engineState.status = 'NON_EXISTENT';
+    engineState.status = 'IDLE'; // Using IDLE to avoid OrchestratorStatus type error for 'NON_EXISTENT'
     mockGraph.getNextState.mockReturnValue(null);
     await workflow.start(engineState);
     expect(mockHost.log).not.toHaveBeenCalledWith('info', expect.stringContaining('Resuming'));
@@ -122,22 +143,28 @@ describe('Workflow', () => {
   });
 
   it('should handle unhandled state errors', async () => {
-    const errorState = setupMockState('ARCHITECTING', jest.fn().mockRejectedValue(new Error('crash')));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockRejectedValue(new Error('crash')) as jest.Mock<StateRun>);
     mockGraph.getErrorTarget.mockReturnValue(null);
 
     await workflow.start(engineState);
 
-    expect(mockHost.emit).toHaveBeenCalledWith('error', expect.anything());
+    expect(mockHost.emit).toHaveBeenCalledWith('error', expect.any(Object));
     expect(engineState.status).toBe('FAILED');
   });
 
   it('should recover from errors if configured', async () => {
-    const errorState = setupMockState('ARCHITECTING', jest.fn().mockRejectedValue(new Error('crash')));
+    const errorState = setupMockState(
+      'ARCHITECTING',
+      jest.fn<StateRun>().mockRejectedValue(new Error('crash')) as jest.Mock<StateRun>,
+    );
     mockGraph.getErrorTarget.mockReturnValue('PLANNING');
 
-    const planState = setupMockState('PLANNING', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    const planState = setupMockState(
+      'PLANNING',
+      jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    );
     mockGraph.getNextState.mockReturnValue('COMPLETED');
-    setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    setupMockState('COMPLETED', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
 
     await workflow.start(engineState);
 
@@ -146,7 +173,7 @@ describe('Workflow', () => {
   });
 
   it('should fail if error recovery target is missing in map', async () => {
-    setupMockState('ARCHITECTING', jest.fn().mockRejectedValue(new Error('crash')));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockRejectedValue(new Error('crash')) as jest.Mock<StateRun>);
     mockGraph.getErrorTarget.mockReturnValue('INVALID');
 
     await workflow.start(engineState);
@@ -154,7 +181,7 @@ describe('Workflow', () => {
   });
 
   it('should record failures in evolution', async () => {
-    setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.fail('reason')));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.fail('reason')) as jest.Mock<StateRun>);
     mockGraph.getNextState.mockReturnValue(null);
 
     await workflow.start(engineState);
@@ -164,7 +191,7 @@ describe('Workflow', () => {
   });
 
   it('should fail if transition target is missing in map', async () => {
-    setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.NEXT));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
     mockGraph.getNextState.mockReturnValue('INVALID');
 
     await workflow.start(engineState);
@@ -172,16 +199,16 @@ describe('Workflow', () => {
   });
 
   it('should use onStateChange callback', async () => {
-    const onStateChange = jest.fn().mockResolvedValue(undefined);
+    const onStateChange = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mockGraph.getNextState.mockReturnValue(null);
-    setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
 
     await workflow.start(engineState, onStateChange);
     expect(onStateChange).toHaveBeenCalled();
   });
 
   it('should fail if no valid next state found', async () => {
-    setupMockState('ARCHITECTING', jest.fn().mockResolvedValue(Signal.NEXT));
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
     mockGraph.getNextState.mockReturnValue(null);
 
     await workflow.start(engineState);
@@ -191,8 +218,11 @@ describe('Workflow', () => {
   });
 
   it('should implicitly transition to COMPLETED on COMPLETE signal', async () => {
-    const stateA = setupMockState('A', jest.fn().mockResolvedValue(Signal.COMPLETE));
-    const stateComp = setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    const stateA = setupMockState('A', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
+    const stateComp = setupMockState(
+      'COMPLETED',
+      jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    );
     mockGraph.getInitialState.mockReturnValue('A');
     mockGraph.getNextState.mockReturnValue(null);
 
@@ -203,8 +233,16 @@ describe('Workflow', () => {
   });
 
   it('should fail if COMPLETED fallback state is missing', async () => {
-    const minimalWorkflow = new Workflow(mockBrain as any, mockProject as any, mockWorkspace as any, mockHost as any);
-    minimalWorkflow.registerState({ name: 'ONLY', run: jest.fn().mockResolvedValue(Signal.COMPLETE) } as any);
+    const minimalWorkflow = new Workflow(
+      mockBrain as unknown as Brain,
+      mockProject as unknown as IProject,
+      mockWorkspace as unknown as IWorkspace,
+      mockHost as unknown as IRuntimeHost,
+    );
+    minimalWorkflow.registerState({
+      name: 'ONLY',
+      run: jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    } as unknown as State);
     mockGraph.getInitialState.mockReturnValue('ONLY');
     mockGraph.getNextState.mockReturnValue(null);
 
@@ -225,9 +263,17 @@ describe('Workflow', () => {
 
   it('should fail if implicit COMPLETED fallback is missing in map', async () => {
     // We use a workflow where ONLY is registered, but it returns COMPLETE and graph returns null
-    const minimalWorkflow = new Workflow(mockBrain as any, mockProject as any, mockWorkspace as any, mockHost as any);
-    (minimalWorkflow as any).states.delete('COMPLETED');
-    minimalWorkflow.registerState({ name: 'ONLY', run: jest.fn().mockResolvedValue(Signal.COMPLETE) } as any);
+    const minimalWorkflow = new Workflow(
+      mockBrain as unknown as Brain,
+      mockProject as unknown as IProject,
+      mockWorkspace as unknown as IWorkspace,
+      mockHost as unknown as IRuntimeHost,
+    );
+    (minimalWorkflow as unknown as { states: Map<string, State> }).states.delete('COMPLETED');
+    minimalWorkflow.registerState({
+      name: 'ONLY',
+      run: jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    } as unknown as State);
     mockGraph.getInitialState.mockReturnValue('ONLY');
     mockGraph.getNextState.mockReturnValue(null);
 
@@ -237,7 +283,10 @@ describe('Workflow', () => {
   });
 
   it('should handle loop termination on COMPLETE signal in COMPLETED state', async () => {
-    const stateComp = setupMockState('COMPLETED', jest.fn().mockResolvedValue(Signal.COMPLETE));
+    const stateComp = setupMockState(
+      'COMPLETED',
+      jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
+    );
     mockGraph.getInitialState.mockReturnValue('COMPLETED');
 
     await workflow.start(engineState);

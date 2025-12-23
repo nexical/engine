@@ -130,9 +130,13 @@ export class FileSystemService implements IFileSystem {
         // exclusive flag 'wx' ensures we fail if file exists
         fs.closeSync(fs.openSync(lockPath, 'wx'));
         return () => this.releaseLock(filePath);
-      } catch {
-        if (i === retries - 1) {
-          throw new Error(`Could not acquire lock for ${filePath} after ${retries} attempts.`);
+      } catch (error) {
+        const err = error as { code?: string };
+        if (err.code !== 'EEXIST' || i === retries - 1) {
+          if (err.code === 'EEXIST') {
+            throw new Error(`Could not acquire lock for ${filePath} after ${retries} attempts.`);
+          }
+          throw error;
         }
         await new Promise((resolve) => setTimeout(resolve, delay));
       }

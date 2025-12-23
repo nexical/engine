@@ -53,7 +53,7 @@ describe('ShellExecutor', () => {
 
       const result = await promise;
       expect(result.code).toBe(0);
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('debug', expect.stringContaining('Executing'));
+      expect(mockHost.log).toHaveBeenCalledWith('debug', expect.stringContaining('Executing'));
     });
 
     it('should handle stdout/stderr data', async () => {
@@ -80,8 +80,8 @@ describe('ShellExecutor', () => {
       expect(result.stdout).toBe('out');
       expect(result.stderr).toBe('err');
       // Check streaming logs
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('info', 'out');
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('error', 'err');
+      expect(mockHost.log).toHaveBeenCalledWith('info', 'out');
+      expect(mockHost.log).toHaveBeenCalledWith('error', 'err');
     });
 
     it('should handle process error', async () => {
@@ -93,7 +93,7 @@ describe('ShellExecutor', () => {
       if (errorHandler) errorHandler(new Error('fail'));
 
       await expect(promise).rejects.toThrow('fail');
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('error', expect.stringContaining('Command failed'));
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Command failed'));
     });
 
     it('should handle missing stdout/stderr streams', async () => {
@@ -133,8 +133,8 @@ describe('ShellExecutor', () => {
       const result = await promise;
       expect(result.stdout).toBe('out');
       expect(result.stderr).toBe('err');
-      expect(mockHost.log.bind(mockHost)).not.toHaveBeenCalledWith('info', expect.anything());
-      expect(mockHost.log.bind(mockHost)).not.toHaveBeenCalledWith('error', expect.anything());
+      expect(mockHost.log).not.toHaveBeenCalledWith('info', expect.anything());
+      expect(mockHost.log).not.toHaveBeenCalledWith('error', expect.anything());
     });
   });
 

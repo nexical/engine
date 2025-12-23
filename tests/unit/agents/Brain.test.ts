@@ -56,9 +56,9 @@ describe('Brain', () => {
   describe('init', () => {
     it('should initialize components', async () => {
       await brain.init();
-      expect(mockDriverRegistry.load.bind(mockDriverRegistry)).toHaveBeenCalledWith('drivers_path');
-      expect(mockSkillRunner.init.bind(mockSkillRunner)).toHaveBeenCalled();
-      expect(mockSkillRunner.validateAvailableSkills.bind(mockSkillRunner)).toHaveBeenCalled();
+      expect(mockDriverRegistry.load).toHaveBeenCalledWith('drivers_path');
+      expect(mockSkillRunner.init).toHaveBeenCalled();
+      expect(mockSkillRunner.validateAvailableSkills).toHaveBeenCalled();
     });
   });
 
@@ -71,9 +71,9 @@ describe('Brain', () => {
 
     it('should proxy driver requests', () => {
       brain.getDriver('test');
-      expect(mockDriverRegistry.get.bind(mockDriverRegistry)).toHaveBeenCalledWith('test');
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('test');
       brain.getDefaultDriver();
-      expect(mockDriverRegistry.getDefault.bind(mockDriverRegistry)).toHaveBeenCalled();
+      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
     });
   });
 

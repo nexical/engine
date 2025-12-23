@@ -47,4 +47,10 @@ export default tseslint.config(
             'eqeqeq': ['error', 'always'],
         },
     },
+    {
+        files: ['tests/**/*.test.ts'],
+        rules: {
+            '@typescript-eslint/unbound-method': 'off',
+        },
+    },
 );

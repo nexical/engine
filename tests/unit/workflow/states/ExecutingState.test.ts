@@ -1,37 +1,41 @@
 import { jest } from '@jest/globals';
 
 import { Brain } from '../../../../src/agents/Brain.js';
-import { RuntimeHost } from '../../../../src/domain/RuntimeHost.js';
+import { DeveloperAgent } from '../../../../src/agents/DeveloperAgent.js';
+import { IProject } from '../../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { EngineState } from '../../../../src/domain/State.js';
-import { Workspace } from '../../../../src/domain/Workspace.js';
+import { IWorkspace } from '../../../../src/domain/Workspace.js';
 import { SignalDetectedError } from '../../../../src/errors/SignalDetectedError.js';
 import { Signal, SignalType } from '../../../../src/workflow/Signal.js';
 import { ExecutingState } from '../../../../src/workflow/states/ExecutingState.js';
 
 describe('ExecutingState', () => {
-  let mockHost: jest.Mocked<RuntimeHost>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let mockBrain: jest.Mocked<Brain>;
-  let mockWorkspace: jest.Mocked<Workspace>;
+  let mockWorkspace: jest.Mocked<IWorkspace>;
   let engineState: EngineState;
   let state: ExecutingState;
-  let mockDeveloper: any;
+  let mockDeveloper: jest.Mocked<DeveloperAgent>;
 
   beforeEach(() => {
-    mockHost = { log: jest.fn(), ask: jest.fn() } as unknown as jest.Mocked<RuntimeHost>;
+    mockHost = { log: jest.fn(), ask: jest.fn() } as unknown as jest.Mocked<IRuntimeHost>;
     mockBrain = {
-      createDeveloper: jest.fn(),
+      createDeveloper: jest.fn<Brain['createDeveloper']>(),
     } as unknown as jest.Mocked<Brain>;
     mockWorkspace = {
       getArchitecture: jest.fn(),
-    } as unknown as jest.Mocked<Workspace>;
+    } as unknown as jest.Mocked<IWorkspace>;
 
     engineState = new EngineState('session-id');
     engineState.user_prompt = 'Do something';
     engineState.interactive = true;
 
-    mockDeveloper = { execute: jest.fn().mockResolvedValue(undefined) };
+    mockDeveloper = {
+      execute: jest.fn<DeveloperAgent['execute']>().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<DeveloperAgent>;
     mockBrain.createDeveloper.mockReturnValue(mockDeveloper);
-    state = new ExecutingState(mockBrain, {} as any, mockWorkspace, mockHost);
+    state = new ExecutingState(mockBrain, {} as unknown as IProject, mockWorkspace, mockHost);
   });
 
   it('should have correct name', () => {
@@ -40,6 +44,7 @@ describe('ExecutingState', () => {
 
   it('should execute and complete', async () => {
     const signal = await state.run(engineState);
+
     expect(mockDeveloper.execute).toHaveBeenCalled();
     expect(signal).toBe(Signal.COMPLETE);
   });

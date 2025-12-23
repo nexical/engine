@@ -1,17 +1,21 @@
 import { jest } from '@jest/globals';
 
+import { IFileSystem } from '../../../src/domain/IFileSystem.js';
+import { IProject } from '../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+
 // Mocks
 const mockProject = {
   paths: { prompts: '/prompts' },
   rootDirectory: '/root',
-};
-const mockWorkspace = {};
+} as unknown as jest.Mocked<IProject>;
+const mockWorkspace = {} as Record<string, unknown>;
 const mockBrain = {
-  init: jest.fn().mockResolvedValue(undefined),
+  init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   registerAgent: jest.fn(),
-};
+} as unknown as { init: jest.Mock; registerAgent: jest.Mock };
 const mockSession = {};
-const mockFileSystem = {};
+const mockFileSystem = {} as jest.Mocked<IFileSystem>;
 const mockDriverRegistry = {};
 const mockPromptEngine = {};
 const mockSkillRunner = {};
@@ -57,17 +61,22 @@ jest.unstable_mockModule('../../../src/agents/PlannerAgent.js', () => ({ Planner
 jest.unstable_mockModule('../../../src/agents/DeveloperAgent.js', () => ({ DeveloperAgent: MockDeveloperAgent }));
 
 const { ServiceFactory } = await import('../../../src/services/ServiceFactory.js');
-const { RuntimeHost } = await import('../../../src/domain/RuntimeHost.js');
 
 describe('ServiceFactory', () => {
-  let mockHost: any;
+  let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHost = { log: jest.fn() };
+    mockHost = {
+      log: jest.fn<IRuntimeHost['log']>(),
+      status: jest.fn<IRuntimeHost['status']>(),
+      ask: jest.fn<IRuntimeHost['ask']>(),
+      emit: jest.fn<IRuntimeHost['emit']>(),
+    };
 
     // Setup default container resolve behavior
-    mockContainer.resolve.mockImplementation((key: string) => {
+    mockContainer.resolve.mockImplementation((...args: unknown[]) => {
+      const key = args[0] as string;
       switch (key) {
         case 'rootDirectory':
           return '/root';
@@ -129,21 +138,21 @@ describe('ServiceFactory', () => {
 
     // Extract callbacks
     const calls = (mockContainer.registerFactory as jest.Mock).mock.calls;
-    const factories: Record<string, Function> = {};
+    const factories: Record<string, ((...args: unknown[]) => unknown) | undefined> = {};
     for (const call of calls) {
-      factories[call[0] as string] = call[1] as Function;
+      factories[call[0] as string] = call[1] as (...args: unknown[]) => unknown;
     }
 
     // Test Project Factory
-    factories['project']();
+    factories['project']?.();
     expect(MockProject).toHaveBeenCalledWith('/root', mockFileSystem);
 
     // Test Workspace Factory
-    factories['workspace']();
+    factories['workspace']?.();
     expect(MockWorkspace).toHaveBeenCalledWith(mockProject);
 
     // Test DriverRegistry Factory
-    factories['driverRegistry']();
+    factories['driverRegistry']?.();
     expect(MockDriverRegistry).toHaveBeenCalledWith(
       mockHost,
       expect.objectContaining({ rootDirectory: '/root' }),
@@ -151,19 +160,19 @@ describe('ServiceFactory', () => {
     );
 
     // Test PromptEngine Factory
-    factories['promptEngine']();
+    factories['promptEngine']?.();
     expect(MockPromptEngine).toHaveBeenCalledWith(expect.objectContaining({ promptDirectory: '/prompts' }), mockHost);
 
     // Test SkillRunner Factory
-    factories['skillRunner']();
+    factories['skillRunner']?.();
     expect(MockSkillRunner).toHaveBeenCalledWith(mockProject, mockDriverRegistry, mockPromptEngine, mockHost);
 
     // Test EvolutionService Factory
-    factories['evolutionService']();
+    factories['evolutionService']?.();
     expect(MockEvolutionService).toHaveBeenCalledWith(mockProject, mockFileSystem);
 
     // Test Brain Factory
-    const brainInstance = factories['brain']();
+    factories['brain']?.();
     expect(MockBrain).toHaveBeenCalledWith(
       mockProject,
       mockHost,
@@ -181,27 +190,27 @@ describe('ServiceFactory', () => {
     expect(mockBrain.registerAgent).toHaveBeenCalledWith('developer', expect.any(Function));
 
     // Test Agent Factories (inside Brain registration)
-    const agentCalls = (mockBrain.registerAgent as jest.Mock).mock.calls;
-    const architectFactory = agentCalls.find((c) => c[0] === 'architect')[1];
-    const plannerFactory = agentCalls.find((c) => c[0] === 'planner')[1];
-    const developerFactory = agentCalls.find((c) => c[0] === 'developer')[1];
+    const agentCalls = mockBrain.registerAgent.mock.calls;
+    const architectFactory = agentCalls.find((c) => c[0] === 'architect')?.[1];
+    const plannerFactory = agentCalls.find((c) => c[0] === 'planner')?.[1];
+    const developerFactory = agentCalls.find((c) => c[0] === 'developer')?.[1];
 
-    if (architectFactory) architectFactory(mockWorkspace);
+    if (architectFactory) (architectFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockArchitectAgent).toHaveBeenCalled();
 
-    if (plannerFactory) plannerFactory(mockWorkspace);
+    if (plannerFactory) (plannerFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockPlannerAgent).toHaveBeenCalled();
 
-    if (developerFactory) developerFactory(mockWorkspace);
+    if (developerFactory) (developerFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockDeveloperAgent).toHaveBeenCalled();
 
     // Test Session Factory
-    factories['session']();
+    factories['session']?.();
     expect(MockSession).toHaveBeenCalledWith(mockProject, mockWorkspace, mockBrain, mockHost);
   });
 
   it('should use provided FileSystem if passed', async () => {
-    const customFs: any = {};
+    const customFs: IFileSystem = {} as unknown as jest.Mocked<IFileSystem>;
     await ServiceFactory.createServices('/root', mockHost, customFs);
     expect(mockContainer.register).toHaveBeenCalledWith('fileSystem', customFs);
   });

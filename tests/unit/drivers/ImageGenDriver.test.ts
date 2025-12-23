@@ -1,22 +1,38 @@
 import { jest } from '@jest/globals';
 
+import { ISkill } from '../../../src/domain/Driver.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
-import { RuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { ImageGenDriver } from '../../../src/drivers/ImageGenDriver.js';
 
 // Mock fetch
-const mockFetch = jest.fn();
-(global as any).fetch = mockFetch;
+const mockFetch = jest.fn<() => Promise<Response>>();
+(global as unknown as { fetch: typeof mockFetch }).fetch = mockFetch;
 
 describe('ImageGenDriver', () => {
   let driver: ImageGenDriver;
-  let mockHost: jest.Mocked<RuntimeHost>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let mockFileSystem: jest.Mocked<IFileSystem>;
 
   beforeEach(() => {
-    mockHost = { log: jest.fn() } as unknown as jest.Mocked<RuntimeHost>;
+    mockHost = {
+      log: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
     mockFileSystem = {
       writeFile: jest.fn(),
+      exists: jest.fn(),
+      readFile: jest.fn(),
+      writeFileAtomic: jest.fn(),
+      ensureDir: jest.fn(),
+      copy: jest.fn(),
+      deleteFile: jest.fn(),
+      acquireLock: jest.fn(),
+      mkdir: jest.fn(),
+      isDirectory: jest.fn(),
+      listFiles: jest.fn(),
     } as unknown as jest.Mocked<IFileSystem>;
 
     // Set env variable
@@ -36,16 +52,17 @@ describe('ImageGenDriver', () => {
   it('should generate image', async () => {
     // Mock API response
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await driver.run(skill, { userPrompt: 'cat' });
@@ -57,26 +74,34 @@ describe('ImageGenDriver', () => {
   it('should handle HTTP image URLs', async () => {
     // Mock API response
     mockFetch.mockImplementation(async (url: string | URL | Request) => {
-      const urlStr = url.toString();
+      let urlStr: string;
+      if (typeof url === 'string') {
+        urlStr = url;
+      } else if (url instanceof URL) {
+        urlStr = url.toString();
+      } else {
+        urlStr = url.url;
+      }
       if (urlStr.includes('openrouter')) {
-        return {
-          json: async () => ({
-            choices: [
-              {
-                message: {
-                  images: [{ image_url: { url: 'https://example.com/image.png' } }],
+        return Promise.resolve({
+          json: async () =>
+            Promise.resolve({
+              choices: [
+                {
+                  message: {
+                    images: [{ image_url: { url: 'https://example.com/image.png' } }],
+                  },
                 },
-              },
-            ],
-          }),
-        };
+              ],
+            }),
+        } as Response);
       }
       if (urlStr === 'https://example.com/image.png') {
-        return {
-          arrayBuffer: async () => Buffer.from('image-data'),
-        };
+        return Promise.resolve({
+          arrayBuffer: async () => Promise.resolve(Buffer.from('image-data')),
+        } as Response);
       }
-      return {};
+      return Promise.resolve({} as Response);
     });
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
@@ -87,16 +112,17 @@ describe('ImageGenDriver', () => {
 
   it('should use provided output path', async () => {
     mockFetch.mockResolvedValue({
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await driver.run(skill, { userPrompt: 'test', params: { output_path: 'custom.png' } });
@@ -106,8 +132,8 @@ describe('ImageGenDriver', () => {
 
   it('should throw error if no choices returned', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({ choices: [] }),
-    });
+      json: async () => Promise.resolve({ choices: [] }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('No image data returned from provider');
@@ -117,24 +143,25 @@ describe('ImageGenDriver', () => {
     mockFetch.mockRejectedValueOnce(new Error('API Down'));
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
 
-    const consoleSpy = jest.spyOn(mockHost, 'log');
+    jest.spyOn(mockHost, 'log');
 
     await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('API Down');
-    expect(consoleSpy).toHaveBeenCalledWith('error', expect.stringContaining('Image generation failed: API Down'));
+    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Image generation failed: API Down'));
   });
 
   it('should use custom aspect ratio and resolution from params', async () => {
     mockFetch.mockResolvedValue({
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, {
@@ -142,23 +169,25 @@ describe('ImageGenDriver', () => {
       params: { aspectRatio: '16:9', resolution: '2K' },
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const calls = mockFetch.mock.calls as [string, { body: string }][];
+    const body = JSON.parse(calls[0][1].body) as { image_config: { aspect_ratio: string; image_size: string } };
     expect(body.image_config.aspect_ratio).toBe('16:9');
     expect(body.image_config.image_size).toBe('2K');
   });
 
   it('should handle raw image data without prefix', async () => {
     mockFetch.mockResolvedValue({
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              images: [{ image_url: { url: 'RAW_DATA' } }],
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'RAW_DATA' } }],
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, { userPrompt: 'test' });
@@ -173,23 +202,26 @@ describe('ImageGenDriver', () => {
       aspect_ratio: '4:3',
       resolution: 'HD',
     };
-    const result = (driver as any).parseSchema(skill);
+    const result = (
+      driver as unknown as { parseSchema: (skill: ISkill) => { success: boolean; data: { model: string } } }
+    ).parseSchema(skill);
     expect(result.success).toBe(true);
     expect(result.data.model).toBe('test-model');
   });
 
   it('should handle empty user prompt', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        choices: [
-          {
-            message: {
-              images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+              },
             },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, { userPrompt: '' });
@@ -198,14 +230,15 @@ describe('ImageGenDriver', () => {
 
   it('should handle missing images property in response', async () => {
     mockFetch.mockResolvedValueOnce({
-      json: async () => ({
-        choices: [
-          {
-            message: { text: 'No images here' },
-          },
-        ],
-      }),
-    });
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: { text: 'No images here' },
+            },
+          ],
+        }),
+    } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('No image data returned from provider');

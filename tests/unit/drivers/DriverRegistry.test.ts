@@ -17,19 +17,15 @@ describe('DriverRegistry', () => {
 
   beforeEach(() => {
     jest.resetModules();
-    console.error('TEST STARTING: DriverRegistrySpec');
 
     mockHost = {
-      log: jest.fn((level, msg) => {
-        console.error('[MOCK LOG]', level, msg);
-      }),
+      log: jest.fn(),
       status: jest.fn(),
       ask: jest.fn(),
       emit: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'driver-registry-test-'));
-    console.error('TEMP DIR CREATED:', tempDir);
     fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({ type: 'module' }));
 
     // Create a simple Driver file
@@ -63,13 +59,11 @@ describe('DriverRegistry', () => {
     mockFileSystem = {
       isDirectory: jest.fn((p: string) => {
         if (!p) {
-          console.error('[MOCK FS] isDirectory received falsy!', p);
           return false;
         }
         try {
           return fs.statSync(p).isDirectory();
-        } catch (e) {
-          console.error('[MOCK FS] isDirectory error for', p, e);
+        } catch {
           return false;
         }
       }),
@@ -98,7 +92,7 @@ describe('DriverRegistry', () => {
     if (tempDir && fs.existsSync(tempDir)) {
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }
@@ -114,7 +108,6 @@ describe('DriverRegistry', () => {
 
   describe('load', () => {
     it('should load flat drivers', async () => {
-      console.error('TEST: Calling load with', tempDir);
       await registry.load(tempDir);
       const valid = registry.get('valid-driver');
       expect(valid).toBeDefined();
@@ -152,10 +145,7 @@ describe('DriverRegistry', () => {
 
       await registry.load(tempDir);
 
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith(
-        'warn',
-        expect.stringContaining('No valid driver found'),
-      );
+      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('No valid driver found'));
     });
 
     it('should handle import errors gracefully', async () => {
@@ -165,10 +155,7 @@ describe('DriverRegistry', () => {
 
       await registry.load(tempDir);
 
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Failed to load driver'),
-      );
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to load driver'));
     });
 
     it('should log debug if driver is valid but not supported', async () => {
@@ -184,7 +171,7 @@ describe('DriverRegistry', () => {
 
       await registry.load(tempDir);
 
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('debug', expect.stringContaining('not supported'));
+      expect(mockHost.log).toHaveBeenCalledWith('debug', expect.stringContaining('not supported'));
       expect(registry.get('unsupported')).toBeUndefined();
     });
 
@@ -194,10 +181,7 @@ describe('DriverRegistry', () => {
 
       await registry.load(tempDir);
 
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('CRITICAL DRIVER LOAD FAILURE'),
-      );
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('CRITICAL DRIVER LOAD FAILURE'));
     });
 
     it('should handle non-function exports', async () => {
@@ -205,7 +189,7 @@ describe('DriverRegistry', () => {
       fs.writeFileSync(nonFunctionFile, 'export const foo = "bar";');
 
       await registry.load(tempDir);
-      expect(mockHost.log.bind(mockHost)).not.toHaveBeenCalledWith(
+      expect(mockHost.log).not.toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('No valid driver found in ' + nonFunctionFile),
       );

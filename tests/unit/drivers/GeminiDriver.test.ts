@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 
-import { RuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { ISkill } from '../../../src/domain/Driver.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { GeminiDriver } from '../../../src/drivers/GeminiDriver.js';
 import { ShellExecutor } from '../../../src/utils/shell.js';
 
@@ -9,16 +10,23 @@ jest.mock('../../../src/utils/shell.js');
 
 describe('GeminiDriver', () => {
   let driver: GeminiDriver;
-  let mockHost: jest.Mocked<RuntimeHost>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let mockShell: jest.Mocked<ShellExecutor>;
 
   beforeEach(() => {
-    mockHost = { log: jest.fn() } as unknown as jest.Mocked<RuntimeHost>;
+    mockHost = {
+      log: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
     driver = new GeminiDriver(mockHost);
-    // Access protected shell property via any or test helper
-    mockShell = (driver as any).shell;
+    // Access protected shell property via unknown cast
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
     // Mock execute method
-    mockShell.execute = jest.fn().mockResolvedValue({ code: 0, stdout: 'ok', stderr: '' });
+    mockShell.execute = jest
+      .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
+      .mockResolvedValue({ code: 0, stdout: 'ok', stderr: '' });
   });
 
   it('should have correct name', () => {
@@ -41,7 +49,7 @@ describe('GeminiDriver', () => {
   });
 
   it('should include extra arguments if provided in skill', async () => {
-    await driver.run({ name: 'test', prompt_template: 'Hello', args: ['--extra', 'val'] } as any, {
+    await driver.run({ name: 'test', prompt_template: 'Hello', args: ['--extra', 'val'] } as unknown as ISkill, {
       userPrompt: 'User',
     });
     expect(mockShell.execute).toHaveBeenCalledWith(

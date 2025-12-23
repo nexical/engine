@@ -1,21 +1,22 @@
 import { jest } from '@jest/globals';
 
 import { Brain } from '../../../../src/agents/Brain.js';
-import { RuntimeHost } from '../../../../src/domain/RuntimeHost.js';
+import { IProject } from '../../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { EngineState } from '../../../../src/domain/State.js';
-import { Workspace } from '../../../../src/domain/Workspace.js';
+import { IWorkspace } from '../../../../src/domain/Workspace.js';
 import { Signal } from '../../../../src/workflow/Signal.js';
 import { CompletedState } from '../../../../src/workflow/states/CompletedState.js';
 
 describe('CompletedState', () => {
-  let mockHost: jest.Mocked<RuntimeHost>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let mockBrain: jest.Mocked<Brain>;
-  let mockWorkspace: jest.Mocked<Workspace>;
+  let mockWorkspace: jest.Mocked<IWorkspace>;
   let engineState: EngineState;
   let state: CompletedState;
 
   beforeEach(() => {
-    mockHost = { log: jest.fn(), ask: jest.fn() } as unknown as jest.Mocked<RuntimeHost>;
+    mockHost = { log: jest.fn(), ask: jest.fn() } as unknown as jest.Mocked<IRuntimeHost>;
     mockBrain = {
       createArchitect: jest.fn(),
       createPlanner: jest.fn(),
@@ -23,10 +24,10 @@ describe('CompletedState', () => {
     } as unknown as jest.Mocked<Brain>;
     mockWorkspace = {
       getArchitecture: jest.fn(),
-    } as unknown as jest.Mocked<Workspace>;
+    } as unknown as jest.Mocked<IWorkspace>;
 
     engineState = new EngineState('session-id');
-    state = new CompletedState(mockBrain, {} as any, mockWorkspace, mockHost);
+    state = new CompletedState(mockBrain, {} as unknown as IProject, mockWorkspace, mockHost);
   });
 
   it('should have correct name', () => {

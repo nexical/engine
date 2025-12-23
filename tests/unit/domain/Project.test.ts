@@ -28,7 +28,7 @@ describe('Project', () => {
   });
 
   it('should ensure directory structure on initialization', () => {
-    expect(mockFileSystem.ensureDir.bind(mockFileSystem)).toHaveBeenCalledTimes(9); // count of ensureDir calls in ensureStructure
+    expect(mockFileSystem.ensureDir).toHaveBeenCalledTimes(9); // count of ensureDir calls in ensureStructure
   });
 
   describe('getConstraints', () => {
@@ -65,7 +65,7 @@ describe('Project', () => {
       const c2 = project.getConfig();
 
       expect(c1).toBe(c2);
-      expect(mockFileSystem.readFile.bind(mockFileSystem)).toHaveBeenCalledTimes(1);
+      expect(mockFileSystem.readFile).toHaveBeenCalledTimes(1);
     });
 
     it('should log error and throw if loading fails', () => {

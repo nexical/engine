@@ -22,15 +22,24 @@ const mockFs = {
 };
 jest.unstable_mockModule('fs-extra', () => ({ default: mockFs, ...mockFs }));
 
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import type { PromptEngine as PromptEngineClass } from '../../../src/services/PromptEngine.js';
+
 const { PromptEngine } = await import('../../../src/services/PromptEngine.js');
 
 describe('PromptEngine', () => {
-  let engine: InstanceType<typeof PromptEngine>;
-  let mockHost: any;
-  let mockEnv: any;
+  let engine: PromptEngineClass;
+  let mockHost: jest.Mocked<IRuntimeHost>;
+  let mockEnv: { render: jest.Mock };
 
   beforeEach(() => {
-    mockHost = { log: jest.fn() };
+    jest.clearAllMocks();
+    mockHost = {
+      log: jest.fn<IRuntimeHost['log']>(),
+      status: jest.fn<IRuntimeHost['status']>(),
+      ask: jest.fn<IRuntimeHost['ask']>(),
+      emit: jest.fn<IRuntimeHost['emit']>(),
+    };
     mockEnv = { render: mockRender };
     // Environment constructor call needs to return instance
     mockEnvironment.mockReturnValue(mockEnv);

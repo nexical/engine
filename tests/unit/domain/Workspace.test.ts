@@ -32,13 +32,17 @@ describe('Workspace', () => {
     mockFileSystem = {
       exists: jest.fn(),
       readFile: jest.fn(),
-      writeFileAtomic: jest.fn(),
-      acquireLock: jest.fn<() => Promise<() => void>>().mockResolvedValue(() => {}),
+      writeFile: jest.fn(),
+      appendFile: jest.fn(),
+      move: jest.fn(),
       copy: jest.fn(),
-      deleteFile: jest.fn(),
-      listFiles: jest.fn(),
+      ensureDir: jest.fn(),
       isDirectory: jest.fn(),
-      mkdir: jest.fn(),
+      listFiles: jest.fn(),
+      writeFileAtomic: jest.fn(),
+      deleteFile: jest.fn(),
+      acquireLock: jest.fn<IFileSystem['acquireLock']>().mockResolvedValue(() => {}),
+      releaseLock: jest.fn(),
     } as unknown as jest.Mocked<IFileSystem>;
 
     mockProject = {
@@ -69,7 +73,7 @@ describe('Workspace', () => {
       const first = await workspace.getArchitecture('current');
       const second = await workspace.getArchitecture('current');
 
-      expect(mockFileSystem.readFile.bind(mockFileSystem)).toHaveBeenCalledTimes(1);
+      expect(mockFileSystem.readFile).toHaveBeenCalledTimes(1);
       expect(first).toEqual(second);
     });
 
@@ -91,7 +95,7 @@ describe('Workspace', () => {
     it('should write to file', async () => {
       const arch = new Architecture({ overview: '', fileStructure: '', components: '', details: '' }, 'content');
       await workspace.saveArchitecture(arch);
-      expect(mockFileSystem.writeFileAtomic.bind(mockFileSystem)).toHaveBeenCalledWith('arch_current', 'content');
+      expect(mockFileSystem.writeFileAtomic).toHaveBeenCalledWith('arch_current', 'content');
     });
   });
 
@@ -100,7 +104,7 @@ describe('Workspace', () => {
       mockDump.mockReturnValue('plan_name: test plan');
       const plan = new Plan('test plan', []);
       await workspace.savePlan(plan);
-      expect(mockFileSystem.writeFileAtomic.bind(mockFileSystem)).toHaveBeenCalledWith(
+      expect(mockFileSystem.writeFileAtomic).toHaveBeenCalledWith(
         'plan_current',
         expect.stringContaining('plan_name: test plan'),
       );
@@ -125,7 +129,7 @@ describe('Workspace', () => {
       const first = await workspace.loadPlan();
       const second = await workspace.loadPlan();
 
-      expect(mockFileSystem.readFile.bind(mockFileSystem)).toHaveBeenCalledTimes(1);
+      expect(mockFileSystem.readFile).toHaveBeenCalledTimes(1);
       expect(first).toBe(second);
     });
 
@@ -141,13 +145,13 @@ describe('Workspace', () => {
     it('should copy artifacts to archive if they exist', () => {
       mockFileSystem.exists.mockReturnValue(true);
       workspace.archiveArtifacts();
-      expect(mockFileSystem.copy.bind(mockFileSystem)).toHaveBeenCalledTimes(2);
+      expect(mockFileSystem.copy).toHaveBeenCalledTimes(2);
     });
 
     it('should skip copying if artifacts do not exist', () => {
       mockFileSystem.exists.mockReturnValue(false);
       workspace.archiveArtifacts();
-      expect(mockFileSystem.copy.bind(mockFileSystem)).not.toHaveBeenCalled();
+      expect(mockFileSystem.copy).not.toHaveBeenCalled();
     });
   });
 
@@ -182,7 +186,7 @@ describe('Workspace', () => {
 
       const signal = await workspace.detectSignal();
       expect(signal).toBeDefined();
-      expect(mockFileSystem.readFile.bind(mockFileSystem)).toHaveBeenCalledTimes(1); // Only read the yml one
+      expect(mockFileSystem.readFile).toHaveBeenCalledTimes(1); // Only read the yml one
     });
 
     it('should return null if no signals', async () => {
@@ -241,13 +245,13 @@ describe('Workspace', () => {
 
       await workspace.clearSignals();
 
-      expect(mockFileSystem.deleteFile.bind(mockFileSystem)).toHaveBeenCalledTimes(2);
+      expect(mockFileSystem.deleteFile).toHaveBeenCalledTimes(2);
     });
 
     it('should do nothing if signals dir is missing', async () => {
       mockFileSystem.isDirectory.mockReturnValue(false);
       await workspace.clearSignals();
-      expect(mockFileSystem.deleteFile.bind(mockFileSystem)).not.toHaveBeenCalled();
+      expect(mockFileSystem.deleteFile).not.toHaveBeenCalled();
     });
   });
 
@@ -256,7 +260,7 @@ describe('Workspace', () => {
       const state = new EngineState('id');
       mockDump.mockReturnValue('yaml state');
       await workspace.saveState(state);
-      expect(mockFileSystem.writeFileAtomic.bind(mockFileSystem)).toHaveBeenCalledWith('state.yml', 'yaml state');
+      expect(mockFileSystem.writeFileAtomic).toHaveBeenCalledWith('state.yml', 'yaml state');
     });
 
     it('should load state if exists', async () => {

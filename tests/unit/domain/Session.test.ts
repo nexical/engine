@@ -74,7 +74,7 @@ describe('Session', () => {
       await session.resume();
 
       expect(session.state).toBe(mockLoadedState);
-      expect(mockHost.log.bind(mockHost)).toHaveBeenCalledWith('info', expect.stringContaining('Resuming session'));
+      expect(mockHost.log).toHaveBeenCalledWith('info', expect.stringContaining('Resuming session'));
     });
 
     it('should throw if no state found', async () => {

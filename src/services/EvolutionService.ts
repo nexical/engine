@@ -1,9 +1,9 @@
 import yaml from 'js-yaml';
 import { z } from 'zod';
 
-import { Project } from '../domain/Project.js';
+import { IFileSystem } from '../domain/IFileSystem.js';
+import { IProject } from '../domain/Project.js';
 import { Signal } from '../workflow/Signal.js';
-import { FileSystemService } from './FileSystemService.js';
 
 export const EvolutionEntrySchema = z.object({
   timestamp: z.string(),
@@ -23,8 +23,8 @@ export interface IEvolutionService {
 
 export class EvolutionService implements IEvolutionService {
   constructor(
-    private project: Project,
-    private disk: FileSystemService,
+    private project: IProject,
+    private disk: IFileSystem,
   ) {}
 
   public async recordFailure(stateName: string, signal: Signal, completedTasks: string[] = []): Promise<void> {

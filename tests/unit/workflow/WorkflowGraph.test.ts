@@ -1,5 +1,5 @@
 import { Signal, SignalType } from '../../../src/workflow/Signal.js';
-import { DefaultWorkflowConfig, WorkflowConfig, WorkflowGraph } from '../../../src/workflow/WorkflowGraph.js';
+import { DefaultWorkflowConfig, IWorkflowConfig, WorkflowGraph } from '../../../src/workflow/WorkflowGraph.js';
 
 describe('WorkflowGraph', () => {
   let graph: WorkflowGraph;
@@ -33,7 +33,7 @@ describe('WorkflowGraph', () => {
     expect(graph.getErrorTarget('ARCHITECTING')).toBeUndefined();
 
     // Create graph with onError
-    const errorConfig: WorkflowConfig = {
+    const errorConfig: IWorkflowConfig = {
       initialState: 'START',
       states: [
         {
