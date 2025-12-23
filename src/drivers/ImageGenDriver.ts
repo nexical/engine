@@ -72,7 +72,7 @@ export class ImageGenDriver extends BaseDriver<DriverContext, string> {
             const result = (await response.json()) as any;
             let base64Data: string | null = null;
 
-            if (result.choices) {
+            if (result.choices && result.choices.length > 0) {
                 const message = result.choices[0].message;
                 if (message.images) {
                     for (const image of message.images) {
