@@ -280,5 +280,11 @@ describe('SkillRunner', () => {
       const task = { skill: 'test-skill' } as unknown as Task;
       await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('execution failed');
     });
+
+    it('should throw "Unknown error" if driver execute returns failure without error', async () => {
+      mockDriverExecute.mockResolvedValue(Result.fail<string, unknown>(null) as unknown as Result<string, Error>);
+      const task = { skill: 'test-skill' } as unknown as Task;
+      await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('Unknown error during skill execution');
+    });
   });
 });

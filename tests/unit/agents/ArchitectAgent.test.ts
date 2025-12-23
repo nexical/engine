@@ -124,5 +124,11 @@ describe('ArchitectAgent', () => {
       expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
       expect(mockDriver.execute).toHaveBeenCalled();
     });
+    it('should throw if driver execution fails with non-Error result', async () => {
+      const mockResult = Result.fail<string, string>('String error');
+      mockDriver.execute.mockResolvedValue(mockResult as unknown as Result<string, Error>);
+
+      await expect(agent.design('req')).rejects.toThrow('Failed to generate architecture: String error');
+    });
   });
 });

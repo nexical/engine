@@ -140,5 +140,13 @@ describe('PlannerAgent', () => {
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('No driver available');
     });
+
+    it('should throw "Planner execution failed" if result.error() is falsy', async () => {
+      const mockArch = { data: {} } as Architecture;
+      const mockResult = Result.fail<string, unknown>(null);
+      mockDriver.execute.mockResolvedValue(mockResult as unknown as Result<string, Error>);
+
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
+    });
   });
 });

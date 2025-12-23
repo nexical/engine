@@ -125,6 +125,13 @@ describe('Workflow', () => {
     expect(mockHost.log).toHaveBeenCalledWith('info', expect.stringContaining('Resuming from state: PLANNING'));
   });
 
+  it('should ignore resume if state is not registered', async () => {
+    engineState.status = 'FAILED'; // Or any other status that might not be a valid state name
+    mockGraph.getInitialState.mockReturnValue('ARCHITECTING');
+    await workflow.start(engineState);
+    expect(mockHost.log).not.toHaveBeenCalledWith('info', expect.stringContaining('Resuming'));
+  });
+
   it('should skip resume if restored state name is missing in map', async () => {
     engineState.status = 'IDLE'; // Using IDLE to avoid OrchestratorStatus type error for 'NON_EXISTENT'
     mockGraph.getNextState.mockReturnValue(null);

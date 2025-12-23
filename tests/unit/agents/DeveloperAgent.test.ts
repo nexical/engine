@@ -132,5 +132,14 @@ describe('DeveloperAgent', () => {
       expect(mockSkillRunner.runSkill).not.toHaveBeenCalled();
       expect(mockHost.log).toHaveBeenCalledWith('info', 'All tasks in plan are already completed.');
     });
+
+    it('should handle skill failure with non-Error', async () => {
+      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
+      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+      mockSkillRunner.runSkill.mockRejectedValue('String error');
+
+      await expect(agent.execute(state)).rejects.toBe('String error');
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Task 1 failed: String error'));
+    });
   });
 });

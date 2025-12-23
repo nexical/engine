@@ -104,5 +104,11 @@ describe('EngineState', () => {
       const deserialized = EngineState.fromYaml(yaml);
       expect(deserialized.tasks.completed).toEqual([]);
     });
+
+    it('should handle non-string current_plan in fromYaml', () => {
+      const yaml = 'session_id: test\ncurrent_plan: { id: 123 }';
+      const deserialized = EngineState.fromYaml(yaml);
+      expect(deserialized.current_plan).toBe('{"id":123}');
+    });
   });
 });

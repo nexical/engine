@@ -31,4 +31,15 @@ describe('Result', () => {
     expect(mapped.isFail()).toBe(true);
     expect(mapped.error()).toBe(error);
   });
+
+  it('should wrap non-Error in Error during unwrap', () => {
+    const result = Result.fail<number, string>('String error');
+    expect(() => result.unwrap()).toThrow('String error');
+    try {
+      result.unwrap();
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toBe('String error');
+    }
+  });
 });
