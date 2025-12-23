@@ -4,6 +4,10 @@
   "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
   "scripts": {
     "build": "tsc --build --force && cp -fr src/prompts dist/",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",
     "test:unit": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
     "test:integration": "npm run build && NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
     "test": "npm run build && npm run test:unit && npm run test:integration"
@@ -23,9 +27,17 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "@types/nunjucks": "^3.2.6",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "jest": "^30.2.0",
+    "prettier": "^3.7.4",
     "ts-jest": "^29.4.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.1"
   },
   "dependencies": {
     "fs-extra": "^11.3.2",
