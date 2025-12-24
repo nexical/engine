@@ -187,8 +187,8 @@ describe('SkillRunner', () => {
     it('should fail if default driver missing for provider-less skill', async () => {
       // Force skill to have no provider
       const skillNoProvider = { name: 'test-skill' };
-      // @ts-ignore - reaching into private/protected or public property
-      runner.skills['test-skill'] = skillNoProvider as any;
+      // @ts-expect-error - reaching into private/protected or public property
+      (runner.skills as Record<string, unknown>)['test-skill'] = skillNoProvider;
 
       mockRegistryGetDefault.mockReturnValue(undefined);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('needs a default driver but none is available.');
@@ -197,7 +197,7 @@ describe('SkillRunner', () => {
 
   it('should fail if driver not supported', async () => {
     // Manually populate skills to bypass init/fs complexity since we are outside the describe block that calls init
-    (runner as any).skills = {
+    (runner as unknown as { skills: Record<string, unknown> }).skills = {
       'test-skill': { name: 'test-skill', provider: 'mock-driver' },
     };
 
@@ -211,7 +211,7 @@ describe('SkillRunner', () => {
   });
 
   it('should handle driver errors during validation', async () => {
-    (runner as any).skills = {
+    (runner as unknown as { skills: Record<string, unknown> }).skills = {
       'test-skill': { name: 'test-skill', provider: 'mock-driver' },
     };
 

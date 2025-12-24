@@ -176,6 +176,7 @@ describe('PlannerAgent', () => {
       mockDriver.execute.mockResolvedValue(mockResult);
 
       const spy = jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw 'String Error';
       });
 

@@ -23,29 +23,30 @@ export class SkillRunner implements ISkillRunner {
     private driverRegistry: DriverRegistry,
     private promptEngine: PromptEngine,
     private host: IRuntimeHost,
-  ) { }
+  ) {}
 
-  async init(): Promise<void> {
-    await this.loadYamlSkills();
+  init(): Promise<void> {
+    this.loadYamlSkills();
+    return Promise.resolve();
   }
 
-  private async loadYamlSkills(): Promise<void> {
-    if (!(await this.project.fileSystem.isDirectory(this.project.paths.skills))) {
+  private loadYamlSkills(): void {
+    if (!this.project.fileSystem.isDirectory(this.project.paths.skills)) {
       return;
     }
 
-    const files = await this.project.fileSystem.listFiles(this.project.paths.skills);
+    const files = this.project.fileSystem.listFiles(this.project.paths.skills);
 
     for (const filename of files) {
       if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml') || filename.endsWith('.yml')) {
         const filePath = path.join(this.project.paths.skills, filename);
         try {
-          const content = await this.project.fileSystem.readFile(filePath);
+          const content = this.project.fileSystem.readFile(filePath);
           const profile = yaml.load(content);
           const parsed = SkillSchema.parse(profile);
           this.skills[parsed.name] = parsed as ISkill;
-        } catch (e: any) {
-          this.host.log('error', `Error loading skill profile ${filename}: ${e.message}`);
+        } catch (e: unknown) {
+          this.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
         }
       }
     }

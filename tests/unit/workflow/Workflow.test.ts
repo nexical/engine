@@ -47,11 +47,27 @@ jest.unstable_mockModule('../../../src/workflow/WorkflowGraph.js', () => ({
   DefaultWorkflowConfig: {},
 }));
 
-let Workflow: any;
+// Define the shape of the Workflow class constructor
+type WorkflowConstructor = new (
+  brain: Brain,
+  project: IProject,
+  workspace: IWorkspace,
+  host: IRuntimeHost,
+) => {
+  start(state: EngineState, onStateChange?: () => Promise<void>): Promise<void>;
+  registerState(state: State): void;
+  currentState?: State;
+  // Access private property for testing if needed, though strictly not allowed
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  states: Map<string, any>;
+};
+
+let Workflow: WorkflowConstructor;
 try {
   const mod = await import('../../../src/workflow/Workflow.js');
-  Workflow = mod.Workflow;
+  Workflow = mod.Workflow as unknown as WorkflowConstructor;
 } catch (e) {
+  // eslint-disable-next-line no-console
   console.error('Error importing Workflow module:', e);
 }
 
@@ -256,7 +272,7 @@ describe('Workflow Unit Tests', () => {
     setupMockState('PLANNING', planningRun);
 
     // Mock graph to return undefined for subsequent states to finish loop if needed
-    mockGraph.getNextState.mockImplementation((state, signal) => {
+    mockGraph.getNextState.mockImplementation((state, _signal) => {
       if (state === 'ARCHITECTING') return 'PLANNING';
       return undefined;
     });
