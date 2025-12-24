@@ -17,6 +17,7 @@ export class ShellExecutor {
 
   async execute(command: string, args: string[] = [], options: IShellOptions = {}): Promise<IShellResult> {
     return new Promise((resolve, reject) => {
+      const sanitizedOptions = this.sanitizeEnv(options);
       const log = (msg: string): void => {
         this.host.log('debug', msg);
       };
@@ -24,8 +25,8 @@ export class ShellExecutor {
       this.host.log('debug', `Executing: ${command} ${args.join(' ')}`);
 
       const spawnOptions: SpawnOptions = {
-        ...options,
-        stdio: options.streamStdio ? ['inherit', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
+        ...sanitizedOptions,
+        stdio: sanitizedOptions.streamStdio ? ['inherit', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe'],
       };
 
       const child = spawn(command, args, spawnOptions);
@@ -67,9 +68,10 @@ export class ShellExecutor {
   }
 
   executeSync(command: string, args: string[] = [], options: SpawnOptions = {}): IShellResult {
+    const sanitizedOptions = this.sanitizeEnv(options);
     const result = spawnSync(command, args, {
       encoding: 'utf-8',
-      ...options,
+      ...sanitizedOptions,
     });
 
     if (result.error) {
@@ -80,6 +82,22 @@ export class ShellExecutor {
       stdout: result.stdout ? result.stdout.toString() : '',
       stderr: result.stderr ? result.stderr.toString() : '',
       code: result.status,
+    };
+  }
+
+  private sanitizeEnv<T extends SpawnOptions>(options: T): T {
+    const env = options.env || process.env;
+    const sanitizedEnv = { ...env };
+
+    // Remove Git-related variables that might interfere when running in a hook
+    const keysToRemove = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX'];
+    for (const key of keysToRemove) {
+      delete sanitizedEnv[key];
+    }
+
+    return {
+      ...options,
+      env: sanitizedEnv,
     };
   }
 }

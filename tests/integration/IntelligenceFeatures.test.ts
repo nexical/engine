@@ -76,19 +76,21 @@ describe('Intelligence Features Integration', () => {
         validateSkill: async (): Promise<boolean> => {
           return Promise.resolve(true);
         },
-        execute: async (_skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
+        execute: async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
           const prompt = (options?.params as { prompt: string } | undefined)?.prompt || '';
           if (prompt.includes('PersonaTest')) {
             capturedPrompt = prompt;
           }
-          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+          if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+          if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+          return Promise.resolve(Result.ok('OK'));
         },
       },
       true,
     );
 
     await orchestrator.start('Persona test');
-
+    expect(orchestrator.session.state.status).toBe('COMPLETED');
     expect(capturedPrompt).toContain('PersonaTest');
   });
 
@@ -112,6 +114,7 @@ describe('Intelligence Features Integration', () => {
         capturedArchitectPrompt = (ctx?.params as { prompt: string } | undefined)?.prompt || '';
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 

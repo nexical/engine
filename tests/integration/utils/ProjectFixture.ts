@@ -49,15 +49,23 @@ export class ProjectFixture {
     // Initialize Git Repo for Worktree Support
     try {
       const { execSync } = await import('child_process');
-      execSync('git init', { cwd: this.tmpDir });
-      execSync('git config user.email "test@example.com"', { cwd: this.tmpDir });
-      execSync('git config user.name "Test User"', { cwd: this.tmpDir });
+      const cleanEnv = { ...process.env };
+      const keysToRemove = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX'];
+      for (const key of keysToRemove) {
+        delete cleanEnv[key];
+      }
+
+      const execOptions = { cwd: this.tmpDir, env: cleanEnv };
+
+      execSync('git init', execOptions);
+      execSync('git config user.email "test@example.com"', execOptions);
+      execSync('git config user.name "Test User"', execOptions);
       // Track initial files to avoid merge collisions with untracked files later
-      execSync('git add .', { cwd: this.tmpDir });
+      execSync('git add .', execOptions);
       // Create initial commit to allow worktrees
-      execSync('git commit -m "Initial commit"', { cwd: this.tmpDir });
+      execSync('git commit -m "Initial commit"', execOptions);
     } catch (e) {
-      console.warn('Failed to init git in fixture:', e);
+      this.mockHost.log('warn', `Failed to init git in fixture: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

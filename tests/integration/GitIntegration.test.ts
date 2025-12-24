@@ -32,9 +32,16 @@ describe('Git Integration', () => {
   test('should initialize git and commit shared content (Scenario 3)', async (): Promise<void> => {
     // 1. Setup git in the tmp directory correctly
     const realTmpDir = fixture.tmpDir;
+    const cleanEnv = { ...process.env };
+    const keysToRemove = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX'];
+    for (const key of keysToRemove) {
+      delete cleanEnv[key];
+    }
+    const execOptions = { cwd: realTmpDir, env: cleanEnv };
+
     execSync(
       'git init && git config user.email "test@example.com" && git config user.name "Test User" && touch initial && git add . && git commit -m "initial"',
-      { cwd: realTmpDir },
+      execOptions,
     );
 
     await fixture.writeConfig({ project_name: 'GitTest' });

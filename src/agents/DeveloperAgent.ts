@@ -1,9 +1,9 @@
 import path from 'path';
 
-import { Task } from '../domain/Task.js';
 import { IProject } from '../domain/Project.js';
 import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { EngineState } from '../domain/State.js';
+import { Task } from '../domain/Task.js';
 import { IWorkspace } from '../domain/Workspace.js';
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { GitService } from '../services/GitService.js';
@@ -25,7 +25,8 @@ export class DeveloperAgent {
         this.git.cleanStaleWorktrees();
       } catch (e) {
         // Warning only, as we might be in a fresh/non-git env
-        this.host.log('warn', `Failed to clean stale worktrees: ${(e as Error).message}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        this.host.log('warn', `Failed to clean stale worktrees: ${msg}`);
       }
     }
   }
@@ -44,7 +45,7 @@ export class DeveloperAgent {
     const layers = plan.getExecutionLayers();
     this.host.log('debug', `[DEBUG] Plan execution layers: ${layers.length}`);
 
-    if (layers.flat().every(t => state.tasks.completed.includes(t.id))) {
+    if (layers.flat().every((t) => state.tasks.completed.includes(t.id))) {
       this.host.log('info', 'All tasks in plan are already completed.');
       return;
     }
@@ -52,18 +53,13 @@ export class DeveloperAgent {
     // Execute layers
     for (const layer of layers) {
       // Filter out tasks in this layer that are already complete
-      const pendingTasks = layer.filter(t => !state.tasks.completed.includes(t.id));
+      const pendingTasks = layer.filter((t) => !state.tasks.completed.includes(t.id));
 
       if (pendingTasks.length === 0) {
         continue;
       }
 
-      try {
-        await this.executeLayer(pendingTasks, prompt, state);
-      } catch (e) {
-        // Stop execution on failure
-        throw e;
-      }
+      await this.executeLayer(pendingTasks, prompt, state);
     }
   }
 
@@ -74,13 +70,11 @@ export class DeveloperAgent {
     await this.executeParallelLayer(tasks, userPrompt, state);
   }
 
-
-
   private async executeParallelLayer(tasks: Task[], userPrompt: string, state: EngineState): Promise<void> {
-    this.host.log('info', `Starting execution layer with ${tasks.length} tasks: ${tasks.map(t => t.id).join(', ')}`);
+    this.host.log('info', `Starting execution layer with ${tasks.length} tasks: ${tasks.map((t) => t.id).join(', ')}`);
 
     if (!this.git) {
-      throw new Error("Git is required for isolated execution.");
+      throw new Error('Git is required for isolated execution.');
     }
 
     const worktreesBaseDir = path.join(this.project.paths.root, '.worktrees');
@@ -100,7 +94,7 @@ export class DeveloperAgent {
           this.host.log('debug', `Setting up isolation for task ${task.id}`);
 
           // 1. Create Worktree (Create new branch from current)
-          await this.git!.worktreeAdd(worktreePath, branchName, baseBranch);
+          this.git!.worktreeAdd(worktreePath, branchName, baseBranch);
 
           // 1.5 Submodule Initialization (if globally enabled)
           if (this.project.getConfig().git?.submodules) {
@@ -109,7 +103,7 @@ export class DeveloperAgent {
           }
 
           // Get Skill Config
-          const skillDef = this.skillRunner.getSkills().find(s => s.name === task.skill);
+          const skillDef = this.skillRunner.getSkills().find((s) => s.name === task.skill);
 
           // 2. Sparse Checkout (Hydration A)
           if (skillDef?.sparse_checkout && Array.isArray(skillDef.sparse_checkout)) {
@@ -161,7 +155,6 @@ export class DeveloperAgent {
           this.host.log('info', `Task ${task.id} completed.`);
 
           return { taskId: task.id, branch: branchName, worktreePath };
-
         } catch (e) {
           state.tasks.failed.push(task.id);
           this.host.log('error', `Task ${task.id} failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -183,7 +176,6 @@ export class DeveloperAgent {
           throw new Error(`Merge conflict detected for task ${res.taskId}. Manual resolution required.`);
         }
       }
-
     } finally {
       // Cleanup Phase (Resilience)
       this.host.log('info', `Cleaning up ${activeWorktrees.length} worktrees...`);
@@ -192,7 +184,8 @@ export class DeveloperAgent {
           this.git.worktreeRemove(wt.path);
           this.git.deleteBranch(wt.branch, true);
         } catch (e) {
-          this.host.log('warn', `Failed to cleanup worktree ${wt.path}: ${(e as Error).message}`);
+          const msg = e instanceof Error ? e.message : String(e);
+          this.host.log('warn', `Failed to cleanup worktree ${wt.path}: ${msg}`);
         }
       }
 
@@ -200,7 +193,8 @@ export class DeveloperAgent {
       try {
         this.git.worktreePrune();
       } catch (e) {
-        this.host.log('warn', `Failed to prune worktrees: ${(e as Error).message}`);
+        const msg = e instanceof Error ? e.message : String(e);
+        this.host.log('warn', `Failed to prune worktrees: ${msg}`);
       }
     }
   }

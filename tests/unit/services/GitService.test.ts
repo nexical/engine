@@ -107,6 +107,11 @@ describe('GitService', () => {
     expect(mockExecuteSync).toHaveBeenCalledWith('git', ['add', 'file.ts'], expect.any(Object));
   });
 
+  it('should add files with specific cwd', () => {
+    service.add('file.ts', '/other');
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['add', 'file.ts'], expect.objectContaining({ cwd: '/other' }));
+  });
+
   it('should add multiple files', () => {
     service.add(['file1.ts', 'file2.ts']);
     expect(mockExecuteSync).toHaveBeenCalledWith('git', ['add', 'file1.ts', 'file2.ts'], expect.any(Object));
@@ -139,17 +144,29 @@ describe('GitService', () => {
 
   it('should add worktree', () => {
     service.worktreeAdd('/path/to/wt', 'branch');
-    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'add', '-f', '/path/to/wt', 'branch'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['worktree', 'add', '-f', '/path/to/wt', 'branch'],
+      expect.any(Object),
+    );
   });
 
   it('should add worktree with base', () => {
     service.worktreeAdd('/path/to/wt', 'branch', 'base');
-    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'add', '-f', '-b', 'branch', '/path/to/wt', 'base'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['worktree', 'add', '-f', '-b', 'branch', '/path/to/wt', 'base'],
+      expect.any(Object),
+    );
   });
 
   it('should remove worktree', () => {
     service.worktreeRemove('/path/to/wt');
-    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'remove', '-f', '/path/to/wt'], expect.any(Object));
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['worktree', 'remove', '-f', '/path/to/wt'],
+      expect.any(Object),
+    );
   });
 
   it('should prune worktrees', () => {
@@ -161,5 +178,46 @@ describe('GitService', () => {
     mockExecuteSync.mockReturnValue({ code: 0, stdout: 'hash', stderr: '' });
     expect(service.mergeBase('main', 'feature')).toBe('hash');
     expect(mockExecuteSync).toHaveBeenCalledWith('git', ['merge-base', 'main', 'feature'], expect.any(Object));
+  });
+
+  it('should init sparse checkout', () => {
+    service.sparseCheckoutInit('/path');
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['sparse-checkout', 'init', '--cone'],
+      expect.objectContaining({ cwd: '/path' }),
+    );
+  });
+
+  it('should set sparse checkout paths', () => {
+    service.sparseCheckoutSet('/path', ['dir1', 'dir2']);
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['sparse-checkout', 'set', 'dir1', 'dir2'],
+      expect.objectContaining({ cwd: '/path' }),
+    );
+  });
+
+  it('should clean stale worktrees', () => {
+    service.cleanStaleWorktrees();
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'prune'], expect.any(Object));
+  });
+
+  it('should init submodule', () => {
+    service.submoduleInit('/path');
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['submodule', 'init'],
+      expect.objectContaining({ cwd: '/path' }),
+    );
+  });
+
+  it('should update submodule', () => {
+    service.submoduleUpdate('/path');
+    expect(mockExecuteSync).toHaveBeenCalledWith(
+      'git',
+      ['submodule', 'update', '--init', '--recursive'],
+      expect.objectContaining({ cwd: '/path' }),
+    );
   });
 });

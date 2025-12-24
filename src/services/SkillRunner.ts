@@ -24,7 +24,7 @@ export class SkillRunner implements ISkillRunner {
     private driverRegistry: DriverRegistry,
     private promptEngine: PromptEngine,
     private host: IRuntimeHost,
-  ) { }
+  ) {}
 
   init(): Promise<void> {
     this.loadYamlSkills();

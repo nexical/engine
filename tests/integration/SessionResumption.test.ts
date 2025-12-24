@@ -63,6 +63,7 @@ describe('Session Resumption Integration', () => {
     // Mock a partial run: Architecting -> Planning -> STOP
     fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
       if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
