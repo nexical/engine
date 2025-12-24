@@ -22,8 +22,12 @@ describe('PlannerAgent', () => {
   let mockSkillRunner: jest.Mocked<ISkillRunner>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
   let mockDriver: jest.Mocked<IDriver>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(() => {
+    mockHost = {
+      log: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
     mockProject = {
       getConstraints: jest.fn().mockReturnValue('constraints'),
       paths: {
@@ -63,10 +67,6 @@ describe('PlannerAgent', () => {
     mockEvolution = {
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
-
-    const mockHost = {
-      log: jest.fn(),
-    } as unknown as jest.Mocked<IRuntimeHost>;
 
     agent = new PlannerAgent(
       mockProject,
@@ -157,6 +157,35 @@ describe('PlannerAgent', () => {
       mockDriver.execute.mockResolvedValue(mockResult as unknown as Result<string, Error>);
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
+    });
+
+    it('should throw and log error if plan YAML is invalid', async () => {
+      const mockArch = { data: {} } as Architecture;
+      const invalidYaml = 'invalid: yaml: content: :';
+      const mockResult = Result.ok(invalidYaml);
+      mockDriver.execute.mockResolvedValue(mockResult);
+
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to parse plan YAML'));
+    });
+
+    it('should handle non-Error throw during plan parsing', async () => {
+      const mockArch = { data: {} } as Architecture;
+      const validYaml = 'plan: valid';
+      const mockResult = Result.ok(validYaml);
+      mockDriver.execute.mockResolvedValue(mockResult);
+
+      const spy = jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {
+        throw 'String Error';
+      });
+
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('String Error');
+      expect(mockHost.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to parse plan YAML: String Error'),
+      );
+
+      spy.mockRestore();
     });
   });
 });

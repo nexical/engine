@@ -8,6 +8,7 @@ import { EngineState } from '../../../src/domain/State.js';
 import { Task } from '../../../src/domain/Task.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { SignalDetectedError } from '../../../src/errors/SignalDetectedError.js';
+import { GitService } from '../../../src/services/GitService.js';
 import { ISkillRunner } from '../../../src/services/SkillRunner.js';
 import { Signal, SignalType } from '../../../src/workflow/Signal.js';
 
@@ -17,10 +18,13 @@ describe('DeveloperAgent', () => {
   let mockWorkspace: jest.Mocked<IWorkspace>;
   let mockSkillRunner: jest.Mocked<ISkillRunner>;
   let mockHost: jest.Mocked<IRuntimeHost>;
+  let mockGit: jest.Mocked<GitService>;
   let state: EngineState;
 
   beforeEach(() => {
-    mockProject = {} as unknown as jest.Mocked<IProject>;
+    mockProject = {
+      paths: { root: '/tmp' },
+    } as unknown as jest.Mocked<IProject>;
     mockWorkspace = {
       loadPlan: jest.fn(),
       detectSignal: jest.fn<() => Promise<Signal | null>>().mockResolvedValue(null),
@@ -34,11 +38,15 @@ describe('DeveloperAgent', () => {
       ask: jest.fn(),
       emit: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
+    mockGit = {
+      add: jest.fn(),
+      commit: jest.fn(),
+    } as unknown as jest.Mocked<GitService>;
 
     state = new EngineState('test-session');
     state.initialize('prompt');
 
-    agent = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost);
+    agent = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
   });
 
   it('should be defined', () => {
@@ -140,6 +148,31 @@ describe('DeveloperAgent', () => {
 
       await expect(agent.execute(state)).rejects.toBe('String error');
       expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Task 1 failed: String error'));
+    });
+
+    it('should log warning but not fail if git commit throws', async () => {
+      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
+      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+      mockGit.commit.mockImplementation(() => {
+        throw new Error('Git failure');
+      });
+
+      await agent.execute(state);
+
+      expect(mockSkillRunner.runSkill).toHaveBeenCalled();
+      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Git commit failed'));
+      expect(state.tasks.completed).toContain('1');
+    });
+    it('should skip git operations if git service is not provided', async () => {
+      const agentNoGit = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, undefined);
+      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
+      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+
+      await agentNoGit.execute(state);
+
+      expect(mockSkillRunner.runSkill).toHaveBeenCalled();
+      expect(mockGit.commit).not.toHaveBeenCalled();
+      expect(state.tasks.completed).toContain('1');
     });
   });
 });

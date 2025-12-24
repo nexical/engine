@@ -72,8 +72,4 @@ export class ArchitectAgent {
 
     return reloaded;
   }
-
-  private saveHistory(): void {
-    this.workspace.archiveArtifacts();
-  }
 }

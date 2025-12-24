@@ -59,6 +59,8 @@ jest.unstable_mockModule('../../../src/services/DIContainer.js', () => ({ DICont
 jest.unstable_mockModule('../../../src/agents/ArchitectAgent.js', () => ({ ArchitectAgent: MockArchitectAgent }));
 jest.unstable_mockModule('../../../src/agents/PlannerAgent.js', () => ({ PlannerAgent: MockPlannerAgent }));
 jest.unstable_mockModule('../../../src/agents/DeveloperAgent.js', () => ({ DeveloperAgent: MockDeveloperAgent }));
+const MockGitService = jest.fn().mockImplementation(() => ({}));
+jest.unstable_mockModule('../../../src/services/GitService.js', () => ({ GitService: MockGitService }));
 
 const { ServiceFactory } = await import('../../../src/services/ServiceFactory.js');
 
@@ -131,6 +133,7 @@ describe('ServiceFactory', () => {
     expect(services.workspace).toBe(mockWorkspace);
     expect(services.session).toBe(mockSession);
     expect(mockBrain.init).toHaveBeenCalled();
+    expect(mockContainer.registerFactory).toHaveBeenCalledWith('gitService', expect.any(Function));
   });
 
   it('should invoke factory callbacks correctly', async () => {
@@ -166,6 +169,10 @@ describe('ServiceFactory', () => {
     // Test SkillRunner Factory
     factories['skillRunner']?.();
     expect(MockSkillRunner).toHaveBeenCalledWith(mockProject, mockDriverRegistry, mockPromptEngine, mockHost);
+
+    // Test GitService Factory
+    factories['gitService']?.();
+    expect(MockGitService).toHaveBeenCalledWith(mockHost, '/root');
 
     // Test EvolutionService Factory
     factories['evolutionService']?.();

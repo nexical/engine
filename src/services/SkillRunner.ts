@@ -23,30 +23,29 @@ export class SkillRunner implements ISkillRunner {
     private driverRegistry: DriverRegistry,
     private promptEngine: PromptEngine,
     private host: IRuntimeHost,
-  ) {}
+  ) { }
 
   async init(): Promise<void> {
     await this.loadYamlSkills();
   }
 
   private async loadYamlSkills(): Promise<void> {
-    await Promise.resolve();
-    const skillsDir = this.project.paths.skills;
-    if (!this.project.fileSystem.isDirectory(skillsDir)) {
+    if (!(await this.project.fileSystem.isDirectory(this.project.paths.skills))) {
       return;
     }
 
-    const files = this.project.fileSystem.listFiles(skillsDir);
+    const files = await this.project.fileSystem.listFiles(this.project.paths.skills);
+
     for (const filename of files) {
-      if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml')) {
-        const filePath = path.join(skillsDir, filename);
-        const content = this.project.fileSystem.readFile(filePath);
+      if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml') || filename.endsWith('.yml')) {
+        const filePath = path.join(this.project.paths.skills, filename);
         try {
+          const content = await this.project.fileSystem.readFile(filePath);
           const profile = yaml.load(content);
           const parsed = SkillSchema.parse(profile);
           this.skills[parsed.name] = parsed as ISkill;
-        } catch (_e) {
-          this.host.log('error', `Error loading skill profile ${filename}: ${(_e as Error).message}`);
+        } catch (e: any) {
+          this.host.log('error', `Error loading skill profile ${filename}: ${e.message}`);
         }
       }
     }
@@ -79,28 +78,19 @@ export class SkillRunner implements ISkillRunner {
           continue;
         }
 
-        // Start of the change
-        if (driver) {
-          const valid = await driver.validateSkill(skill);
-          this.host.log('debug', `[DEBUG SkillRunner] Validating ${skill.name} with ${driver.name}: ${valid}`);
-          if (!valid) {
-            errors.push(
-              `Skill '${name}' failed validation for driver '${driver.name}': Driver reported incompatibility.`,
-            );
-          }
-        } else {
-          this.host.log('debug', `[DEBUG SkillRunner] No driver found for provider ${skill.provider}`);
+        const valid = await driver.validateSkill(skill);
+        if (!valid) {
+          errors.push(
+            `Skill '${name}' failed validation for driver '${driver.name}': Driver reported incompatibility.`,
+          );
         }
-        // End of the change
       } catch (_e) {
-        errors.push(`Error validating skill '${name}': ${(_e as Error).message}`);
+        this.host.log('error', `Error loading skill profile ${name}: ${(_e as Error).message}`);
       }
     }
 
     if (errors.length > 0) {
-      const msg = `Skill validation failed:\n${errors.map((e) => `- ${e}`).join('\n')}`;
-      this.host.log('error', `[DEBUG SkillRunner] Throwing: ${msg}`);
-      throw new Error(msg);
+      throw new Error(`Skill validation failed:\n${errors.join('\n')}`);
     }
 
     this.host.log('debug', `Validated ${Object.keys(this.skills).length} skills successfully.`);

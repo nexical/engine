@@ -101,8 +101,10 @@ describe('SkillRunner', () => {
 
     // Default happy path setup
     mockFsIsDirectory.mockReturnValue(true);
-    mockFsListFiles.mockReturnValue(['test.skill.yaml']);
-    mockFsReadFile.mockReturnValue('yaml content');
+    mockRegistryGet.mockReturnValue(mockDriver as unknown as IDriver);
+    mockRegistryGetDefault.mockReturnValue(mockDriver as unknown as IDriver);
+    mockFsListFiles.mockReturnValue(['skill.yml']);
+    mockFsReadFile.mockReturnValue('name: test-skill');
 
     mockYaml.load.mockReturnValue({ name: 'test-skill', provider: 'mock-driver' });
     MockSkillSchema.parse.mockReturnValue({ name: 'test-skill', provider: 'mock-driver' });
@@ -183,33 +185,40 @@ describe('SkillRunner', () => {
     });
 
     it('should fail if default driver missing for provider-less skill', async () => {
-      MockSkillSchema.parse.mockReturnValue({ name: 'test-skill' }); // no provider
-      await runner.init(); // reload
+      // Force skill to have no provider
+      const skillNoProvider = { name: 'test-skill' };
+      // @ts-ignore - reaching into private/protected or public property
+      runner.skills['test-skill'] = skillNoProvider as any;
 
       mockRegistryGetDefault.mockReturnValue(undefined);
       await expect(runner.validateAvailableSkills()).rejects.toThrow('needs a default driver but none is available.');
     });
+  });
 
-    it('should handle skill validation when driver is not found', async () => {
-      // This is hard to trigger because validateAvailableSkills usually throws earlier if driver is missing.
-      // But if getDefault() returns undefined, it hits line 68.
-      MockSkillSchema.parse.mockReturnValue({ name: 'skill-no-driver' });
-      await runner.init();
-      mockRegistryGetDefault.mockReturnValue(undefined);
-      await expect(runner.validateAvailableSkills()).rejects.toThrow('needs a default driver');
-    });
+  it('should fail if driver not supported', async () => {
+    // Manually populate skills to bypass init/fs complexity since we are outside the describe block that calls init
+    (runner as any).skills = {
+      'test-skill': { name: 'test-skill', provider: 'mock-driver' },
+    };
 
-    it('should fail if driver not supported', async () => {
-      mockDriverIsSupported.mockResolvedValue(false);
-      await expect(runner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
-    });
+    // Override registry to return a driver that is NOT supported
+    const mockBadDriver = { ...mockDriver, isSupported: jest.fn<() => Promise<boolean>>().mockResolvedValue(false) };
 
-    it('should handle driver errors during validation', async () => {
-      mockDriverValidateSkill.mockImplementation(() => {
-        throw new Error('validation crash');
-      });
-      await expect(runner.validateAvailableSkills()).rejects.toThrow('validation crash');
-    });
+    mockRegistryGet.mockReturnValue(mockBadDriver as unknown as IDriver);
+    mockRegistryGetDefault.mockReturnValue(mockBadDriver as unknown as IDriver);
+
+    await expect(runner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
+  });
+
+  it('should handle driver errors during validation', async () => {
+    (runner as any).skills = {
+      'test-skill': { name: 'test-skill', provider: 'mock-driver' },
+    };
+
+    mockDriverValidateSkill.mockRejectedValue(new Error('validation crash'));
+
+    await runner.validateAvailableSkills();
+    expect(mockHostLog).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
   });
 
   describe('runSkill', () => {

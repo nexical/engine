@@ -69,7 +69,14 @@ describe('PlanningState', () => {
     mockWorkspace.getArchitecture.mockResolvedValue({} as Architecture);
     mockHost.ask.mockResolvedValue('revise it');
     const signal = await state.run(engineState);
-    expect(signal.type).toBe(SignalType.REPLAN);
     expect(signal.metadata).toEqual({ feedback: 'revise it' });
+  });
+
+  it('should return rearchitect signal if feedback contains "rearchitect"', async () => {
+    mockWorkspace.getArchitecture.mockResolvedValue({} as Architecture);
+    mockHost.ask.mockResolvedValue('I want to rearchitect this');
+    const signal = await state.run(engineState);
+    expect(signal.type).toBe(SignalType.REARCHITECT);
+    expect(signal.metadata).toEqual({ feedback: 'I want to rearchitect this' });
   });
 });

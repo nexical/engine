@@ -1,15 +1,16 @@
 {
   "name": "@astrical/engine",
   "version": "0.1.0",
-  "description": "Extensible AI-driven multi-agent planner and orchstrator for local project development",
+  "description": "Extensible AI-driven multi-agent planner and orchestrator for local project development",
   "scripts": {
     "build": "tsc --build --force && cp -fr src/prompts dist/",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",
-    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
-    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
+    "test:unit": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
+    "test:one": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:integration": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules jest tests/integration --collectCoverage=false",
     "test": "npm run test:unit && npm run test:integration",
     "prepare": "husky"
   },

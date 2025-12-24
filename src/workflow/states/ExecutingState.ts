@@ -21,26 +21,23 @@ export class ExecutingState extends State {
       // Fallback for cases where instanceof might fail (ESM/Jest quirks)
       const errObj = error as Record<string, unknown>;
 
-      if (errObj && typeof errObj === 'object') {
-        if (errObj.code === 'SIGNAL_DETECTED' && errObj.signal) {
-          return errObj.signal as Signal;
-        }
-      }
-
       const metadata = (errObj?.metadata || {}) as Record<string, unknown>;
       const rawSignal = (errObj?.signal || metadata.signal) as Record<string, unknown> | undefined;
 
       if (errObj && typeof errObj === 'object' && (errObj.code === 'SIGNAL_DETECTED' || rawSignal)) {
         if (rawSignal && typeof rawSignal.type === 'string') {
-          return new Signal(
-            rawSignal.type as SignalType,
-            (rawSignal.reason as string) || '',
-            (rawSignal.metadata as Record<string, unknown>) || {},
-          );
+          const reason = typeof rawSignal.reason === 'string' ? rawSignal.reason : '';
+          const meta =
+            rawSignal.metadata && typeof rawSignal.metadata === 'object'
+              ? (rawSignal.metadata as Record<string, unknown>)
+              : {};
+          return new Signal(rawSignal.type as SignalType, reason, meta);
         }
         return Signal.fail('Signal detected but missing signal object or type');
       }
-      return Signal.fail(`Execution failed: ${(error as Error).message}`);
+
+      const message = error instanceof Error ? error.message : String(error);
+      return Signal.fail(`Execution failed: ${message}`);
     }
   }
 }

@@ -62,4 +62,63 @@ describe('ExecutingState', () => {
     const signal = await state.run(engineState);
     expect(signal.type).toBe(SignalType.FAIL);
   });
+  it('should handle error object with code SIGNAL_DETECTED and signal property', async () => {
+    const signal = new Signal(SignalType.FAIL, 'stop');
+    const errObj = { code: 'SIGNAL_DETECTED', signal };
+    mockDeveloper.execute.mockRejectedValue(errObj);
+
+    const result = await state.run(engineState);
+    expect(result).toEqual(signal);
+  });
+
+  it('should handle error object with raw signal data', async () => {
+    const rawSignal = { type: 'REPLAN', reason: 'change', metadata: { foo: 'bar' } };
+    const errObj = { code: 'SIGNAL_DETECTED', signal: rawSignal };
+    mockDeveloper.execute.mockRejectedValue(errObj);
+
+    const result = await state.run(engineState);
+    expect(result.type).toBe(SignalType.REPLAN);
+    expect(result.reason).toBe('change');
+    expect(result.metadata).toEqual({ foo: 'bar' });
+  });
+
+  it('should return fail signal if signal data is invalid', async () => {
+    const errObj = { code: 'SIGNAL_DETECTED', signal: undefined }; // Missing signal
+    mockDeveloper.execute.mockRejectedValue(errObj);
+
+    const result = await state.run(engineState);
+    expect(result.type).toBe(SignalType.FAIL);
+    expect(result.reason).toContain('Signal detected but missing signal object or type');
+  });
+
+  it('should handle signal in error metadata', async () => {
+    const rawSignal = { type: 'REPLAN', reason: 'change from metadata', metadata: { foo: 'bar' } };
+    const errObj = { message: 'Some error', metadata: { signal: rawSignal } };
+    mockDeveloper.execute.mockRejectedValue(errObj);
+
+    const result = await state.run(engineState);
+    expect(result.type).toBe(SignalType.REPLAN);
+    expect(result.reason).toBe('change from metadata');
+  });
+
+  it('should handle non-object error', async () => {
+    mockDeveloper.execute.mockRejectedValue('String Error'); // Not an object
+
+    // Should fall through to generic error handling
+    const result = await state.run(engineState);
+    expect(result.type).toBe(SignalType.FAIL);
+    expect(result.reason).toContain('Execution failed: String Error');
+  });
+
+  it('should handle signal with missing properties (defaults)', async () => {
+    // Only type provided, reason and metadata undefined
+    const rawSignal = { type: 'REPLAN' };
+    const errObj = { code: 'SIGNAL_DETECTED', signal: rawSignal };
+    mockDeveloper.execute.mockRejectedValue(errObj);
+
+    const result = await state.run(engineState);
+    expect(result.type).toBe(SignalType.REPLAN);
+    expect(result.reason).toBe(''); // Default
+    expect(result.metadata).toEqual({}); // Default
+  });
 });
