@@ -14,6 +14,7 @@ export type OrchestratorStatus =
 export class EngineState {
   public session_id: string;
   public status: OrchestratorStatus;
+  public current_state: string;
   public current_plan?: string;
   public loop_count: number;
   public tasks: {
@@ -29,6 +30,7 @@ export class EngineState {
   constructor(session_id: string) {
     this.session_id = session_id;
     this.status = 'IDLE';
+    this.current_state = 'ARCHITECTING';
     this.loop_count = 0;
     this.tasks = {
       completed: [],
@@ -43,6 +45,7 @@ export class EngineState {
     this.user_prompt = prompt;
     this.interactive = interactive;
     this.status = 'IDLE';
+    this.current_state = 'ARCHITECTING';
     this.loop_count = 0;
     this.tasks.failed = [];
     this.context = {};
@@ -80,6 +83,7 @@ export class EngineState {
     const state = new EngineState(session_id);
 
     if (data.status) state.status = data.status as OrchestratorStatus;
+    if (data.current_state) state.current_state = data.current_state as string;
     if (data.current_plan)
       state.current_plan =
         typeof data.current_plan === 'string' ? data.current_plan : JSON.stringify(data.current_plan);

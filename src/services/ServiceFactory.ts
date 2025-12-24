@@ -11,6 +11,7 @@ import { DriverRegistry, IDriverRegistry } from '../drivers/DriverRegistry.js';
 import { DIContainer } from './DIContainer.js';
 import { EvolutionService, IEvolutionService } from './EvolutionService.js';
 import { FileSystemService } from './FileSystemService.js';
+import { GitService } from './GitService.js';
 import { IPromptEngine, PromptEngine } from './PromptEngine.js';
 import { ISkillRunner, SkillRunner } from './SkillRunner.js';
 
@@ -82,6 +83,12 @@ export class ServiceFactory {
       return new EvolutionService(project as Project, fs as FileSystemService);
     });
 
+    container.registerFactory('gitService', () => {
+      const host = container.resolve<IRuntimeHost>('host');
+      const rootDirectory = container.resolve<string>('rootDirectory');
+      return new GitService(host, rootDirectory);
+    });
+
     // 5. Register Brain
     container.registerFactory('brain', () => {
       const project = container.resolve<IProject>('project');
@@ -102,13 +109,17 @@ export class ServiceFactory {
       // Register Default Agents
       brain.registerAgent(
         'architect',
-        (workspace) => new ArchitectAgent(project, workspace, promptEngine, driverRegistry, evolution),
+        (workspace) =>
+          new ArchitectAgent(project, workspace, promptEngine, driverRegistry, skillRunner, evolution, host),
       );
       brain.registerAgent(
         'planner',
-        (workspace) => new PlannerAgent(project, workspace, promptEngine, driverRegistry, skillRunner, evolution),
+        (workspace) => new PlannerAgent(project, workspace, promptEngine, driverRegistry, skillRunner, evolution, host),
       );
-      brain.registerAgent('developer', (workspace) => new DeveloperAgent(project, workspace, skillRunner, host));
+      brain.registerAgent('developer', (workspace) => {
+        const gitService = container.resolve<GitService>('gitService');
+        return new DeveloperAgent(project, workspace, skillRunner, host, gitService);
+      });
 
       return brain;
     });

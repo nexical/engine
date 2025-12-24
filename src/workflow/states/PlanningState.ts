@@ -26,7 +26,12 @@ export class PlanningState extends State {
         state,
         'Plan generated. Approve? (yes/feedback)',
         Signal.fail('User rejected plan.'),
-        (feedback) => Signal.replan('User feedback on plan', { feedback }),
+        (feedback) => {
+          if (feedback.toLowerCase().includes('rearchitect')) {
+            return Signal.rearchitect('User requested re-architecture from planning', { feedback });
+          }
+          return Signal.replan('User feedback on plan', { feedback });
+        },
       );
       if (approval) return approval;
 

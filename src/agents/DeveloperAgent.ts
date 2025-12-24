@@ -3,6 +3,7 @@ import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { EngineState } from '../domain/State.js';
 import { IWorkspace } from '../domain/Workspace.js';
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
+import { GitService } from '../services/GitService.js';
 import { ISkillRunner } from '../services/SkillRunner.js';
 
 export class DeveloperAgent {
@@ -14,6 +15,7 @@ export class DeveloperAgent {
     private workspace: IWorkspace,
     private skillRunner: ISkillRunner,
     private host: IRuntimeHost,
+    private git?: GitService,
   ) {}
 
   async execute(state: EngineState): Promise<void> {
@@ -27,8 +29,12 @@ export class DeveloperAgent {
     // Sync pending tasks in state
     state.tasks.pending = plan.tasks.map((t) => t.id).filter((id) => !state.tasks.completed.includes(id));
 
+    this.host.log('debug', `[DEBUG] Plan tasks IDs: ${JSON.stringify(plan.tasks.map((t) => t.id))}`);
+    this.host.log('debug', `[DEBUG] Completed tasks IDs: ${JSON.stringify(state.tasks.completed)}`);
+
     // Filter out completed tasks
     const tasksToExecute = plan.tasks.filter((task) => !state.tasks.completed.includes(task.id));
+    this.host.log('debug', `[DEBUG] Tasks to execute count: ${tasksToExecute.length}`);
 
     if (tasksToExecute.length === 0) {
       this.host.log('info', 'All tasks in plan are already completed.');
@@ -61,6 +67,17 @@ export class DeveloperAgent {
 
       state.completeTask(task.id);
       this.host.log('info', `Task ${task.id} completed.`);
+
+      // Optional: Git Commit
+      if (this.git) {
+        try {
+          this.git.add('.');
+          this.git.commit(`[nexical] Completed task: ${task.id} - ${task.message}`);
+        } catch (e) {
+          this.host.log('warn', `Git commit failed for task ${task.id}: ${e instanceof Error ? e.message : String(e)}`);
+          // We don't fail the whole workflow just because git failed
+        }
+      }
 
       // Check for signals after each task
       await this.checkSignals(task.id);

@@ -6,7 +6,6 @@ import { EngineState } from './State.js';
 import { IWorkspace } from './Workspace.js';
 
 export class Session {
-  public readonly id: string;
   public state: EngineState;
   public workflow: Workflow | null = null;
 
@@ -16,8 +15,11 @@ export class Session {
     private brain: Brain,
     private host: IRuntimeHost,
   ) {
-    this.id = new Date().toISOString().replace(/[:.]/g, '-');
-    this.state = new EngineState(this.id);
+    this.state = new EngineState(new Date().toISOString().replace(/[:.]/g, '-'));
+  }
+
+  public get id(): string {
+    return this.state.session_id;
   }
 
   public async start(prompt: string, interactive: boolean = false): Promise<void> {

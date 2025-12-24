@@ -106,6 +106,7 @@ export class Workspace implements IWorkspace {
     if (this.disk.exists(archCurrent)) {
       const archArchive = nodePath.join(archiveDir, `${timestamp}.architecture.md`);
       this.disk.copy(archCurrent, archArchive);
+      this.disk.deleteFile(archCurrent);
     }
 
     // Archive plan
@@ -113,6 +114,7 @@ export class Workspace implements IWorkspace {
     if (this.disk.exists(planCurrent)) {
       const planArchive = nodePath.join(archiveDir, `${timestamp}.plan.yml`);
       this.disk.copy(planCurrent, planArchive);
+      this.disk.deleteFile(planCurrent);
     }
   }
 

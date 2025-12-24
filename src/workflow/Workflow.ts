@@ -46,9 +46,8 @@ export class Workflow {
 
   public async start(state: EngineState, onStateChange?: () => Promise<void>): Promise<void> {
     // RESUME LOGIC: Check if we are resuming from a valid state on disk
-    // Ideally Orchestrator decides this, but here we enforce state continuity.
     if (state.status !== 'IDLE') {
-      const stateName = state.status as string;
+      const stateName = state.current_state;
       const restoredState = this.states.get(stateName);
       if (restoredState) {
         this.currentState = restoredState;
@@ -59,6 +58,10 @@ export class Workflow {
     }
 
     while (true) {
+      if (!this.currentState) {
+        this.host.log('error', '[Workflow] No current state! Breaking loop.');
+        break;
+      }
       // Retry/Loop protection: Check before entering state
       const maxLoops = this.graph.getConfig().maxLoops || 10;
       if (state.loop_count > maxLoops) {
@@ -70,6 +73,7 @@ export class Workflow {
 
       this.host.log('info', `[Workflow] Enter State: ${this.currentState.name} (Loop: ${state.loop_count})`);
       this.host.emit('state:enter', { state: this.currentState.name, loop: state.loop_count });
+      state.current_state = this.currentState.name;
       state.updateStatus(this.currentState.name as OrchestratorStatus);
       await this.workspace.saveState(state);
 

@@ -9,14 +9,14 @@ export const AgentConfigSchema = z
     skill: z.string().optional(),
     driver: z.string().optional(),
   })
-  .loose();
+  .passthrough();
 
 export const ProjectConfigurationSchema = z
   .object({
     agents: z.record(z.string(), AgentConfigSchema).optional(),
     // Add other known config fields here
   })
-  .loose();
+  .passthrough();
 
 export type ProjectProfile = z.infer<typeof ProjectConfigurationSchema>;
 

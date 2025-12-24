@@ -2,6 +2,7 @@ import { Architecture } from '../domain/Architecture.js';
 import { IDriver } from '../domain/Driver.js';
 import { Plan } from '../domain/Plan.js';
 import { IProject } from '../domain/Project.js';
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { IWorkspace } from '../domain/Workspace.js';
 import { AISkill } from '../drivers/base/AICLIDriver.js';
 import { IDriverRegistry } from '../drivers/DriverRegistry.js';
@@ -17,6 +18,7 @@ export class PlannerAgent {
     private driverRegistry: IDriverRegistry,
     private skillRunner: ISkillRunner,
     private evolutionService: IEvolutionService,
+    private host: IRuntimeHost,
   ) {}
 
   public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {
@@ -26,6 +28,7 @@ export class PlannerAgent {
     const agentSkills = JSON.stringify(this.skillRunner.getSkills(), null, 2);
 
     const fullPrompt = this.promptEngine.render(this.project.paths.plannerPrompt, {
+      ...this.project.getConfig(),
       user_prompt: userRequest,
       agent_skills: agentSkills,
       plan_file: this.project.paths.planCurrent,
@@ -60,8 +63,17 @@ export class PlannerAgent {
       throw result.error() || new Error('Planner execution failed');
     }
 
+    const planStr = result.unwrap();
+    try {
+      const plan = Plan.fromYaml(planStr);
+      await this.workspace.savePlan(plan);
+    } catch (e: any) {
+      this.host.log('error', `Failed to parse plan YAML: ${e.message}\nContent: ${planStr}`);
+      throw e;
+    }
+
     // Reload plan
-    const plan = await this.workspace.loadPlan();
-    return plan;
+    const reloaded = await this.workspace.loadPlan();
+    return reloaded;
   }
 }
