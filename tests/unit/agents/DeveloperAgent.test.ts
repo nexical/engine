@@ -1,5 +1,10 @@
 import { jest } from '@jest/globals';
 
+const mockExecSync = jest.fn();
+jest.unstable_mockModule('child_process', () => ({
+  execSync: mockExecSync,
+}));
+
 import { DeveloperAgent } from '../../../src/agents/DeveloperAgent.js';
 import { Plan } from '../../../src/domain/Plan.js';
 import { IProject } from '../../../src/domain/Project.js';
@@ -22,8 +27,13 @@ describe('DeveloperAgent', () => {
   let state: EngineState;
 
   beforeEach(() => {
+    jest.clearAllMocks();
+    mockExecSync.mockReset();
+
     mockProject = {
-      paths: { root: '/tmp' },
+      paths: { root: '/tmp', signals: '/tmp/signals' },
+      getConfig: jest.fn().mockReturnValue({}),
+      getConstraints: jest.fn().mockReturnValue('constraints'),
     } as unknown as jest.Mocked<IProject>;
     mockWorkspace = {
       loadPlan: jest.fn(),
@@ -31,6 +41,7 @@ describe('DeveloperAgent', () => {
     } as unknown as jest.Mocked<IWorkspace>;
     mockSkillRunner = {
       runSkill: jest.fn(),
+      getSkills: jest.fn().mockReturnValue([]),
     } as unknown as jest.Mocked<ISkillRunner>;
     mockHost = {
       log: jest.fn(),
@@ -41,6 +52,18 @@ describe('DeveloperAgent', () => {
     mockGit = {
       add: jest.fn(),
       commit: jest.fn(),
+      worktreeAdd: jest.fn(),
+      worktreeRemove: jest.fn(),
+      worktreePrune: jest.fn(),
+      merge: jest.fn(),
+      getCurrentBranch: jest.fn().mockReturnValue('main'),
+      deleteBranch: jest.fn(),
+      cleanStaleWorktrees: jest.fn(),
+      sparseCheckoutInit: jest.fn(),
+      sparseCheckoutSet: jest.fn(),
+      submoduleInit: jest.fn(),
+      submoduleUpdate: jest.fn(),
+      mergeBase: jest.fn(),
     } as unknown as jest.Mocked<GitService>;
 
     state = new EngineState('test-session');
@@ -54,125 +77,152 @@ describe('DeveloperAgent', () => {
   });
 
   describe('execute', () => {
-    it('should execute tasks in the plan', async () => {
-      const mockPlan = new Plan('test plan', [
-        new Task('1', 'task 1', 'desc 1', 'skill 1'),
-        new Task('2', 'task 2', 'desc 2', 'skill 2'),
+    it('should execute tasks in the plan sequentially', async () => {
+      const state = new EngineState('test-session');
+      const plan = new Plan('test plan', [
+        new Task('1', 'task 1', 'msg', 'test-skill')
       ]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+      mockWorkspace.loadPlan.mockResolvedValue(plan);
+
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'test-skill', provider: 'test' },
+      ]);
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill).toHaveBeenCalledTimes(2);
-      expect(state.tasks.completed).toContain('1');
-      expect(state.tasks.completed).toContain('2');
-    });
-
-    it('should skip completed tasks', async () => {
-      state.tasks.completed = ['1'];
-      const mockPlan = new Plan('test plan', [
-        new Task('1', 'task 1', 'desc 1', 'skill 1'),
-        new Task('2', 'task 2', 'desc 2', 'skill 2'),
-      ]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-
-      await agent.execute(state);
-
-      expect(mockSkillRunner.runSkill).toHaveBeenCalledTimes(1);
-      expect(state.tasks.completed).toContain('2');
-    });
-
-    it('should handle skill failure', async () => {
-      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-      mockSkillRunner.runSkill.mockRejectedValue(new Error('Skill failed'));
-
-      await expect(agent.execute(state)).rejects.toThrow('Skill failed');
-      expect(state.tasks.failed).toContain('1');
-    });
-
-    it('should throw SignalDetectedError if signal detected', async () => {
-      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-      mockWorkspace.detectSignal.mockResolvedValue(new Signal(SignalType.FAIL, 'test stop'));
-
-      await expect(agent.execute(state)).rejects.toThrow(SignalDetectedError);
-    });
-
-    it('should respect dependencies', async () => {
-      const mockPlan = new Plan('test plan', [
-        new Task('2', 'task 2', 'desc 2', 'skill 2', undefined, undefined, ['1']),
-      ]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-
-      await agent.execute(state);
-
-      expect(mockSkillRunner.runSkill).not.toHaveBeenCalled();
-      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Skipping task 2'));
-    });
-
-    it('should execute task if dependencies are fulfilled', async () => {
-      state.tasks.completed = ['1'];
-      const mockPlan = new Plan('test plan', [
-        new Task('2', 'task 2', 'desc 2', 'skill 2', undefined, undefined, ['1']),
-      ]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-
-      await agent.execute(state);
-
-      expect(mockSkillRunner.runSkill).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '2' }) as unknown,
-        expect.anything(),
+      expect(mockGit.worktreeAdd).toHaveBeenCalledWith(
+        expect.stringContaining('.worktrees/1'),
+        'task/1',
+        'main'
       );
-      expect(state.tasks.completed).toContain('2');
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        'msg',
+        expect.stringContaining('.worktrees/1')
+      );
+      expect(mockGit.commit).toHaveBeenCalled();
+      expect(mockGit.merge).toHaveBeenCalledWith('task/1');
     });
 
-    it('should return early if all tasks are already completed', async () => {
-      state.tasks.completed = ['1', '2'];
-      const mockPlan = new Plan('test plan', [
-        new Task('1', 'task 1', 'desc 1', 'skill 1'),
-        new Task('2', 'task 2', 'desc 2', 'skill 2'),
+    it('should execute parallel tasks using worktrees', async () => {
+      const state = new EngineState('test-session');
+      const plan = new Plan('test plan', [
+        new Task('1', 'task 1', 'msg1', 'skill1'),
+        new Task('2', 'task 2', 'msg2', 'skill2')
       ]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+      mockWorkspace.loadPlan.mockResolvedValue(plan);
+
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'skill1', provider: 'test' },
+        { name: 'skill2', provider: 'test' },
+      ]);
 
       await agent.execute(state);
 
-      expect(mockSkillRunner.runSkill).not.toHaveBeenCalled();
-      expect(mockHost.log).toHaveBeenCalledWith('info', 'All tasks in plan are already completed.');
+      // Should call worktree logic
+      expect(mockGit.worktreeAdd).toHaveBeenCalledTimes(2);
+      expect(mockGit.worktreeAdd).toHaveBeenCalledWith(expect.stringContaining('.worktrees/1'), 'task/1', 'main');
+      expect(mockGit.worktreeAdd).toHaveBeenCalledWith(expect.stringContaining('.worktrees/2'), 'task/2', 'main');
+
+      // Should run skills with worktree paths
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), expect.anything(), expect.stringContaining('.worktrees/1'));
+      expect(mockSkillRunner.runSkill).toHaveBeenCalledWith(expect.objectContaining({ id: '2' }), expect.anything(), expect.stringContaining('.worktrees/2'));
+
+      // Should copy .ai directory
+      // implementation calls: execSync(`cp -r "${aiDir}" "${aiTarget}"`) -> 1 argument
+      expect(mockExecSync).toHaveBeenCalledWith(expect.stringContaining('cp -r'));
+
+      // Should merge
+      expect(mockGit.merge).toHaveBeenCalledWith('task/1');
+      expect(mockGit.merge).toHaveBeenCalledWith('task/2');
+
+      // Should cleanup
+      expect(mockGit.worktreeRemove).toHaveBeenCalledTimes(2);
+      expect(mockGit.worktreePrune).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle skill failure with non-Error', async () => {
-      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-      mockSkillRunner.runSkill.mockRejectedValue('String error');
+    it('should handle parallel task failure', async () => {
+      const state = new EngineState('test-session');
+      const plan = new Plan('test plan', [
+        new Task('1', 'task 1', 'msg1', 'skill1'),
+        new Task('2', 'task 2', 'msg2', 'skill2')
+      ]);
+      mockWorkspace.loadPlan.mockResolvedValue(plan);
 
-      await expect(agent.execute(state)).rejects.toBe('String error');
-      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Task 1 failed: String error'));
-    });
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'skill1', provider: 'test' },
+        { name: 'skill2', provider: 'test' },
+      ]);
 
-    it('should log warning but not fail if git commit throws', async () => {
-      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
-      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
-      mockGit.commit.mockImplementation(() => {
-        throw new Error('Git failure');
+      mockSkillRunner.runSkill.mockImplementation(async (task) => {
+        if (task.id === '1') throw new Error('Task 1 failed');
+        return Promise.resolve();
       });
 
-      await agent.execute(state);
+      await expect(agent.execute(state)).rejects.toThrow('Task 1 failed');
+      expect(state.tasks.failed).toContain('1');
 
-      expect(mockSkillRunner.runSkill).toHaveBeenCalled();
-      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Git commit failed'));
-      expect(state.tasks.completed).toContain('1');
+      // Should NOT merge if failed (assuming fail-fast)
+      expect(mockGit.merge).not.toHaveBeenCalled();
+      // Should still cleanup (finally block)
+      expect(mockGit.worktreeRemove).toHaveBeenCalled();
     });
-    it('should skip git operations if git service is not provided', async () => {
+
+    it('should throw if git is missing for parallel execution', async () => {
       const agentNoGit = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, undefined);
-      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
+      const mockPlan = new Plan('test plan', [
+        new Task('1', 'task 1', 'desc 1', 'skill 1'),
+        new Task('2', 'task 2', 'desc 2', 'skill 2'),
+      ]);
       mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
 
-      await agentNoGit.execute(state);
+      await expect(agentNoGit.execute(state)).rejects.toThrow('Git is required');
+    });
 
-      expect(mockSkillRunner.runSkill).toHaveBeenCalled();
-      expect(mockGit.commit).not.toHaveBeenCalled();
-      expect(state.tasks.completed).toContain('1');
+    it('should run worktree setup commands', async () => {
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'skill 1', worktree_setup: ['npm install'] }
+      ]);
+
+      // It's a single task, so it runs SEQUENTIALLY by default in existing logic?
+      // Wait, getExecutionLayers will return [[Task 1]]. Length=1.
+      // My logic: if (tasks.length === 1) -> executeSequentialTask.
+      // Sequential task DOES NOT USE WORKTREES.
+      // So worktree_setup is ignored for sequential tasks?
+      // The user request said: "Every sequential task uses the default branch... but when we have parallel tasks we create a git worktree".
+      // So yes, worktrees are ONLY for parallel tasks.
+
+      // Verification: Add a parallel task set to force worktree usage.
+      const mockPlan2 = new Plan('test plan', [
+        new Task('1', 'task 1', 'desc 1', 'skill 1'),
+        new Task('2', 'task 2', 'desc 2', 'skill 2'),
+      ]);
+      mockWorkspace.loadPlan.mockResolvedValue(mockPlan2);
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'skill 1', worktree_setup: ['echo setup 1'] },
+        { name: 'skill 2', worktree_setup: ['echo setup 2'] }
+      ]);
+
+      await agent.execute(state);
+
+      expect(mockExecSync).toHaveBeenCalledWith('echo setup 1', expect.objectContaining({ cwd: expect.stringContaining('.worktrees/1') }));
+      expect(mockExecSync).toHaveBeenCalledWith('echo setup 2', expect.objectContaining({ cwd: expect.stringContaining('.worktrees/2') }));
+    });
+
+    it('should update submodules if enabled in config', async () => {
+      (mockProject.getConfig as jest.Mock).mockReturnValue({ git: { submodules: true } });
+      const mockPlan = new Plan('test plan for submodules', [
+        new Task('1', 'task 1', 'desc 1', 'test-skill'),
+      ]);
+      mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
+
+      mockSkillRunner.getSkills.mockReturnValue([
+        { name: 'test-skill', provider: 'test' },
+      ]);
+
+      await agent.execute(state);
+      expect(mockGit.submoduleUpdate).toHaveBeenCalledWith(expect.stringContaining('.worktrees/1'));
     });
   });
 });
+

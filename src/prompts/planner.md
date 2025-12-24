@@ -72,5 +72,11 @@ tasks:
     skill: "SkillName"
     persona: "frontend"
     dependencies: []
+  - id: "task-2"
+    message: "Description of task 2 (dependent on task-1)"
+    description: "Detailed description..."
+    skill: "AnotherSkill"
+    persona: "backend"
+    dependencies: ["task-1"]
 
 ### Generate Plan

@@ -136,4 +136,30 @@ describe('GitService', () => {
     service.pushDelete('origin', 'feature');
     expect(mockExecuteSync).toHaveBeenCalledWith('git', ['push', 'origin', '--delete', 'feature'], expect.any(Object));
   });
+
+  it('should add worktree', () => {
+    service.worktreeAdd('/path/to/wt', 'branch');
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'add', '-f', '/path/to/wt', 'branch'], expect.any(Object));
+  });
+
+  it('should add worktree with base', () => {
+    service.worktreeAdd('/path/to/wt', 'branch', 'base');
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'add', '-f', '-b', 'branch', '/path/to/wt', 'base'], expect.any(Object));
+  });
+
+  it('should remove worktree', () => {
+    service.worktreeRemove('/path/to/wt');
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'remove', '-f', '/path/to/wt'], expect.any(Object));
+  });
+
+  it('should prune worktrees', () => {
+    service.worktreePrune();
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['worktree', 'prune'], expect.any(Object));
+  });
+
+  it('should get merge base', () => {
+    mockExecuteSync.mockReturnValue({ code: 0, stdout: 'hash', stderr: '' });
+    expect(service.mergeBase('main', 'feature')).toBe('hash');
+    expect(mockExecuteSync).toHaveBeenCalledWith('git', ['merge-base', 'main', 'feature'], expect.any(Object));
+  });
 });

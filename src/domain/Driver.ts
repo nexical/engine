@@ -11,6 +11,9 @@ export interface ISkill {
   description?: string;
   provider?: string;
   dependencies?: string[];
+  worktree_setup?: string[];
+  hydration?: string[];
+  sparse_checkout?: string[];
   [key: string]: unknown;
 }
 
@@ -20,6 +23,7 @@ export interface IDriverContext {
   taskPrompt?: string;
   params?: Record<string, unknown>;
   env?: Record<string, string>;
+  cwd?: string;
 }
 
 export interface IDriver<TContext = IDriverContext, TResult = string> {
@@ -36,6 +40,9 @@ export const SkillSchema = z
     description: z.string().optional(),
     provider: z.string().optional(),
     dependencies: z.array(z.string()).optional(),
+    worktree_setup: z.array(z.string()).optional(),
+    hydration: z.array(z.string()).optional(),
+    sparse_checkout: z.array(z.string()).optional(),
   })
   .passthrough();
 

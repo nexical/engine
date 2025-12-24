@@ -66,6 +66,6 @@ describe('Git Integration', () => {
 
     // Verify commit was made via exec (simplest integration check)
     const log = execSync('git log -n 5 --oneline', { cwd: fixture.tmpDir }).toString();
-    expect(log).toMatch(/Completed task: t1/);
+    expect(log).toMatch(/Task complete: t1/);
   });
 });

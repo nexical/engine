@@ -14,6 +14,11 @@ export const AgentConfigSchema = z
 export const ProjectConfigurationSchema = z
   .object({
     agents: z.record(z.string(), AgentConfigSchema).optional(),
+    git: z
+      .object({
+        submodules: z.boolean().optional(),
+      })
+      .optional(),
     // Add other known config fields here
   })
   .passthrough();

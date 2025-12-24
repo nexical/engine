@@ -14,7 +14,7 @@ export interface IWorkspace {
   loadPlan(): Promise<Plan>;
   savePlan(doc: Plan): Promise<void>;
   archiveArtifacts(): void;
-  detectSignal(): Promise<Signal | null>;
+  detectSignal(path?: string): Promise<Signal | null>;
   clearSignals(): Promise<void>;
   saveState(state: EngineState): Promise<void>;
   loadState(): Promise<EngineState | undefined>;
@@ -121,9 +121,10 @@ export class Workspace implements IWorkspace {
   /**
    * Detects if any signal files exist in the signals directory.
    * Returns the first valid signal found, or null.
+   * @param path Optional path to check for signals. Defaults to project signals directory.
    */
-  public async detectSignal(): Promise<Signal | null> {
-    const signalsDir = this.project.paths.signals;
+  public async detectSignal(path?: string): Promise<Signal | null> {
+    const signalsDir = path || this.project.paths.signals;
     if (!this.disk.isDirectory(signalsDir)) return null;
 
     const files = this.disk.listFiles(signalsDir);

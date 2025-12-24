@@ -48,6 +48,12 @@ describe('Full System Integration (Smoke Test)', () => {
           ),
         );
       }
+      if (skill.name === 'developer') {
+        // Simulate work by writing a file
+        const { execSync } = await import('child_process');
+        execSync('echo "content" > built.txt'); // Writes to cwd (worktree)
+        return Promise.resolve(Result.ok('OK'));
+      }
       return Promise.resolve(Result.ok('OK'));
     });
 

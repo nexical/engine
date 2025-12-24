@@ -12,7 +12,8 @@ export interface ISkillRunner {
   init(): Promise<void>;
   validateAvailableSkills(): Promise<void>;
   getSkills(): ISkill[];
-  runSkill(task: Task, userPrompt: string): Promise<void>;
+  getSkills(): ISkill[];
+  runSkill(task: Task, userPrompt: string, cwd?: string): Promise<void>;
 }
 
 export class SkillRunner implements ISkillRunner {
@@ -23,7 +24,7 @@ export class SkillRunner implements ISkillRunner {
     private driverRegistry: DriverRegistry,
     private promptEngine: PromptEngine,
     private host: IRuntimeHost,
-  ) {}
+  ) { }
 
   init(): Promise<void> {
     this.loadYamlSkills();
@@ -101,7 +102,7 @@ export class SkillRunner implements ISkillRunner {
     return Object.values(this.skills);
   }
 
-  async runSkill(task: Task, userPrompt: string): Promise<void> {
+  async runSkill(task: Task, userPrompt: string, cwd?: string): Promise<void> {
     this.host.log('info', task.message);
 
     const profile = this.skills[task.skill];
@@ -109,10 +110,10 @@ export class SkillRunner implements ISkillRunner {
       throw new Error(`Skill '${task.skill}' not found.`);
     }
 
-    await this.executeSkill(task, profile, userPrompt);
+    await this.executeSkill(task, profile, userPrompt, cwd);
   }
 
-  private async executeSkill(task: Task, profile: ISkill, userPrompt: string): Promise<void> {
+  private async executeSkill(task: Task, profile: ISkill, userPrompt: string, cwd?: string): Promise<void> {
     // Determine which driver to use.
     let driver;
     if (profile.provider) {
@@ -158,6 +159,7 @@ export class SkillRunner implements ISkillRunner {
         taskId: task.id,
         taskPrompt: task.description,
         params: task.params,
+        cwd: cwd,
       });
 
       if (result.isFail()) {

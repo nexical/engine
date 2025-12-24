@@ -45,6 +45,20 @@ export class ProjectFixture {
     await this.writePrompt('architect.md', 'Architect {{ project_name }}');
     await this.writePrompt('planner.md', 'Planner {{ project_name }}');
     await this.writePrompt('skill.md', 'Skill Runner');
+
+    // Initialize Git Repo for Worktree Support
+    try {
+      const { execSync } = await import('child_process');
+      execSync('git init', { cwd: this.tmpDir });
+      execSync('git config user.email "test@example.com"', { cwd: this.tmpDir });
+      execSync('git config user.name "Test User"', { cwd: this.tmpDir });
+      // Track initial files to avoid merge collisions with untracked files later
+      execSync('git add .', { cwd: this.tmpDir });
+      // Create initial commit to allow worktrees
+      execSync('git commit -m "Initial commit"', { cwd: this.tmpDir });
+    } catch (e) {
+      console.warn('Failed to init git in fixture:', e);
+    }
   }
 
   async cleanup(): Promise<void> {

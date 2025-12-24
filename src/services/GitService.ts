@@ -60,17 +60,17 @@ export class GitService {
     this.runCommand(['pull', remote, branch]);
   }
 
-  add(files: string | string[]): void {
+  add(files: string | string[], cwd?: string): void {
     const fileList = Array.isArray(files) ? files : [files];
-    this.runCommand(['add', ...fileList]);
+    this.runCommand(['add', ...fileList], cwd);
   }
 
-  commit(message: string): void {
-    this.runCommand(['commit', '-m', message]);
+  commit(message: string, cwd?: string): void {
+    this.runCommand(['commit', '-m', message], cwd);
   }
 
-  push(remote: string = 'origin', branch: string = 'main'): void {
-    this.runCommand(['push', remote, branch]);
+  push(remote: string = 'origin', branch: string = 'main', cwd?: string): void {
+    this.runCommand(['push', remote, branch], cwd);
   }
 
   status(): string {
@@ -88,5 +88,57 @@ export class GitService {
 
   pushDelete(remote: string, branch: string): void {
     this.runCommand(['push', remote, '--delete', branch]);
+  }
+
+  worktreeAdd(path: string, branch: string, base?: string): void {
+    const args = ['worktree', 'add', '-f'];
+
+    if (base) {
+      // Create new branch from base: git worktree add -f -b <branch> <path> <base>
+      args.push('-b', branch, path, base);
+    } else {
+      // Checkout existing branch: git worktree add -f <path> <branch>
+      args.push(path, branch);
+    }
+
+    this.runCommand(args);
+  }
+
+  worktreeRemove(path: string): void {
+    this.runCommand(['worktree', 'remove', '-f', path]);
+  }
+
+  worktreePrune(): void {
+    this.runCommand(['worktree', 'prune']);
+  }
+
+  mergeBase(branch1: string, branch2: string): string {
+    return this.runCommand(['merge-base', branch1, branch2]);
+  }
+
+  sparseCheckoutInit(path: string): void {
+    this.runCommand(['sparse-checkout', 'init', '--cone'], path);
+  }
+
+  sparseCheckoutSet(path: string, paths: string[]): void {
+    this.runCommand(['sparse-checkout', 'set', ...paths], path);
+  }
+
+  cleanStaleWorktrees(): void {
+    this.runCommand(['worktree', 'prune']);
+    // We might want more aggressive cleanup here, e.g. finding directories in .worktrees/ that are not valid worktrees?
+    // For now, 'git worktree prune' helps if the git metadata believes they are gone.
+    // However, if the process crashed, the directory still exists.
+    // Real GC would involve FS operations to remove .worktrees/* if not locked.
+    // But per instructions: "Startup 'Garbage Collection' routine should check for and prune stale worktrees."
+    // Prune is the git command.
+  }
+
+  submoduleInit(path: string): void {
+    this.runCommand(['submodule', 'init'], path);
+  }
+
+  submoduleUpdate(path: string): void {
+    this.runCommand(['submodule', 'update', '--init', '--recursive'], path);
   }
 }
