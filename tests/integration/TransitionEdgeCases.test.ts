@@ -12,8 +12,7 @@
  * - SignalDetectedError propagation from deep within agents.
  */
 
-import { jest } from '@jest/globals';
-
+import { Result } from '../../src/domain/Result.js';
 import { SignalDetectedError } from '../../src/errors/SignalDetectedError.js';
 import { Signal } from '../../src/workflow/Signal.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -21,50 +20,50 @@ import { ProjectFixture } from './utils/ProjectFixture.js';
 describe('Workflow Transition Edge Cases', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
-    fixture.mockHost.log.mockImplementation((level: string, msg: string) => {
-      console.log(`[TEST ${level.toUpperCase()}] ${msg}`);
+    fixture.mockHost.log.mockImplementation((level: string, msg: string): void => {
+      process.stdout.write(`[TEST ${level.toUpperCase()}] ${msg}\n`);
     });
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should transition from PLANNING back to ARCHITECTING on REARCHITECT signal', async () => {
+  test('should transition from PLANNING back to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCase' });
     await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
 
-    fixture.registerMockDriver('gemini', async (skill: any) => {
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
       if (skill.name === 'architect') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
+        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
       if (skill.name === 'planner') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createPlanResult(), error: () => null };
+        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
       }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      return Promise.resolve(Result.ok('OK'));
     });
 
     // Trigger REARCHITECT via interaction
-    fixture.mockHost.ask.mockImplementation(async (msg: string) => {
+    fixture.mockHost.ask.mockImplementation(async (msg: string): Promise<string> => {
       if (msg.includes('Plan generated') && !rearchitected) {
         rearchitected = true;
-        return 'rearchitect: need more details';
+        return Promise.resolve('rearchitect: need more details');
       }
-      return 'yes';
+      return Promise.resolve('yes');
     });
 
     orchestrator.session.state.interactive = true;
     await orchestrator.start('Build it');
 
-    const stateEnters = fixture.mockHost.emit.mock.calls
-      .filter((call: any) => call[0] === 'state:enter')
-      .map((call: any) => call[1].state);
+    const stateEnters: string[] = fixture.mockHost.emit.mock.calls
+      .filter((call: [string, unknown]) => call[0] === 'state:enter')
+      .map((call: [string, unknown]) => (call[1] as { state: string }).state);
 
     // Sequence: ARCHITECTING -> PLANNING -> ARCHITECTING (re-entry) -> PLANNING -> EXECUTING -> COMPLETED
     expect(stateEnters).toContain('ARCHITECTING');
@@ -72,19 +71,19 @@ describe('Workflow Transition Edge Cases', () => {
     expect(orchestrator.session.state.status).toBe('COMPLETED');
   });
 
-  test('should transition from EXECUTING to ARCHITECTING on REARCHITECT signal', async () => {
+  test('should transition from EXECUTING to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCaseExec' });
     await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
 
-    fixture.registerMockDriver('gemini', async (skill: any) => {
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
       if (skill.name === 'architect') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
+        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
       if (skill.name === 'planner') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createPlanResult(), error: () => null };
+        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
       }
       if (skill.name === 'developer') {
         if (!rearchitected) {
@@ -92,16 +91,17 @@ describe('Workflow Transition Edge Cases', () => {
           // Properly use SignalDetectedError
           throw new SignalDetectedError(Signal.rearchitect('Need more structure'));
         }
-        return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+        return Promise.resolve(Result.ok('OK'));
       }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      return Promise.resolve(Result.ok('OK'));
     });
 
     await orchestrator.start('Complex task');
 
-    const stateEnters = fixture.mockHost.emit.mock.calls
-      .filter((call: any) => call[0] === 'state:enter')
-      .map((call: any) => call[1].state);
+    // Verify state cycles
+    const stateEnters: string[] = fixture.mockHost.emit.mock.calls
+      .filter((call: [string, unknown]) => call[0] === 'state:enter')
+      .map((call: [string, unknown]) => (call[1] as { state: string }).state);
 
     // Sequence: ARCHITECTING -> PLANNING -> EXECUTING -> ARCHITECTING -> PLANNING -> EXECUTING -> COMPLETED
     expect(stateEnters.filter((s: string) => s === 'ARCHITECTING').length).toBe(2);

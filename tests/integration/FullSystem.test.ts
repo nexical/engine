@@ -12,44 +12,43 @@
  * - Large payload handling in drivers and artifacts.
  */
 
-import { jest } from '@jest/globals';
 import fs from 'fs-extra';
 
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Full System Integration (Smoke Test)', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should execute full workflow from prompt to success', async () => {
+  test('should execute full workflow from prompt to success', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'SmokeTest' });
     await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill: any) => {
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
       if (skill.name === 'architect') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
+        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
       if (skill.name === 'planner') {
-        return {
-          isFail: () => false,
-          unwrap: () =>
+        return Promise.resolve(
+          Result.ok(
             ProjectFixture.createPlanResult([
               { id: 'task1', skill: 'developer', message: 'work', description: 'desc' },
             ]),
-          error: () => null,
-        };
+          ),
+        );
       }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      return Promise.resolve(Result.ok('OK'));
     });
 
     await orchestrator.start('Build a landing page');
@@ -58,7 +57,7 @@ describe('Full System Integration (Smoke Test)', () => {
     expect(orchestrator.session.state.tasks.completed).toContain('task1');
   });
 
-  test('should handle large payloads correctly (Scenario 16)', async () => {
+  test('should handle large payloads correctly (Scenario 16)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'LargePayloadTest' });
     await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
 
@@ -78,11 +77,10 @@ describe('Full System Integration (Smoke Test)', () => {
     }));
     const largePlan = ProjectFixture.createPlanResult(tasks);
 
-    fixture.registerMockDriver('gemini', async (skill: any) => {
-      if (skill.name === 'architect')
-        return { isFail: () => false, unwrap: () => largeArchitecture, error: () => null };
-      if (skill.name === 'planner') return { isFail: () => false, unwrap: () => largePlan, error: () => null };
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(largeArchitecture));
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(largePlan));
+      return Promise.resolve(Result.ok('OK'));
     });
 
     await orchestrator.start('Large prompt');

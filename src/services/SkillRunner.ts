@@ -79,16 +79,28 @@ export class SkillRunner implements ISkillRunner {
           continue;
         }
 
-        if (!(await driver.validateSkill(skill))) {
-          errors.push(`Skill '${name}' failed validation for driver '${driver.name}'.`);
+        // Start of the change
+        if (driver) {
+          const valid = await driver.validateSkill(skill);
+          this.host.log('debug', `[DEBUG SkillRunner] Validating ${skill.name} with ${driver.name}: ${valid}`);
+          if (!valid) {
+            errors.push(
+              `Skill '${name}' failed validation for driver '${driver.name}': Driver reported incompatibility.`,
+            );
+          }
+        } else {
+          this.host.log('debug', `[DEBUG SkillRunner] No driver found for provider ${skill.provider}`);
         }
+        // End of the change
       } catch (_e) {
         errors.push(`Error validating skill '${name}': ${(_e as Error).message}`);
       }
     }
 
     if (errors.length > 0) {
-      throw new Error(`Skill validation failed:\n${errors.map((e) => `- ${e}`).join('\n')}`);
+      const msg = `Skill validation failed:\n${errors.map((e) => `- ${e}`).join('\n')}`;
+      this.host.log('error', `[DEBUG SkillRunner] Throwing: ${msg}`);
+      throw new Error(msg);
     }
 
     this.host.log('debug', `Validated ${Object.keys(this.skills).length} skills successfully.`);

@@ -4,21 +4,32 @@ import yaml from 'js-yaml';
 import os from 'os';
 import path from 'path';
 
-import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
+import { Result } from '../../../src/domain/Result.js';
 import { Orchestrator } from '../../../src/orchestrator.js';
 import { SkillRunner } from '../../../src/services/SkillRunner.js';
 
 export class ProjectFixture {
   public tmpDir: string;
   public orchestrator!: Orchestrator;
-  public mockHost: any;
+  public mockHost: {
+    log: jest.Mock<(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown) => void>;
+    emit: jest.Mock<(event: string, data: unknown) => void>;
+    ask: jest.Mock<
+      (msg: string, type?: 'text' | 'confirm' | 'select', options?: string[]) => Promise<string | boolean>
+    >;
+    status: jest.Mock<(status: string) => void>;
+  };
 
   constructor() {
     this.tmpDir = '';
     this.mockHost = {
-      log: jest.fn(),
-      emit: jest.fn(),
-      ask: jest.fn<any>().mockResolvedValue('yes'),
+      log: jest.fn<(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: unknown) => void>(),
+      emit: jest.fn<(event: string, data: unknown) => void>(),
+      ask: jest
+        .fn<(msg: string, type?: 'text' | 'confirm' | 'select', options?: string[]) => Promise<string | boolean>>()
+        .mockResolvedValue('yes'),
+      status: jest.fn<(status: string) => void>(),
     };
   }
 
@@ -37,13 +48,13 @@ export class ProjectFixture {
   }
 
   async cleanup(): Promise<void> {
-    if (this.tmpDir && fs.existsSync(this.tmpDir)) {
+    if (this.tmpDir && (await fs.pathExists(this.tmpDir))) {
       await fs.remove(this.tmpDir);
     }
     jest.restoreAllMocks();
   }
 
-  async writeConfig(config: any): Promise<void> {
+  async writeConfig(config: Record<string, unknown>): Promise<void> {
     await fs.writeFile(path.join(this.tmpDir, '.ai/config.yml'), yaml.dump(config));
   }
 
@@ -51,7 +62,7 @@ export class ProjectFixture {
     await fs.writeFile(path.join(this.tmpDir, '.ai/prompts', name), content);
   }
 
-  async writeSkill(name: string, content: any): Promise<void> {
+  async writeSkill(name: string, content: Record<string, unknown>): Promise<void> {
     await fs.writeFile(path.join(this.tmpDir, '.ai/skills', `${name}.skill.yaml`), yaml.dump(content));
   }
 
@@ -64,17 +75,34 @@ export class ProjectFixture {
     return this.orchestrator;
   }
 
-  registerMockDriver(name: string, executeImpl?: (skill: any, options: any) => Promise<any>): any {
+  registerMockDriver(
+    name: string,
+    executeImpl?: (skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>,
+  ): {
+    name: string;
+    description: string;
+    isSupported: () => Promise<boolean>;
+    validateSkill: jest.Mock<(skill: ISkill) => Promise<boolean>>;
+    execute: jest.Mock<(skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>>;
+  } {
     const mockDriver = {
       name,
-      isSupported: async () => true,
+      description: `Mock driver for ${name}`,
+      isSupported: async (): Promise<boolean> => {
+        return Promise.resolve(true);
+      },
+      validateSkill: jest.fn<(skill: ISkill) => Promise<boolean>>().mockResolvedValue(true),
       execute: jest
-        .fn<any>()
-        .mockImplementation(
-          executeImpl || (async () => ({ isFail: () => false, unwrap: () => 'OK', error: () => null })),
-        ),
+        .fn<(skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>>()
+        .mockImplementation(async (skill, options) => {
+          if (executeImpl) return executeImpl(skill, options);
+          return Result.ok('OK');
+        }),
     };
-    (this.orchestrator.brain as any).driverRegistry.register(mockDriver as any, true);
+    const brainMock = this.orchestrator.brain as unknown as {
+      driverRegistry: { register: (driver: unknown, force: boolean) => void };
+    };
+    brainMock.driverRegistry.register(mockDriver, true);
     return mockDriver;
   }
 
@@ -83,7 +111,7 @@ export class ProjectFixture {
   }
 
   static createPlanResult(
-    tasks: any[] = [{ id: 't1', skill: 'developer', message: 'done', description: 'desc' }],
+    tasks: Record<string, unknown>[] = [{ id: 't1', skill: 'developer', message: 'done', description: 'desc' }],
   ): string {
     return yaml.dump({
       plan_name: 'Fixture Plan',

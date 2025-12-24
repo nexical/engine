@@ -12,23 +12,22 @@
  * - Fallback behavior for resilience.
  */
 
-import { jest } from '@jest/globals';
-
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Driver Management Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should fallback to default driver when requested driver is missing (Scenario 4)', async () => {
+  test('should fallback to default driver when requested driver is missing (Scenario 4)', async (): Promise<void> => {
     // Custom config to request non-existent driver
     await fixture.writeConfig({
       project_name: 'DriverTest',
@@ -40,13 +39,11 @@ describe('Driver Management Integration', () => {
     await fixture.initOrchestrator();
 
     let defaultDriverCalled = false;
-    fixture.registerMockDriver('gemini', async (skill: any) => {
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
       defaultDriverCalled = true;
-      if (skill.name === 'architect')
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
-      if (skill.name === 'planner')
-        return { isFail: () => false, unwrap: () => ProjectFixture.createPlanResult([]), error: () => null };
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      return Promise.resolve(Result.ok('OK'));
     });
 
     const orchestrator = fixture.orchestrator;

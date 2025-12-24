@@ -112,6 +112,7 @@ export class Workflow {
       if (signal.type === SignalType.FAIL) {
         this.host.log('error', `Workflow Failed: ${signal.reason}`);
         state.updateStatus('FAILED');
+        state.error = signal.reason;
         await this.workspace.saveState(state);
         break;
       }

@@ -12,8 +12,10 @@ export class GitService {
   }
 
   runCommand(args: string[], cwd?: string): string {
+    const finalCwd = cwd || this.rootDirectory;
+    this.host.log('debug', `[DEBUG GitService] Executing: git ${args.join(' ')} in ${finalCwd}`);
     const result = this.shell.executeSync('git', args, {
-      cwd: cwd || this.rootDirectory,
+      cwd: finalCwd,
     });
 
     if (result.code !== 0) {

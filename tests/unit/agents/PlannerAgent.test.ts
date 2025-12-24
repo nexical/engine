@@ -6,6 +6,7 @@ import { IDriver } from '../../../src/domain/Driver.js';
 import { Plan } from '../../../src/domain/Plan.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { Result } from '../../../src/domain/Result.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { IDriverRegistry } from '../../../src/drivers/DriverRegistry.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
@@ -35,6 +36,7 @@ describe('PlannerAgent', () => {
 
     mockWorkspace = {
       loadPlan: jest.fn(),
+      savePlan: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
 
     mockPromptEngine = {
@@ -62,6 +64,10 @@ describe('PlannerAgent', () => {
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
+    const mockHost = {
+      log: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
     agent = new PlannerAgent(
       mockProject,
       mockWorkspace,
@@ -69,6 +75,7 @@ describe('PlannerAgent', () => {
       mockDriverRegistry,
       mockSkillRunner,
       mockEvolution,
+      mockHost,
     );
   });
 
@@ -79,7 +86,8 @@ describe('PlannerAgent', () => {
   describe('plan', () => {
     it('should create a plan successfully', async () => {
       const mockArch = { data: {} } as Architecture;
-      const mockResult = Result.ok('some data');
+      const validYaml = 'plan_name: test\ntasks: []';
+      const mockResult = Result.ok(validYaml);
       mockDriver.execute.mockResolvedValue(mockResult);
       const mockPlan = new Plan('test');
       mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
@@ -103,7 +111,8 @@ describe('PlannerAgent', () => {
 
     it('should use default values if config is missing', async () => {
       const mockArch = { data: {} } as Architecture;
-      const mockResult = Result.ok('data');
+      const validYaml = 'plan_name: test\ntasks: []';
+      const mockResult = Result.ok(validYaml);
       mockDriver.execute.mockResolvedValue(mockResult);
       mockWorkspace.loadPlan.mockResolvedValue(new Plan('empty'));
 
@@ -120,7 +129,8 @@ describe('PlannerAgent', () => {
 
     it('should fallback to default driver if requested driver not found', async () => {
       const mockArch = { data: {} } as Architecture;
-      const mockResult = Result.ok('data');
+      const validYaml = 'plan_name: test\ntasks: []';
+      const mockResult = Result.ok(validYaml);
       mockDriver.execute.mockResolvedValue(mockResult);
       mockWorkspace.loadPlan.mockResolvedValue(new Plan('fallback'));
 

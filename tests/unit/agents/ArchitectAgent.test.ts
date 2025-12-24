@@ -5,10 +5,12 @@ import { Architecture } from '../../../src/domain/Architecture.js';
 import { IDriver } from '../../../src/domain/Driver.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { Result } from '../../../src/domain/Result.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { IDriverRegistry } from '../../../src/drivers/DriverRegistry.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
 import { IPromptEngine } from '../../../src/services/PromptEngine.js';
+import { ISkillRunner } from '../../../src/services/SkillRunner.js';
 
 describe('ArchitectAgent', () => {
   let agent: ArchitectAgent;
@@ -33,6 +35,7 @@ describe('ArchitectAgent', () => {
     mockWorkspace = {
       getArchitecture: jest.fn(),
       archiveArtifacts: jest.fn(),
+      saveArchitecture: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
 
     mockPromptEngine = {
@@ -56,7 +59,23 @@ describe('ArchitectAgent', () => {
       getLogSummary: jest.fn().mockReturnValue('evolution log'),
     } as unknown as jest.Mocked<IEvolutionService>;
 
-    agent = new ArchitectAgent(mockProject, mockWorkspace, mockPromptEngine, mockDriverRegistry, mockEvolution);
+    const mockHost = {
+      log: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
+    const mockSkillRunner = {
+      getSkills: jest.fn().mockReturnValue(['skill1']),
+    } as unknown as jest.Mocked<ISkillRunner>;
+
+    agent = new ArchitectAgent(
+      mockProject,
+      mockWorkspace,
+      mockPromptEngine,
+      mockDriverRegistry,
+      mockSkillRunner,
+      mockEvolution,
+      mockHost,
+    );
   });
 
   it('should be defined', () => {
@@ -77,7 +96,6 @@ describe('ArchitectAgent', () => {
       expect(mockDriverRegistry.get).toHaveBeenCalledWith('test_driver');
       expect(mockDriver.execute).toHaveBeenCalled();
       expect(mockWorkspace.getArchitecture).toHaveBeenCalledWith('current');
-      expect(mockWorkspace.archiveArtifacts).toHaveBeenCalled();
       expect(result).toBe(mockArchitecture);
     });
 

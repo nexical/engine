@@ -12,7 +12,6 @@
  * - File system interactions for project data.
  */
 
-import { jest } from '@jest/globals';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -21,16 +20,16 @@ import { ProjectFixture } from './utils/ProjectFixture.js';
 describe('Workspace Management Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should archive artifacts and serialize state correctly (Scenario 6 & 9)', async () => {
+  test('should archive artifacts and serialize state correctly (Scenario 6 & 9)', async (): Promise<void> => {
     const orchestrator = await fixture.initOrchestrator();
 
     const workspace = orchestrator.workspace;

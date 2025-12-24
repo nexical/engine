@@ -13,47 +13,86 @@
  * - Workflow state transitions upon resume.
  */
 
-import { jest } from '@jest/globals';
 import fs from 'fs-extra';
 import yaml from 'js-yaml';
 import path from 'path';
 
+import { ISkill } from '../../src/domain/Driver.js';
+import { Result } from '../../src/domain/Result.js';
+import { EngineState } from '../../src/domain/State.js';
+import { Orchestrator } from '../../src/orchestrator.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Session Resumption Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should resume session from saved state', async () => {
+  test('should resume session from saved state (Scenario 1)', async (): Promise<void> => {
+    await fixture.writeConfig({ project_name: 'ResumptionTest' });
+    const orchestrator = await fixture.initOrchestrator();
+
+    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      return Promise.resolve(Result.ok('OK'));
+    });
+
+    await orchestrator.start('First run');
+    const sessionId = orchestrator.session.id;
+
+    // Create a new orchestrator instance to simulate restart
+    const newOrchestrator = await fixture.initOrchestrator();
+    await newOrchestrator.session.resume();
+
+    expect(newOrchestrator.session.id).toBe(sessionId);
+    expect(newOrchestrator.session.state.status).toBe('COMPLETED');
+  });
+
+  test('should maintain state continuity across resumption (Scenario 7)', async (): Promise<void> => {
+    await fixture.writeConfig({ project_name: 'ContinuityTest' });
+    const orchestrator = await fixture.initOrchestrator();
+
+    // Mock a partial run: Architecting -> Planning -> STOP
+    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      return Promise.resolve(Result.ok('OK'));
+    });
+
+    // Manual state manipulation for continuity test
+    const state: EngineState = orchestrator.session.state;
+    state.status = 'PLANNING';
+    state.context.preserved_value = 'continuity-verified';
+    await orchestrator.workspace.saveState(state);
+
+    const resumedOrchestrator = await fixture.initOrchestrator();
+    await resumedOrchestrator.session.resume();
+
+    expect(resumedOrchestrator.session.state.context.preserved_value).toBe('continuity-verified');
+  });
+
+  test('should resume session from saved state after crash during planning', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'ResumeTest' });
 
     // 1. Start first session and let it run until it saves state
-    const orchestrator1 = await fixture.initOrchestrator();
+    const orchestrator1: Orchestrator = await fixture.initOrchestrator();
 
     // Setup Mock Driver to stop after first state
-    fixture.registerMockDriver('gemini', async (skill: any) => {
-      if (skill.name === 'architect')
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
+    fixture.registerMockDriver('gemini', async (skill: ISkill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       if (skill.name === 'planner') {
-        // Force state save before crashing so we can resume at PLANNING
-        // Note: In real flow, state is saved on entering STATE.
-        // We want to verify we can resume FROM planning.
-        // So if we crash IN planning, we should resume IN planning.
-        // Or if we crash before completing, we resume at start of that state?
-
-        // Let's explicitly save for test control
+        // Force state save before crashing
         await orchestrator1.workspace.saveState(orchestrator1.session.state);
-        throw new Error('Stop here');
+        return Promise.resolve(Result.fail(new Error('Stop here'))); // Simulate crash
       }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      return Promise.resolve(Result.ok('OK'));
     });
 
     // Run until failure/stop
@@ -61,53 +100,34 @@ describe('Session Resumption Integration', () => {
       await orchestrator1.start('Initial Prompt');
     } catch (e) {
       // Expected
+      expect((e as Error).message).toBe('Stop here');
     }
 
-    const sessionId = orchestrator1.session.id;
-    const stateFile = path.join(fixture.tmpDir, '.ai/state.yml');
+    const sessionId: string = orchestrator1.session.id;
+    const stateFile: string = path.join(fixture.tmpDir, '.ai/state.yml');
     expect(fs.existsSync(stateFile)).toBe(true);
 
-    const savedState = yaml.load(fs.readFileSync(stateFile, 'utf8')) as any;
+    const savedState: EngineState = yaml.load(fs.readFileSync(stateFile, 'utf8')) as EngineState;
     expect(savedState.session_id).toBe(sessionId);
+    expect(savedState.status).toBe('FAILED');
 
-    // 2. Clear first orchestrator and start a second one pointing to same dir
-    // Reset mockHost emit to clean state
+    // 2. Restart and resume
     fixture.mockHost.emit.mockClear();
+    const orchestrator2: Orchestrator = await fixture.initOrchestrator();
 
-    // Re-init orchestrator (creates new instance on same fixture)
-    const orchestrator2 = await fixture.initOrchestrator();
-
-    // Setup Mock Driver for resumption (this time it succeeds)
-    // Note: registerMockDriver modifies the global registry of the NEW orchestrator's brain
-    fixture.registerMockDriver('gemini', async (skill: any) => {
-      if (skill.name === 'planner')
-        return { isFail: () => false, unwrap: () => ProjectFixture.createPlanResult([]), error: () => null };
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      return Promise.resolve(Result.ok('OK'));
     });
 
-    // Mock workspace to return required data for PLANNING (since Architect didn't run this session)
-    // The Architect artifacts persist on disk, so real Workspace WOULD find them.
-    // But getArchitecture might be cached or require loading.
-    // Since fixture uses real FS, saveArchitect logic in Run 1 should have written files.
-    // So Run 2 should read them.
-    // BUT, to be safe and fast, let's mock if needed?
-    // No, let's trust the FS integration feature of ProjectFixture.
-    // Run 1 saved architecture. Run 2 reads it.
-
-    // Wait, Run 1 'architect' mock returned createArchitectResult().
-    // Does ArchitectAgent save it? Yes.
-    // So FS should have it.
-
-    // Call resume
     await orchestrator2.session.resume();
 
     expect(orchestrator2.session.id).toBe(sessionId);
     expect(orchestrator2.session.state.status).toBe('COMPLETED');
 
-    // Verify it entered PLANNING directly (skipped ARCHITECTING)
-    const stateEnters = fixture.mockHost.emit.mock.calls
-      .filter((call: any) => call[0] === 'state:enter')
-      .map((call: any) => call[1].state);
+    const stateEnters: string[] = fixture.mockHost.emit.mock.calls
+      .filter((call: [string, unknown]) => call[0] === 'state:enter')
+      .map((call: [string, unknown]) => (call[1] as { state: string }).state);
 
     expect(stateEnters).toContain('PLANNING');
     expect(stateEnters).not.toContain('ARCHITECTING');

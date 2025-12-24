@@ -67,9 +67,10 @@ export class PlannerAgent {
     try {
       const plan = Plan.fromYaml(planStr);
       await this.workspace.savePlan(plan);
-    } catch (e: any) {
-      this.host.log('error', `Failed to parse plan YAML: ${e.message}\nContent: ${planStr}`);
-      throw e;
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      this.host.log('error', `Failed to parse plan YAML: ${error.message}\nContent: ${planStr}`);
+      throw error;
     }
 
     // Reload plan

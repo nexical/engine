@@ -12,73 +12,58 @@
  * - Error handling propagation to FAILED state.
  */
 
-import { jest } from '@jest/globals';
-
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Workflow Engine Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should transition through ARCHITECTING -> PLANNING -> EXECUTING -> COMPLETED', async () => {
+  test('should transition through states correctly (Scenario 15)', async (): Promise<void> => {
+    await fixture.writeConfig({ project_name: 'WorkflowTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    // Mock Agents in Brain directly to bypass actual logic and just signal success
-    // We want to test the WORKFLOW engine, not the agents.
-    const mockArchitect = { design: jest.fn().mockImplementation(() => Promise.resolve({ id: 'arch-1' })) };
-    const mockPlanner = { plan: jest.fn().mockImplementation(() => Promise.resolve({ id: 'plan-1' })) };
-    // Developer execute normally returns (void) or logic?
-    // DeveloperAgent.execute returns Promise<void>.
-    const mockDeveloper = { execute: jest.fn().mockImplementation(() => Promise.resolve()) };
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      return Promise.resolve(Result.ok('OK'));
+    });
 
-    const brain = orchestrator.brain;
-    jest.spyOn(brain, 'createArchitect').mockReturnValue(mockArchitect as any);
-    jest.spyOn(brain, 'createPlanner').mockReturnValue(mockPlanner as any);
-    jest.spyOn(brain, 'createDeveloper').mockReturnValue(mockDeveloper as any);
+    await orchestrator.start('Run workflow');
 
-    // Mock workspace.getArchitecture to return something so PlanningState doesn't fail
-    jest.spyOn(orchestrator.workspace, 'getArchitecture').mockResolvedValue({} as any);
-
-    // Run the orchestrator
-    await orchestrator.execute('Build something');
-
-    // Verify each agent was called once
-    expect(mockArchitect.design).toHaveBeenCalledWith('Build something');
-    expect(mockPlanner.plan).toHaveBeenCalled();
-    expect(mockDeveloper.execute).toHaveBeenCalled();
-
-    // Verify the sequence of states via host emits
-    const stateEnters = fixture.mockHost.emit.mock.calls
-      .filter((call: any) => call[0] === 'state:enter')
-      .map((call: any) => call[1].state);
-
+    // Verify events were emitted    // Verify transitions
+    const stateEnters: string[] = fixture.mockHost.emit.mock.calls
+      .filter((call: [string, unknown]) => call[0] === 'state:enter')
+      .map((call: [string, unknown]) => (call[1] as { state: string }).state);
     expect(stateEnters).toEqual(['ARCHITECTING', 'PLANNING', 'EXECUTING', 'COMPLETED']);
   });
 
-  test('should stop on workflow failure', async () => {
+  test('should stop on workflow failure', async (): Promise<void> => {
+    await fixture.writeConfig({ project_name: 'FailTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    // Mock Architect to fail
-    const mockArchitect = {
-      design: jest.fn().mockImplementation(() => Promise.reject(new Error('Architectural meltdown'))),
-    };
-    jest.spyOn(orchestrator.brain, 'createArchitect').mockReturnValue(mockArchitect as any);
+    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') {
+        return Promise.resolve(Result.fail(new Error('Architectural meltdown')));
+      }
+      return Promise.resolve(Result.ok('OK'));
+    });
 
-    await orchestrator.execute('Build something');
+    await orchestrator.start('Build something');
 
-    const stateEnters = fixture.mockHost.emit.mock.calls
-      .filter((call: any) => call[0] === 'state:enter')
-      .map((call: any) => call[1].state);
+    const stateEnters: string[] = fixture.mockHost.emit.mock.calls
+      .filter((call: [string, unknown]) => call[0] === 'state:enter')
+      .map((call: [string, unknown]) => (call[1] as { state: string }).state);
 
-    // Should enter ARCHITECTING then stop (FAILED)
+    // Should enter ARCHITECTING then stop (FAILED or ERROR)
     expect(stateEnters).toEqual(['ARCHITECTING']);
     expect(orchestrator.session.state.status).toBe('FAILED');
   });

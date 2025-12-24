@@ -84,6 +84,7 @@ export class Project implements IProject {
 }
 
 class ProjectPaths {
+  public readonly root: string;
   public readonly ai: string;
   public readonly config: string;
   public readonly state: string;
@@ -109,6 +110,7 @@ class ProjectPaths {
   public readonly archive: string;
 
   constructor(root: string) {
+    this.root = root;
     this.ai = path.join(root, '.ai');
     this.config = path.join(this.ai, 'config.yml');
     this.state = path.join(this.ai, 'state.yml');

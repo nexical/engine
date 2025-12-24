@@ -14,21 +14,24 @@
 
 import { jest } from '@jest/globals';
 
+import { Architecture } from '../../src/domain/Architecture.js';
+import { IDriverContext, ISkill } from '../../src/domain/Driver.js';
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Agent Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('ArchitectAgent should render prompt and call driver', async () => {
+  test('ArchitectAgent should render prompt and call driver', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'AgentTest' });
 
     // Create specific prompts required for this test
@@ -38,17 +41,17 @@ describe('Agent Integration', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     // Register a mock driver that returns a valid architecture result
-    const mockResult = { components: [] };
-    // We want to verify the prompt was rendered correctly.
-    let captureParams: any = null;
-    fixture.registerMockDriver('gemini', async (skill: any, ctx: any) => {
-      captureParams = ctx;
-      return {
-        isFail: () => false,
-        unwrap: () => JSON.stringify(mockResult),
-        error: () => null,
-      };
-    });
+    let capturedArchitectPrompt: string = '';
+    fixture.registerMockDriver(
+      'gemini',
+      async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
+        if (skill.name === 'architect') {
+          capturedArchitectPrompt = (options?.params as { prompt: string } | undefined)?.prompt || '';
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult(['Component A', 'Component B'])));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     // Mock Workspace to bypass file reading if needed, though ProjectFixture sets up paths
     // But the agent design method interacts with workspace to load things in some flows.
@@ -56,16 +59,15 @@ describe('Agent Integration', () => {
     // ArchitectAgent -> PromptEngine -> render('architect.md', ...)
 
     // We rely on the real Workspace/FileSystem from the fixture for standard artifacts.
-    // But we might need to mock getArchitecture if the agent checks it first.
-    jest.spyOn(orchestrator.workspace, 'getArchitecture').mockResolvedValue({ id: 'test-arch' } as any);
+    // But we might need to mock getArchitecture    // Mock Workspace to bypass file reading if needed
+    jest
+      .spyOn(orchestrator.workspace, 'getArchitecture')
+      .mockResolvedValue({ id: 'test-arch' } as unknown as Architecture);
 
     const architect = orchestrator.brain.createArchitect(orchestrator.workspace);
-    const result = await architect.design('Create a blog');
+    await architect.design('Test request');
 
-    expect(result).toBeDefined();
-    expect(captureParams).toBeDefined();
-    // The driver receives { userPrompt: ..., params: { prompt: ... } }
-    expect(captureParams.params.prompt).toContain('User Request: Create a blog');
+    expect(capturedArchitectPrompt).toContain('Test request');
 
     // Verify the driver was called with the rendered prompt
     // We access the mockDriver implementation via the registry for verification

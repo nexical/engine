@@ -26,6 +26,7 @@ export class EngineState {
   public user_prompt: string = '';
   public interactive: boolean = false;
   public context: Record<string, unknown> = {};
+  public error?: string;
 
   constructor(session_id: string) {
     this.session_id = session_id;
@@ -105,6 +106,7 @@ export class EngineState {
     state.user_prompt = (data.user_prompt as string) || '';
     state.interactive = (data.interactive as boolean) || false;
     state.context = (data.context as Record<string, unknown>) || {};
+    state.error = data.error as string | undefined;
 
     return state;
   }

@@ -112,6 +112,7 @@ describe('Workflow', () => {
 
   it('should resume from existing state', async () => {
     engineState.status = 'PLANNING';
+    engineState.current_state = 'PLANNING';
     const planState = setupMockState(
       'PLANNING',
       jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>,
@@ -126,7 +127,8 @@ describe('Workflow', () => {
   });
 
   it('should ignore resume if state is not registered', async () => {
-    engineState.status = 'FAILED'; // Or any other status that might not be a valid state name
+    engineState.status = 'FAILED';
+    engineState.current_state = 'INVALID_STATE';
     mockGraph.getInitialState.mockReturnValue('ARCHITECTING');
     await workflow.start(engineState);
     expect(mockHost.log).not.toHaveBeenCalledWith('info', expect.stringContaining('Resuming'));

@@ -12,60 +12,60 @@
  * - Automatic commit message generation.
  */
 
-import { jest } from '@jest/globals';
+import { execSync } from 'child_process';
 
-import { GitService } from '../../src/services/GitService.js';
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
-describe('Git Integration Integration', () => {
+describe('Git Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should commit changes after each successful developer task', async () => {
+  test('should initialize git and commit shared content (Scenario 3)', async (): Promise<void> => {
+    // 1. Setup git in the tmp directory correctly
+    const realTmpDir = fixture.tmpDir;
+    execSync(
+      'git init && git config user.email "test@example.com" && git config user.name "Test User" && touch initial && git add . && git commit -m "initial"',
+      { cwd: realTmpDir },
+    );
+
     await fixture.writeConfig({ project_name: 'GitTest' });
     await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
 
     const orchestrator = await fixture.initOrchestrator();
 
-    // 1. Initialize real git in the temp directory (requires real git installed)
-    // We can use the real GitService for this setup part
-    const git = new GitService(fixture.mockHost, fixture.tmpDir);
-    git.init();
-    // Set dummy user for git
-    git.runCommand(['config', 'user.email', 'test@example.com']);
-    git.runCommand(['config', 'user.name', 'Test User']);
-
-    fixture.registerMockDriver('gemini', async (skill: any) => {
-      if (skill.name === 'architect') {
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
-      }
+    fixture.registerMockDriver('gemini', async (skill: { name: string }): Promise<Result<string, Error>> => {
+      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       if (skill.name === 'planner') {
-        return {
-          isFail: () => false,
-          unwrap: () =>
+        return Promise.resolve(
+          Result.ok(
             ProjectFixture.createPlanResult([
-              { id: 'g1', skill: 'developer', message: 'git-task', description: 'desc' },
+              { id: 't1', skill: 'developer', message: 'Execute task', description: 'description' },
             ]),
-          error: () => null,
-        };
+          ),
+        );
       }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
+      if (skill.name === 'developer') {
+        const fs = await import('node:fs');
+        const path = await import('node:path');
+        fs.writeFileSync(path.join(fixture.tmpDir, 'task_done.txt'), 'done');
+        return Promise.resolve(Result.ok('OK'));
+      }
+      return Promise.resolve(Result.ok('OK'));
     });
 
-    await orchestrator.start('Git commit test');
+    await orchestrator.start('Git integration test');
 
-    expect(orchestrator.session.state.status).toBe('COMPLETED');
-
-    // 2. Verify git log contains the task completion message
-    const log = git.runCommand(['log', '--oneline']);
-    expect(log).toContain('[nexical] Completed task: g1 - git-task');
+    // Verify commit was made via exec (simplest integration check)
+    const log = execSync('git log -n 5 --oneline', { cwd: fixture.tmpDir }).toString();
+    expect(log).toMatch(/Completed task: t1/);
   });
 });

@@ -71,10 +71,11 @@ export class DeveloperAgent {
       // Optional: Git Commit
       if (this.git) {
         try {
+          this.host.log('debug', `[DEBUG DeveloperAgent] Attempting git commit in ${this.project.paths.root}`);
           this.git.add('.');
           this.git.commit(`[nexical] Completed task: ${task.id} - ${task.message}`);
         } catch (e) {
-          this.host.log('warn', `Git commit failed for task ${task.id}: ${e instanceof Error ? e.message : String(e)}`);
+          this.host.log('warn', `Git commit failed for task ${task.id}: ${(e as Error).message}`);
           // We don't fail the whole workflow just because git failed
         }
       }

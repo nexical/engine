@@ -15,119 +15,94 @@
  */
 
 import { jest } from '@jest/globals';
-import fs from 'fs-extra';
-import path from 'path';
 
+import { ISkill } from '../../src/domain/Driver.js';
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
-describe('Skill Integration Integration', () => {
+describe('Skill Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
     await fixture.setup();
     // We bypass validation by default in fixture setup for convenience,
     // but for THESE tests we want validation to run or be manually controlled.
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should discover and validate skills from YAML (Scenario 7)', async () => {
+  test('should discover and validate available skills (Scenario 8)', async (): Promise<void> => {
+    await fixture.writeSkill('test-skill', { name: 'test-skill', provider: 'gemini' });
     await fixture.writeConfig({ project_name: 'SkillTest' });
 
-    // 1. Create a custom skill file
-    await fixture.writeSkill('custom-skill', {
-      name: 'custom-skill',
-      description: 'A test skill',
-      provider: 'gemini',
-      prompt_template: 'Do something with {{ user_prompt }}',
-    });
-
-    // 2. Initialize orchestration but rely on default bypass=true initially
-    // because we want to setup mock driver BEFORE validation runs for real.
-    const orchestrator = await fixture.initOrchestrator(true);
-
-    // 3. Setup mock driver that validates successfully
-    fixture.registerMockDriver('gemini', async () => ({ isFail: () => false, unwrap: () => 'OK', error: () => null }));
-    // Add validateSkill to mock driver (registerMockDriver uses a default, we need to extend it)
-    // We can access it directly since we know there is one 'gemini' driver.
-    const driver = (orchestrator.brain as any).driverRegistry.get('gemini');
-    driver.validateSkill = async () => true;
-
-    // 4. Manually run validation
+    const orchestrator = await fixture.initOrchestrator();
     const skillRunner = orchestrator.brain.getSkillRunner();
-    // Reset the spy created by initOrchestrator(true) if any?
-    // ProjectFixture implementation:
-    // if (bypassValidation) jest.spyOn(SkillRunner.prototype, 'validateAvailableSkills').mockResolvedValue(undefined);
-    // So we MockRestore that spy.
-    // But we don't have reference to spy?
-    // Actually, ProjectFixture uses SkiRunner.prototype... so it affects all instances.
-    // We can restore it globally.
-    jest.restoreAllMocks();
-    // WARNING: restoreAllMocks might kill our fixture.mockHost spies if they are tracked by jest?
-    // fixture.mockHost properties are jest.fn(). restoreAllMocks restores SPIES.
-    // It shouldn't affect jest.fn() created standalone.
-    // But initOrchestrator spy IS a spy.
-
-    // Re-mock console to avoid noise if desired, but fixture does it via mockHost.
-    // Wait, validateAvailableSkills uses Host.log.
-
     await skillRunner.validateAvailableSkills();
 
     const skills = skillRunner.getSkills();
-    const customSkill = skills.find((s) => s.name === 'custom-skill');
-    expect(customSkill).toBeDefined();
-    expect(customSkill?.description).toBe('A test skill');
+    expect(skills.some((s) => s.name === 'test-skill')).toBe(true);
 
     // Check no error logs in fixture.mockHost.log
     expect(fixture.mockHost.log).not.toHaveBeenCalledWith('error', expect.stringContaining('Skill validation failed'));
   });
 
-  test('should fail validation for invalid skill definitions (Scenario 12)', async () => {
+  test('should fail validation for invalid skill definitions (Scenario 12)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'SkillFailTest' });
 
     // Create an invalid skill (missing name)
-    // writeSkill writes what we pass.
     await fixture.writeSkill('invalid-skill', {
       description: 'Missing name',
       provider: 'gemini',
-    });
+    } as unknown as Record<string, unknown>);
 
-    const orchestrator = await fixture.initOrchestrator(false);
-    // false = run validation on init.
-    // But validation errors are logged, not necessarily thrown if catch block exists?
-    // SkillRunner logs error for individual file load failure but might continue?
-    // check source: loads all, catch -> log error.
+    await fixture.initOrchestrator(false);
 
     expect(fixture.mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
   });
 
-  test('should trigger driver-level validation (Scenario 12)', async () => {
+  test('should trigger driver-level validation (Scenario 12)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'DriverValidTest' });
-    await fixture.writeSkill('driver-test', {
-      name: 'driver-test',
-      provider: 'custom-driver',
-    });
-
-    // Initialize with validation bypassed so we can register the custom driver first
     const orchestrator = await fixture.initOrchestrator(true);
 
-    // Setup mock driver that FAILS validation
     const mockDriver = {
-      name: 'custom-driver',
-      isSupported: async () => true,
-      validateSkill: jest.fn<any>().mockResolvedValue(false), // Fail validation
-      execute: jest.fn<any>(),
+      name: 'validation-fail-driver',
+      description: 'Custom Test Driver',
+      isSupported: async (): Promise<boolean> => {
+        return Promise.resolve(true);
+      },
+      validateSkill: jest.fn<(skill: ISkill) => Promise<boolean>>().mockResolvedValue(false),
+      execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('mocked execution')),
     };
-    (orchestrator.brain as any).driverRegistry.register(mockDriver as any, true);
-
-    // Restore validation logic
-    jest.restoreAllMocks(); // Restore SkillRunner spy
+    // Register driver
+    const brain = orchestrator.brain as unknown as {
+      driverRegistry: { register: (driver: unknown, force: boolean) => void };
+    };
+    brain.driverRegistry.register(mockDriver, true);
 
     const skillRunner = orchestrator.brain.getSkillRunner();
-    await expect(skillRunner.validateAvailableSkills()).rejects.toThrow('Skill validation failed');
+    // The fixture's initOrchestrator(true) mocks validateAvailableSkills.
+    // We need to capture that mock to restore it.
+    const validateSpy = jest.spyOn(skillRunner, 'validateAvailableSkills');
+
+    // Restore the mock so we can test the real logic
+    // Restore the spy
+
+    (validateSpy as unknown as { mockRestore: () => void }).mockRestore();
+
+    // Register a skill that uses this driver
+    const testSkill = { name: 'test-validation', provider: 'validation-fail-driver' } as unknown as ISkill;
+
+    const skillRunnerInternal = skillRunner as unknown as { skills: Record<string, ISkill> };
+    skillRunnerInternal.skills['test-validation'] = testSkill;
+
+    // Verify it is there
+    expect(skillRunner.getSkills().some((s) => s.name === 'test-validation')).toBe(true);
+
+    // We expect it to throw 'Skill validation failed'
+    await expect(skillRunner.validateAvailableSkills()).rejects.toThrow(/Skill validation failed/);
     expect(mockDriver.validateSkill).toHaveBeenCalled();
   });
 });

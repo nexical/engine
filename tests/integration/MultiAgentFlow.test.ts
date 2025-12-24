@@ -12,27 +12,23 @@
  * - Configuration context passing.
  */
 
-import { jest } from '@jest/globals';
-
+import { IDriverContext } from '../../src/domain/Driver.js';
+import { Result } from '../../src/domain/Result.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Multi-Agent Flow Integration', () => {
   let fixture: ProjectFixture;
 
-  beforeEach(async () => {
+  beforeEach(async (): Promise<void> => {
     fixture = new ProjectFixture();
-    fixture.mockHost.log.mockImplementation((level: string, msg: string) => {
-      if (level === 'error') console.error(`[ORCHESTRATOR ERROR] ${msg}`);
-      else console.log(`[ORCHESTRATOR ${level.toUpperCase()}] ${msg}`);
-    });
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterEach(async (): Promise<void> => {
     await fixture.cleanup();
   });
 
-  test('should pass state between agents and inject config variables (Scenario 11 & 13)', async () => {
+  test('should pass state between agents and inject config variables (Scenario 11 & 13)', async (): Promise<void> => {
     await fixture.writePrompt(
       'architect.md',
       'Architect for {{ project_name }} in {{ environment }}. Skills: {{ available_skills }}',
@@ -44,20 +40,24 @@ describe('Multi-Agent Flow Integration', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill: any, options: any) => {
-      if (skill.name === 'architect') {
-        expect(options.params.prompt).toContain('MultiTest');
-        expect(options.params.prompt).toContain('staging');
-        return { isFail: () => false, unwrap: () => ProjectFixture.createArchitectResult(), error: () => null };
-      }
-      if (skill.name === 'planner') {
-        const planResult = await ProjectFixture.createPlanResult([
-          { id: 'task1', skill: 'developer', message: 'work', description: 'work_description' },
-        ]);
-        return { isFail: () => false, unwrap: () => planResult, error: () => null };
-      }
-      return { isFail: () => false, unwrap: () => 'OK', error: () => null };
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (skill, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
+        if (skill.name === 'architect') {
+          const prompt = (options?.params as { prompt: string } | undefined)?.prompt;
+          expect(prompt).toContain('MultiTest');
+          expect(prompt).toContain('staging');
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        if (skill.name === 'planner') {
+          const planResult = ProjectFixture.createPlanResult([
+            { id: 'task1', skill: 'developer', message: 'work', description: 'work_description' },
+          ]);
+          return Promise.resolve(Result.ok(planResult));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Build something');
 
