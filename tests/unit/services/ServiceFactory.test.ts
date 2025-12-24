@@ -102,6 +102,10 @@ describe('ServiceFactory', () => {
           return mockSkillRunner;
         case 'evolutionService':
           return mockEvolutionService;
+        case 'architect':
+          return () => MockArchitectAgent(); // Mock factory returning agent
+        case 'planner':
+          return () => MockPlannerAgent(); // Mock factory returning agent
         default:
           return undefined;
       }

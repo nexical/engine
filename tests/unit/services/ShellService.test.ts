@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
-import { ShellExecutor as ShellExecutorClass } from '../../../src/utils/shell.js';
+import type { ShellService as ShellServiceClass } from '../../../src/services/ShellService.js';
 
 const mockChild = {
   stdout: { on: jest.fn() },
@@ -9,31 +9,34 @@ const mockChild = {
   on: jest.fn(),
 };
 const mockSpawn = jest.fn().mockReturnValue(mockChild);
-const mockSpawnSync = jest.fn(); // Replaced per test
+const mockSpawnSync = jest.fn();
 
 jest.unstable_mockModule('child_process', () => ({
   spawn: mockSpawn,
   spawnSync: mockSpawnSync,
   default: { spawn: mockSpawn, spawnSync: mockSpawnSync },
 }));
+jest.unstable_mockModule('node:child_process', () => ({
+  spawn: mockSpawn,
+  spawnSync: mockSpawnSync,
+  default: { spawn: mockSpawn, spawnSync: mockSpawnSync },
+}));
 
-const shellModule = import('../../../src/utils/shell.js');
+const { ShellService } = await import('../../../src/services/ShellService.js');
 
-describe('ShellExecutor', () => {
-  let ShellExecutor: typeof ShellExecutorClass;
-  let shell: ShellExecutorClass;
+describe('ShellService', () => {
+  let shell: ShellServiceClass;
   let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    ShellExecutor = (await shellModule).ShellExecutor;
     mockHost = {
       log: jest.fn(),
       status: jest.fn(),
       ask: jest.fn(),
       emit: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
-    shell = new ShellExecutor(mockHost);
+    shell = new ShellService(mockHost);
     mockSpawn.mockClear();
     mockChild.on.mockClear();
     mockChild.stdout.on.mockClear();

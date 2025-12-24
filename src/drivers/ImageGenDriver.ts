@@ -2,7 +2,6 @@ import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
 
 import { BaseDriver, IDriverContext, ISkill, SkillSchema } from '../domain/Driver.js';
-import { interpolate } from '../utils/interpolation.js';
 
 export const ImageGenSkillSchema = SkillSchema.extend({
   prompt_template: z.string(),
@@ -30,27 +29,35 @@ export class ImageGenDriver extends BaseDriver<IDriverContext, string> {
     const promptTemplate = imageGenSkill.prompt_template;
     const params = (context?.params as Record<string, unknown>) || {};
 
+    // Interpolate arguments with context
+    // Note: If params/context values are missing, they will be empty strings
     const formatArgs: Record<string, unknown> = {
       user_request: context?.userPrompt || '',
       task_id: context?.taskId || '',
       task_prompt: context?.taskPrompt,
       ...params,
     };
-    const prompt = interpolate(promptTemplate, formatArgs);
+
+    const promptEngine = context?.promptEngine;
+    if (!promptEngine) {
+      throw new Error('PromptEngine is required for ImageGenDriver execution');
+    }
+
+    const prompt = promptEngine.renderString(promptTemplate, formatArgs);
     const modelName = imageGenSkill.model || 'google/gemini-3-pro-image-preview';
     const aspectRatio = (params.aspectRatio as string) || imageGenSkill.aspect_ratio || '1:1';
     const resolution = (params.resolution as string) || imageGenSkill.resolution || '1K';
 
-    this.host.log('debug', `Generating image with model: ${modelName}`);
-    this.host.log('debug', `Prompt: ${prompt}`);
-    this.host.log('debug', `Aspect ratio: ${aspectRatio}`);
-    this.host.log('debug', `Resolution: ${resolution}`);
+    this.host.log('debug', `Generating image with model: ${modelName} `);
+    this.host.log('debug', `Prompt: ${prompt} `);
+    this.host.log('debug', `Aspect ratio: ${aspectRatio} `);
+    this.host.log('debug', `Resolution: ${resolution} `);
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY} `,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -106,7 +113,7 @@ export class ImageGenDriver extends BaseDriver<IDriverContext, string> {
       // Determine output path
       let outputPath = params.output_path as string | undefined;
       if (!outputPath) {
-        const fileName = `image-${Date.now()}.png`;
+        const fileName = `image - ${Date.now()}.png`;
         outputPath = path.join(this.config.rootDirectory, fileName);
       } else {
         outputPath = path.join(this.config.rootDirectory, outputPath);
@@ -115,10 +122,10 @@ export class ImageGenDriver extends BaseDriver<IDriverContext, string> {
       const disk = this.fileSystem;
       disk.writeFile(outputPath, Buffer.from(base64Data, 'base64'));
 
-      this.host.log('info', `Image saved to: ${outputPath}`);
-      return `Image generated and saved to: ${outputPath}`;
+      this.host.log('info', `Image saved to: ${outputPath} `);
+      return `Image generated and saved to: ${outputPath} `;
     } catch (error) {
-      this.host.log('error', `Image generation failed: ${(error as Error).message}`);
+      this.host.log('error', `Image generation failed: ${(error as Error).message} `);
       throw error;
     }
   }

@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 
-import { ISkill } from '../../../src/domain/Driver.js';
+import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { ImageGenDriver } from '../../../src/drivers/ImageGenDriver.js';
@@ -41,6 +41,12 @@ describe('ImageGenDriver', () => {
     driver = new ImageGenDriver(mockHost, { rootDirectory: '/test' }, mockFileSystem);
   });
 
+  const mockContext = {
+    taskId: '1',
+    userPrompt: 'test',
+    promptEngine: { renderString: jest.fn().mockReturnValue('rendered prompt') },
+  } as unknown as IDriverContext;
+
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -65,7 +71,7 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
-    await driver.run(skill, { userPrompt: 'cat' });
+    await driver.run(skill, { ...mockContext, userPrompt: 'cat' });
 
     expect(mockFetch).toHaveBeenCalledWith('https://openrouter.ai/api/v1/chat/completions', expect.anything());
     expect(mockFileSystem.writeFile).toHaveBeenCalled();
@@ -105,9 +111,9 @@ describe('ImageGenDriver', () => {
     });
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
-    await driver.run(skill, { userPrompt: 'test' });
+    await driver.run(skill, { ...mockContext, userPrompt: 'test' });
 
-    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(expect.stringMatching(/image-\d+\.png/), expect.anything());
+    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(expect.stringMatching(/image - \d+\.png/), expect.anything());
   });
 
   it('should use provided output path', async () => {
@@ -125,7 +131,7 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
-    await driver.run(skill, { userPrompt: 'test', params: { output_path: 'custom.png' } });
+    await driver.run(skill, { ...mockContext, userPrompt: 'test', params: { output_path: 'custom.png' } });
 
     expect(mockFileSystem.writeFile).toHaveBeenCalledWith('/test/custom.png', expect.anything());
   });
@@ -136,7 +142,9 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
-    await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('No image data returned from provider');
+    await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
+      'No image data returned from provider',
+    );
   });
 
   it('should throw error if fetch fails', async () => {
@@ -145,7 +153,7 @@ describe('ImageGenDriver', () => {
 
     jest.spyOn(mockHost, 'log');
 
-    await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('API Down');
+    await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow('API Down');
     expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Image generation failed: API Down'));
   });
 
@@ -165,6 +173,7 @@ describe('ImageGenDriver', () => {
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, {
+      ...mockContext,
       userPrompt: 'test',
       params: { aspectRatio: '16:9', resolution: '2K' },
     });
@@ -190,7 +199,7 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
-    await driver.run(skill, { userPrompt: 'test' });
+    await driver.run(skill, { ...mockContext, userPrompt: 'test' });
     expect(mockFileSystem.writeFile).toHaveBeenCalledWith(expect.anything(), Buffer.from('RAW_DATA', 'base64'));
   });
 
@@ -224,7 +233,7 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
-    await driver.run(skill, { userPrompt: '' });
+    await driver.run(skill, { ...mockContext, userPrompt: '' });
     expect(mockFetch).toHaveBeenCalled();
   });
 
@@ -241,6 +250,8 @@ describe('ImageGenDriver', () => {
     } as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
-    await expect(driver.run(skill, { userPrompt: 'test' })).rejects.toThrow('No image data returned from provider');
+    await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
+      'No image data returned from provider',
+    );
   });
 });

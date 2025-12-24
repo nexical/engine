@@ -6,14 +6,15 @@ const mockShell = {
   executeSync: mockExecuteSync,
 };
 
-const MockShellExecutor = jest.fn<(...args: unknown[]) => unknown>().mockReturnValue(mockShell);
+const MockShellService = jest.fn<(...args: unknown[]) => unknown>().mockReturnValue(mockShell);
 
-jest.unstable_mockModule('../../../src/utils/shell.js', () => ({
-  ShellExecutor: MockShellExecutor,
+jest.unstable_mockModule('../../../src/services/ShellService.js', () => ({
+  ShellService: MockShellService,
 }));
 
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import type { GitService as GitServiceClass } from '../../../src/services/GitService.js';
+import type { ShellService } from '../../../src/services/ShellService.js';
 
 const { GitService } = await import('../../../src/services/GitService.js');
 
@@ -34,7 +35,7 @@ describe('GitService', () => {
   });
 
   it('should initialize correctly', () => {
-    expect(MockShellExecutor).toHaveBeenCalledWith(mockHost);
+    expect(MockShellService).toHaveBeenCalledWith(mockHost);
   });
 
   it('should init repo', () => {

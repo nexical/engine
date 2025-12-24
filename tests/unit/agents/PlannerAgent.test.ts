@@ -62,21 +62,14 @@ describe('PlannerAgent', () => {
 
     mockSkillRunner = {
       getSkills: jest.fn().mockReturnValue([]),
+      executeNativeSkill: jest.fn<ISkillRunner['executeNativeSkill']>().mockResolvedValue('plan_name: test\ntasks: []'),
     } as unknown as jest.Mocked<ISkillRunner>;
 
     mockEvolution = {
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
-    agent = new PlannerAgent(
-      mockProject,
-      mockWorkspace,
-      mockPromptEngine,
-      mockDriverRegistry,
-      mockSkillRunner,
-      mockEvolution,
-      mockHost,
-    );
+    agent = new PlannerAgent(mockProject, mockWorkspace, mockSkillRunner, mockEvolution, mockHost);
   });
 
   it('should be defined', () => {
@@ -87,24 +80,20 @@ describe('PlannerAgent', () => {
     it('should create a plan successfully', async () => {
       const mockArch = { data: {} } as Architecture;
       const validYaml = 'plan_name: test\ntasks: []';
-      const mockResult = Result.ok(validYaml);
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
       const mockPlan = new Plan('test');
       mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
 
       const result = await agent.plan(mockArch, 'user request');
 
-      expect(mockPromptEngine.render).toHaveBeenCalled();
-      expect(mockDriverRegistry.get).toHaveBeenCalledWith('test_driver');
-      expect(mockDriver.execute).toHaveBeenCalled();
+      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith('planner', expect.anything(), 'user request');
       expect(mockWorkspace.loadPlan).toHaveBeenCalled();
       expect(result).toBe(mockPlan);
     });
 
     it('should throw if driver execution fails', async () => {
       const mockArch = { data: {} } as Architecture;
-      const mockResult = Result.fail<string>(new Error('Driver failed'));
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('Driver failed'));
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Driver failed');
     });
@@ -112,49 +101,45 @@ describe('PlannerAgent', () => {
     it('should use default values if config is missing', async () => {
       const mockArch = { data: {} } as Architecture;
       const validYaml = 'plan_name: test\ntasks: []';
-      const mockResult = Result.ok(validYaml);
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
       mockWorkspace.loadPlan.mockResolvedValue(new Plan('empty'));
 
       mockProject.getConfig.mockReturnValue({}); // Empty config
 
       await agent.plan(mockArch, 'req');
 
-      expect(mockDriverRegistry.get).toHaveBeenCalledWith('gemini');
-      expect(mockDriver.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'planner' }) as unknown,
-        expect.anything(),
+      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith(
+        'planner',
+        expect.objectContaining({ user_prompt: 'req' }),
+        'req',
       );
     });
 
     it('should fallback to default driver if requested driver not found', async () => {
+      // This test is less relevant now as SkillRunner handles driver selection.
+      // We essentially test that agent calls executeNativeSkill correctly.
       const mockArch = { data: {} } as Architecture;
       const validYaml = 'plan_name: test\ntasks: []';
-      const mockResult = Result.ok(validYaml);
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
       mockWorkspace.loadPlan.mockResolvedValue(new Plan('fallback'));
-
-      mockDriverRegistry.get.mockReturnValue(undefined);
-      mockDriverRegistry.getDefault.mockReturnValue(mockDriver);
 
       await agent.plan(mockArch, 'req');
 
-      expect(mockDriverRegistry.getDefault).toHaveBeenCalled();
-      expect(mockDriver.execute).toHaveBeenCalled();
+      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalled();
     });
 
     it('should throw if no driver available', async () => {
+      // SkillRunner throws this now.
       const mockArch = { data: {} } as Architecture;
-      mockDriverRegistry.get.mockReturnValue(undefined);
-      mockDriverRegistry.getDefault.mockReturnValue(undefined);
+      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('No driver available'));
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('No driver available');
     });
 
     it('should throw "Planner execution failed" if result.error() is falsy', async () => {
       const mockArch = { data: {} } as Architecture;
-      const mockResult = Result.fail<string, unknown>(null);
-      mockDriver.execute.mockResolvedValue(mockResult as unknown as Result<string, Error>);
+      // Simulating SkillRunner throwing a specific error or generic error
+      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('Planner execution failed'));
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
     });
@@ -162,18 +147,17 @@ describe('PlannerAgent', () => {
     it('should throw and log error if plan YAML is invalid', async () => {
       const mockArch = { data: {} } as Architecture;
       const invalidYaml = 'invalid: yaml: content: :';
-      const mockResult = Result.ok(invalidYaml);
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockResolvedValue(invalidYaml);
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow();
       expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to parse plan YAML'));
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining(invalidYaml));
     });
 
     it('should handle non-Error throw during plan parsing', async () => {
       const mockArch = { data: {} } as Architecture;
       const validYaml = 'plan: valid';
-      const mockResult = Result.ok(validYaml);
-      mockDriver.execute.mockResolvedValue(mockResult);
+      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
 
       const spy = jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error

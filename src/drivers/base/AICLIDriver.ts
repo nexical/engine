@@ -1,7 +1,7 @@
 import { z, ZodSafeParseResult } from 'zod';
 
 import { IDriverContext, ISkill } from '../../domain/Driver.js';
-import { interpolate } from '../../utils/interpolation.js';
+import { ShellService } from '../../services/ShellService.js';
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
 
 export const AISkillSchema = CLISkillSchema.extend({
@@ -26,6 +26,11 @@ export abstract class AICLIDriver<TContext extends IDriverContext = IDriverConte
     const aiSkill = skill as AISkill;
     const promptTemplate = aiSkill.prompt_template || '';
     const params = (context?.params as Record<string, unknown>) || {};
+    const promptEngine = context?.promptEngine;
+
+    if (!promptEngine) {
+      throw new Error('PromptEngine is required in DriverContext for AISkill execution.');
+    }
 
     const formatArgs: Record<string, unknown> = {
       user_request: context?.userPrompt || '',
@@ -33,10 +38,10 @@ export abstract class AICLIDriver<TContext extends IDriverContext = IDriverConte
       task_prompt: context?.taskPrompt,
       ...params,
     };
-    formatArgs['prompt'] = interpolate(promptTemplate, formatArgs);
+    formatArgs['prompt'] = promptEngine.renderString(promptTemplate, formatArgs);
 
     const argsTemplate = this.getArguments(aiSkill);
-    const finalArgs = argsTemplate.map((arg) => interpolate(arg, formatArgs));
+    const finalArgs = argsTemplate.map((arg) => promptEngine.renderString(arg, formatArgs));
 
     return await this.executeShell(aiSkill, finalArgs, context);
   }

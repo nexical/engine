@@ -12,7 +12,7 @@ export interface IShellOptions extends SpawnOptions {
   streamStdio?: boolean;
 }
 
-export class ShellExecutor {
+export class ShellService {
   constructor(private host: IRuntimeHost) {}
 
   async execute(command: string, args: string[] = [], options: IShellOptions = {}): Promise<IShellResult> {

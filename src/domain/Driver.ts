@@ -1,7 +1,8 @@
 import { z, ZodSafeParseResult } from 'zod';
 
 import { FileSystemService } from '../services/FileSystemService.js';
-import { ShellExecutor } from '../utils/shell.js';
+import { IPromptEngine } from '../services/PromptEngine.js';
+import { ShellService } from '../services/ShellService.js';
 import { IFileSystem } from './IFileSystem.js';
 import { Result } from './Result.js';
 import { IRuntimeHost } from './RuntimeHost.js';
@@ -18,12 +19,13 @@ export interface ISkill {
 }
 
 export interface IDriverContext {
-  userPrompt: string;
+  userPrompt?: string;
   taskId?: string;
   taskPrompt?: string;
-  params?: Record<string, unknown>;
-  env?: Record<string, string>;
   cwd?: string;
+  params?: Record<string, unknown>;
+  promptEngine?: IPromptEngine;
+  env?: Record<string, string>;
 }
 
 export interface IDriver<TContext = IDriverContext, TResult = string> {
@@ -56,7 +58,7 @@ export abstract class BaseDriver<TContext = IDriverContext, TResult = string> im
   abstract name: string;
   abstract description: string;
 
-  protected shell: ShellExecutor;
+  protected shell: ShellService;
   protected fileSystem: IFileSystem;
 
   constructor(
@@ -64,7 +66,7 @@ export abstract class BaseDriver<TContext = IDriverContext, TResult = string> im
     protected config: IDriverConfig = { rootDirectory: process.cwd() },
     fileSystem?: IFileSystem,
   ) {
-    this.shell = new ShellExecutor(host);
+    this.shell = new ShellService(host);
     this.fileSystem = fileSystem || new FileSystemService(host);
   }
 

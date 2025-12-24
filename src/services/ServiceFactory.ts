@@ -107,14 +107,29 @@ export class ServiceFactory {
       });
 
       // Register Default Agents
-      brain.registerAgent(
-        'architect',
-        (workspace) =>
-          new ArchitectAgent(project, workspace, promptEngine, driverRegistry, skillRunner, evolution, host),
+      container.registerFactory('architect', () => {
+        const project = container.resolve<IProject>('project');
+        const skillRunner = container.resolve<ISkillRunner>('skillRunner');
+        const evolution = container.resolve<IEvolutionService>('evolutionService');
+        const host = container.resolve<IRuntimeHost>('host');
+
+        return (workspace: IWorkspace) => new ArchitectAgent(project, workspace, skillRunner, evolution, host);
+      });
+
+      container.registerFactory('planner', () => {
+        const project = container.resolve<IProject>('project');
+        const skillRunner = container.resolve<ISkillRunner>('skillRunner');
+        const evolution = container.resolve<IEvolutionService>('evolutionService');
+        const host = container.resolve<IRuntimeHost>('host');
+
+        return (workspace: IWorkspace) => new PlannerAgent(project, workspace, skillRunner, evolution, host);
+      });
+
+      brain.registerAgent('architect', (workspace) =>
+        container.resolve<(workspace: IWorkspace) => ArchitectAgent>('architect')(workspace),
       );
-      brain.registerAgent(
-        'planner',
-        (workspace) => new PlannerAgent(project, workspace, promptEngine, driverRegistry, skillRunner, evolution, host),
+      brain.registerAgent('planner', (workspace) =>
+        container.resolve<(workspace: IWorkspace) => PlannerAgent>('planner')(workspace),
       );
       brain.registerAgent('developer', (workspace) => {
         const gitService = container.resolve<GitService>('gitService');

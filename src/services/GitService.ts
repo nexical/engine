@@ -1,14 +1,23 @@
+import { IFileSystem } from '../domain/IFileSystem.js';
 import { IRuntimeHost } from '../domain/RuntimeHost.js';
-import { ShellExecutor } from '../utils/shell.js';
+import { ShellService } from './ShellService.js';
 
-export class GitService {
-  private shell: ShellExecutor;
+export interface IGitService {
+  clone(repoUrl: string, destination: string, branch?: string): Promise<void>;
+  checkout(branch: string, create?: boolean): void;
+  pull(remote?: string, branch?: string): void;
+  status(): string;
+  init(cwd?: string): void;
+}
+
+export class GitService implements IGitService {
+  private shell: ShellService;
 
   constructor(
     private host: IRuntimeHost,
     private rootDirectory: string,
   ) {
-    this.shell = new ShellExecutor(this.host);
+    this.shell = new ShellService(host);
   }
 
   runCommand(args: string[], cwd?: string): string {

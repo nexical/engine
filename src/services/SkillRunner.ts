@@ -1,5 +1,9 @@
 import yaml from 'js-yaml';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { ISkill, SkillSchema } from '../domain/Driver.js';
 import { IProject } from '../domain/Project.js';
@@ -12,8 +16,8 @@ export interface ISkillRunner {
   init(): Promise<void>;
   validateAvailableSkills(): Promise<void>;
   getSkills(): ISkill[];
-  getSkills(): ISkill[];
   runSkill(task: Task, userPrompt: string, cwd?: string): Promise<void>;
+  executeNativeSkill(skillName: string, params: Record<string, unknown>, userPrompt: string): Promise<string>;
 }
 
 export class SkillRunner implements ISkillRunner {
@@ -32,22 +36,32 @@ export class SkillRunner implements ISkillRunner {
   }
 
   private loadYamlSkills(): void {
-    if (!this.project.fileSystem.isDirectory(this.project.paths.skills)) {
-      return;
-    }
+    const searchConfig: { path: string; name: string }[] = [
+      { path: path.join(__dirname, '../skills'), name: 'Default' },
+      { path: this.project.paths.skills, name: 'User' },
+    ];
 
-    const files = this.project.fileSystem.listFiles(this.project.paths.skills);
+    for (const config of searchConfig) {
+      if (!this.project.fileSystem.isDirectory(config.path)) {
+        continue;
+      }
 
-    for (const filename of files) {
-      if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml') || filename.endsWith('.yml')) {
-        const filePath = path.join(this.project.paths.skills, filename);
-        try {
-          const content = this.project.fileSystem.readFile(filePath);
-          const profile = yaml.load(content);
-          const parsed = SkillSchema.parse(profile);
-          this.skills[parsed.name] = parsed as ISkill;
-        } catch (e: unknown) {
-          this.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
+      this.host.log('debug', `Loading ${config.name} skills from: ${config.path}`);
+      const files = this.project.fileSystem.listFiles(config.path);
+
+      for (const filename of files) {
+        if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml') || filename.endsWith('.yml')) {
+          const filePath = path.join(config.path, filename);
+          try {
+            const content = this.project.fileSystem.readFile(filePath);
+            const profile = yaml.load(content);
+            const parsed = SkillSchema.parse(profile);
+            // User skills overwrite default skills
+            this.skills[parsed.name] = parsed as ISkill;
+            this.host.log('debug', `Loaded skill: ${parsed.name}`);
+          } catch (e: unknown) {
+            this.host.log('error', `Error loading skill profile ${filename}: ${(e as Error).message}`);
+          }
         }
       }
     }
@@ -113,6 +127,43 @@ export class SkillRunner implements ISkillRunner {
     await this.executeSkill(task, profile, userPrompt, cwd);
   }
 
+  async executeNativeSkill(skillName: string, params: Record<string, unknown>, userPrompt: string): Promise<string> {
+    const profile = this.skills[skillName];
+    if (!profile) {
+      throw new Error(`Skill '${skillName}' not found.`);
+    }
+
+    let driver;
+    if (profile.provider) {
+      driver = this.driverRegistry.get(String(profile.provider));
+      if (!driver) {
+        throw new Error(`Driver '${String(profile.provider)}' not found.`);
+      }
+    } else {
+      driver = this.driverRegistry.getDefault();
+    }
+
+    if (!driver) {
+      throw new Error('No driver found for execution.');
+    }
+
+    try {
+      const result = await driver.execute(profile, {
+        userPrompt: userPrompt,
+        params: params,
+        promptEngine: this.promptEngine,
+      });
+
+      if (result.isFail()) {
+        throw result.error() || new Error('Unknown error during native skill execution');
+      }
+      return result.unwrap();
+    } catch (err) {
+      this.host.log('error', `An error occurred while executing the native skill ${skillName}: ${String(err)}`);
+      throw err;
+    }
+  }
+
   private async executeSkill(task: Task, profile: ISkill, userPrompt: string, cwd?: string): Promise<void> {
     // Determine which driver to use.
     let driver;
@@ -160,6 +211,7 @@ export class SkillRunner implements ISkillRunner {
         taskPrompt: task.description,
         params: task.params,
         cwd: cwd,
+        promptEngine: this.promptEngine,
       });
 
       if (result.isFail()) {

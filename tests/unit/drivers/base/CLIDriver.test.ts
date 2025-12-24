@@ -1,12 +1,12 @@
 import { jest } from '@jest/globals';
 
-import { ISkill } from '../../../../src/domain/Driver.js';
+import { IDriverContext, ISkill } from '../../../../src/domain/Driver.js';
 import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { CLIDriver, CLISkill } from '../../../../src/drivers/base/CLIDriver.js';
-import { ShellExecutor } from '../../../../src/utils/shell.js';
+import { ShellService } from '../../../../src/services/ShellService.js';
 
 // Mock shell
-jest.mock('../../../../src/utils/shell.js');
+jest.mock('../../../../src/services/ShellService.js');
 
 class TestCLIDriver extends CLIDriver {
   name = 'test-cli';
@@ -18,7 +18,7 @@ class TestCLIDriver extends CLIDriver {
 
 describe('CLIDriver', () => {
   let mockHost: jest.Mocked<IRuntimeHost>;
-  let mockShell: jest.Mocked<ShellExecutor>;
+  let mockShell: jest.Mocked<ShellService>;
 
   beforeEach(() => {
     mockHost = {
@@ -30,13 +30,17 @@ describe('CLIDriver', () => {
   });
 
   it('should execute shell command', async () => {
+    const mockContext = {
+      promptEngine: { renderString: jest.fn().mockReturnValue('foo') },
+    } as unknown as IDriverContext;
+
     const driver = new TestCLIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 0, stdout: 'ok', stderr: '' });
 
-    const result = await driver.run({ name: 'test', args: ['foo'] } as CLISkill);
+    const result = await driver.run({ name: 'test', args: ['foo'] } as CLISkill, mockContext);
     expect(mockShell.execute).toHaveBeenCalledWith('cmd', ['foo'], expect.anything());
     expect(result).toBe('ok');
   });
@@ -48,8 +52,11 @@ describe('CLIDriver', () => {
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 1, stdout: '', stderr: 'error msg' });
 
-    await expect(driver.run({ name: 'test', args: ['foo'] } as CLISkill)).rejects.toThrow(
-      'Command exited with code 1\nStderr: error msg',
+    const mockContext = {
+      promptEngine: { renderString: jest.fn().mockReturnValue('foo') },
+    } as unknown as IDriverContext;
+    await expect(driver.run({ name: 'test', args: ['foo'] } as CLISkill, mockContext)).rejects.toThrow(
+      'Command exited with code 1 \nStderr: error msg ',
     );
     expect(mockHost.log).toHaveBeenCalledWith('error', 'error msg');
   });
@@ -62,7 +69,12 @@ describe('CLIDriver', () => {
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockRejectedValue(error);
 
-    await expect(driver.run({ name: 'test', args: ['foo'] } as CLISkill)).rejects.toThrow('execution failed');
+    const mockContext = {
+      promptEngine: { renderString: jest.fn().mockReturnValue('foo') },
+    } as unknown as IDriverContext;
+    await expect(driver.run({ name: 'test', args: ['foo'] } as CLISkill, mockContext)).rejects.toThrow(
+      'execution failed',
+    );
     expect(mockHost.log).toHaveBeenCalledWith(
       'error',
       expect.stringContaining('An error occurred while executing the CLI agent: execution failed'),
@@ -84,13 +96,17 @@ describe('CLIDriver', () => {
   });
 
   it('should handle missing args', async () => {
+    const mockContext = {
+      promptEngine: { renderString: jest.fn().mockReturnValue('foo') },
+    } as unknown as IDriverContext;
+
     const driver = new TestCLIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 0, stdout: 'ok', stderr: '' });
 
-    await driver.run({ name: 'test' } as unknown as CLISkill);
+    await driver.run({ name: 'test' } as CLISkill, mockContext);
     expect(mockShell.execute).toHaveBeenCalledWith('cmd', [], expect.anything());
   });
 });

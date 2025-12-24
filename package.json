@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Extensible AI-driven multi-agent planner and orchestrator for local project development",
   "scripts": {
-    "build": "tsc --build --force && cp -fr src/prompts dist/",
+    "build": "tsc --build --force && cp -fr src/skills dist/",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' 'README.md' 'package.json'",

@@ -73,7 +73,10 @@ const mockDriver = {
 } as unknown as jest.Mocked<IDriver>;
 
 jest.unstable_mockModule('path', () => ({
-  default: { join: (...args: string[]): string => args.join('/') },
+  default: {
+    join: (...args: string[]): string => args.join('/'),
+    dirname: (p: string): string => p.substring(0, p.lastIndexOf('/')),
+  },
 }));
 
 jest.unstable_mockModule('js-yaml', () => ({
@@ -121,6 +124,7 @@ describe('SkillRunner', () => {
 
   describe('init', () => {
     it('should load skills from yaml and yml', async () => {
+      mockFsIsDirectory.mockReturnValueOnce(false).mockReturnValue(true);
       mockFsListFiles.mockReturnValue(['test.skill.yaml', 'other.skill.yml']);
       mockYaml.load
         .mockReturnValueOnce({ name: 'skill1', provider: 'mock-driver' })

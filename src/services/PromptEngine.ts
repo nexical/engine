@@ -11,6 +11,7 @@ export interface IPromptEngineConfig {
 
 export interface IPromptEngine {
   render(templateName: string, context: Record<string, unknown>): string;
+  renderString(template: string, context: Record<string, unknown>): string;
 }
 
 export class PromptEngine implements IPromptEngine {
@@ -56,6 +57,15 @@ export class PromptEngine implements IPromptEngine {
       return this.env.render(templateName, context);
     } catch (e) {
       this.host.log('error', `Error rendering template ${templateName}: ${(e as Error).message}`);
+      throw e;
+    }
+  }
+
+  renderString(template: string, context: Record<string, unknown>): string {
+    try {
+      return this.env.renderString(template, context);
+    } catch (e) {
+      this.host.log('error', `Error rendering string template: ${(e as Error).message}\nTemplate: ${template}`);
       throw e;
     }
   }

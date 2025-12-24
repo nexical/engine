@@ -1,12 +1,12 @@
 import { jest } from '@jest/globals';
 
-import { ISkill } from '../../../../src/domain/Driver.js';
+import { IDriverContext, ISkill } from '../../../../src/domain/Driver.js';
 import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { AICLIDriver, AISkill } from '../../../../src/drivers/base/AICLIDriver.js';
-import { ShellExecutor } from '../../../../src/utils/shell.js';
+import { ShellService } from '../../../../src/services/ShellService.js';
 
 // Mock shell
-jest.mock('../../../../src/utils/shell.js');
+jest.mock('../../../../src/services/ShellService.js');
 
 class TestAIDriver extends AICLIDriver {
   name = 'test-ai';
@@ -21,7 +21,7 @@ class TestAIDriver extends AICLIDriver {
 
 describe('AICLIDriver', () => {
   let mockHost: jest.Mocked<IRuntimeHost>;
-  let mockShell: jest.Mocked<ShellExecutor>;
+  let mockShell: jest.Mocked<ShellService>;
 
   beforeEach(() => {
     mockHost = {
@@ -34,12 +34,39 @@ describe('AICLIDriver', () => {
 
   it('should interpolate args', async () => {
     const driver = new TestAIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 0, stdout: 'ai ok', stderr: '' });
 
-    await driver.run({ name: 'test', prompt_template: 'hi' } as AISkill);
+    const mockRender = jest.fn().mockImplementation((t, c) => t);
+    const context = {
+      params: { param1: 'value1' },
+      userPrompt: 'test prompt',
+      taskId: 'task-1',
+      promptEngine: {
+        render: mockRender,
+        renderString: mockRender,
+      },
+    } as unknown as IDriverContext;
+
+    const result = await driver.run(
+      {
+        name: 'test',
+        prompt_template: 'template',
+        args: ['arg1', 'arg2'],
+      } as AISkill,
+      context,
+    );
+
+    expect(result).toBe('ai ok');
+    expect(mockRender).toHaveBeenCalledWith(
+      'template',
+      expect.objectContaining({
+        param1: 'value1',
+        user_request: 'test prompt',
+      }),
+    );
     expect(mockShell.execute).toHaveBeenCalledWith('aicmd', ['arg1'], expect.anything());
   });
 
@@ -58,13 +85,20 @@ describe('AICLIDriver', () => {
   });
 
   it('should handle missing prompt template', async () => {
+    const mockContext = {
+      promptEngine: {
+        renderString: jest.fn().mockImplementation((t, c) => t),
+        render: jest.fn().mockImplementation((t, c) => t),
+      },
+    } as unknown as IDriverContext;
+
     const driver = new TestAIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 0, stdout: 'ok', stderr: '' });
 
-    await driver.run({ name: 'test' } as unknown as AISkill);
+    await driver.run({ name: 'test' } as unknown as AISkill, mockContext);
     expect(mockShell.execute).toHaveBeenCalled();
   });
 });

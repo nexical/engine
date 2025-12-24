@@ -1,7 +1,7 @@
 import { z, ZodSafeParseResult } from 'zod';
 
 import { BaseDriver, IDriverContext, ISkill, SkillSchema } from '../../domain/Driver.js';
-import { interpolate } from '../../utils/interpolation.js';
+import { ShellService } from '../../services/ShellService.js';
 
 export const CLISkillSchema = SkillSchema.extend({
   name: z.string(),
@@ -28,16 +28,21 @@ export abstract class CLIDriver<TContext extends IDriverContext = IDriverContext
 
   async run(skill: ISkill, context?: TContext): Promise<string> {
     const cliSkill = skill as CLISkill;
-    const params = (context?.params as Record<string, unknown>) || {};
+    const argsTemplate = this.getArguments(cliSkill);
 
+    // Interpolate arguments with context
+    // Note: If params/context values are missing, they will be empty strings
     const formatArgs: Record<string, unknown> = {
-      user_request: context?.userPrompt || '',
-      task_id: context?.taskId || '',
-      ...params,
+      ...(context?.params as Record<string, unknown>),
+      task_id: context?.taskId,
     };
 
-    const argsTemplate = this.getArguments(cliSkill);
-    const finalArgs = argsTemplate.map((arg) => interpolate(arg, formatArgs));
+    const promptEngine = context?.promptEngine;
+    if (!promptEngine) {
+      throw new Error('PromptEngine is required for CLIDriver execution');
+    }
+
+    const finalArgs = argsTemplate.map((arg) => promptEngine.renderString(arg, formatArgs));
 
     return await this.executeShell(cliSkill, finalArgs, context);
   }
@@ -45,8 +50,8 @@ export abstract class CLIDriver<TContext extends IDriverContext = IDriverContext
   protected async executeShell(skill: ISkill, args: Array<string>, context?: TContext): Promise<string> {
     const commandBin = this.getExecutable(skill);
 
-    this.host.log('debug', `Running CLI skill: ${skill.name}`);
-    this.host.log('debug', `Command: ${commandBin} ${args.join(' ')}`);
+    this.host.log('debug', `Running CLI skill: ${skill.name} `);
+    this.host.log('debug', `Command: ${commandBin} ${args.join(' ')} `);
 
     try {
       const result = await this.shell.execute(commandBin, args, {
@@ -61,12 +66,12 @@ export abstract class CLIDriver<TContext extends IDriverContext = IDriverContext
       this.host.log('error', result.stderr);
 
       if (result.code !== 0) {
-        throw new Error(`Command exited with code ${result.code}\nStderr: ${result.stderr}`);
+        throw new Error(`Command exited with code ${result.code} \nStderr: ${result.stderr} `);
       }
 
       return result.stdout;
     } catch (err) {
-      this.host.log('error', `An error occurred while executing the CLI agent: ${(err as Error).message}`);
+      this.host.log('error', `An error occurred while executing the CLI agent: ${(err as Error).message} `);
       throw err;
     }
   }
