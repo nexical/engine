@@ -4,17 +4,8 @@ node_modules
 
 # Test files
 coverage
-
-# Environment files
-.env
-
-# Test project
-.nexical
-dev_project
-test_project*
-
-# Cloudflare files
-.wrangler
+*.txt
+*.log
 
 # MacOS specific files
 .DS_Store
