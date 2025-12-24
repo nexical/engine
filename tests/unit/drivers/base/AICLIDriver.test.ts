@@ -39,7 +39,7 @@ describe('AICLIDriver', () => {
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 0, stdout: 'ai ok', stderr: '' });
 
-    const mockRender = jest.fn().mockImplementation((t, c) => t);
+    const mockRender = jest.fn().mockImplementation((t, _c) => t);
     const context = {
       params: { param1: 'value1' },
       userPrompt: 'test prompt',
@@ -87,8 +87,8 @@ describe('AICLIDriver', () => {
   it('should handle missing prompt template', async () => {
     const mockContext = {
       promptEngine: {
-        renderString: jest.fn().mockImplementation((t, c) => t),
-        render: jest.fn().mockImplementation((t, c) => t),
+        renderString: jest.fn().mockImplementation((t, _c) => t),
+        render: jest.fn().mockImplementation((t, _c) => t),
       },
     } as unknown as IDriverContext;
 
@@ -100,5 +100,13 @@ describe('AICLIDriver', () => {
 
     await driver.run({ name: 'test' } as unknown as AISkill, mockContext);
     expect(mockShell.execute).toHaveBeenCalled();
+  });
+
+  it('should throw error if promptEngine is missing', async () => {
+    const driver = new TestAIDriver(mockHost);
+    const contextWithoutEngine = {} as unknown as IDriverContext;
+    await expect(driver.run({ name: 'test' } as unknown as AISkill, contextWithoutEngine)).rejects.toThrow(
+      'PromptEngine is required in DriverContext for AISkill execution.',
+    );
   });
 });

@@ -58,7 +58,7 @@ describe('Skill Integration', () => {
       provider: 'gemini',
     } as unknown as Record<string, unknown>);
 
-    await fixture.initOrchestrator(false);
+    await fixture.initOrchestrator(true);
 
     expect(fixture.mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
   });

@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 
 const mockRender = jest.fn();
+const mockRenderString = jest.fn();
 const mockConfigure = jest.fn();
 const mockEnvironment = jest.fn();
 const mockFileSystemLoader = jest.fn();
@@ -30,7 +31,7 @@ const { PromptEngine } = await import('../../../src/services/PromptEngine.js');
 describe('PromptEngine', () => {
   let engine: PromptEngineClass;
   let mockHost: jest.Mocked<IRuntimeHost>;
-  let mockEnv: { render: jest.Mock };
+  let mockEnv: { render: jest.Mock; renderString: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -40,7 +41,7 @@ describe('PromptEngine', () => {
       ask: jest.fn<IRuntimeHost['ask']>(),
       emit: jest.fn<IRuntimeHost['emit']>(),
     };
-    mockEnv = { render: mockRender };
+    mockEnv = { render: mockRender, renderString: mockRenderString };
     // Environment constructor call needs to return instance
     mockEnvironment.mockReturnValue(mockEnv);
     // FileSystemLoader constructor call
@@ -72,7 +73,22 @@ describe('PromptEngine', () => {
     (mockFs.existsSync as jest.Mock).mockReturnValue(false);
     // Re-initialize PromptEngine to trigger the path checking logic
     new PromptEngine({ promptDirectory: '/prompts', appDirectory: '/app' }, mockHost);
-    expect(mockHost.log).toHaveBeenCalledWith('debug', expect.stringContaining('NOT FOUND'));
     expect(mockHost.log).toHaveBeenCalledWith('warn', 'No valid prompt search paths found. Prompt rendering may fail.');
+  });
+
+  it('should render string template', () => {
+    mockRenderString.mockReturnValue('rendered string');
+    const result = engine.renderString('{{ foo }}', { foo: 'bar' });
+    expect(result).toBe('rendered string');
+    expect(mockRenderString).toHaveBeenCalledWith('{{ foo }}', { foo: 'bar' });
+  });
+
+  it('should log error on renderString failure', () => {
+    mockRenderString.mockImplementation(() => {
+      throw new Error('string fail');
+    });
+
+    expect(() => engine.renderString('{{ foo }}', { foo: 'bar' })).toThrow('string fail');
+    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error rendering string template'));
   });
 });

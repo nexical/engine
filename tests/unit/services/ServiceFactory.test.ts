@@ -1,8 +1,11 @@
 import { jest } from '@jest/globals';
 
+import { ArchitectAgent } from '../../../src/agents/ArchitectAgent.js';
+import { PlannerAgent } from '../../../src/agents/PlannerAgent.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { IWorkspace } from '../../../src/domain/Workspace.js';
 
 // Mocks
 const mockProject = {
@@ -26,6 +29,13 @@ const mockContainer = {
   resolve: jest.fn(),
 };
 
+const factories: Record<string, (...args: unknown[]) => unknown> = {};
+mockContainer.registerFactory.mockImplementation((key: unknown, factory: unknown) => {
+  if (typeof key === 'string' && typeof factory === 'function') {
+    factories[key] = factory as (...args: unknown[]) => unknown;
+  }
+});
+
 // Mock Constructors
 const MockProject = jest.fn().mockReturnValue(mockProject);
 const MockWorkspace = jest.fn().mockReturnValue(mockWorkspace);
@@ -37,8 +47,8 @@ const MockPromptEngine = jest.fn().mockReturnValue(mockPromptEngine);
 const MockSkillRunner = jest.fn().mockReturnValue(mockSkillRunner);
 const MockEvolutionService = jest.fn().mockReturnValue(mockEvolutionService);
 const MockDIContainer = jest.fn().mockReturnValue(mockContainer);
-const MockArchitectAgent = jest.fn();
-const MockPlannerAgent = jest.fn();
+const MockArchitectAgent = jest.fn<() => ArchitectAgent>();
+const MockPlannerAgent = jest.fn<() => PlannerAgent>();
 const MockDeveloperAgent = jest.fn();
 
 // Register Mocks
@@ -102,10 +112,14 @@ describe('ServiceFactory', () => {
           return mockSkillRunner;
         case 'evolutionService':
           return mockEvolutionService;
-        case 'architect':
-          return () => MockArchitectAgent(); // Mock factory returning agent
-        case 'planner':
-          return () => MockPlannerAgent(); // Mock factory returning agent
+        case 'architect': {
+          const factory = factories['architect'];
+          return factory ? factory() : (): ArchitectAgent => MockArchitectAgent();
+        }
+        case 'planner': {
+          const factory = factories['planner'];
+          return factory ? factory() : (): PlannerAgent => MockPlannerAgent();
+        }
         default:
           return undefined;
       }
@@ -214,6 +228,22 @@ describe('ServiceFactory', () => {
 
     if (developerFactory) (developerFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockDeveloperAgent).toHaveBeenCalled();
+
+    // Test Architect Factory (the one registered in the container)
+    const architectContainerFactory = factories['architect'];
+    if (architectContainerFactory) {
+      const agentCreator = architectContainerFactory() as (ws: IWorkspace) => ArchitectAgent;
+      agentCreator(mockWorkspace as unknown as IWorkspace);
+      expect(MockArchitectAgent).toHaveBeenCalled();
+    }
+
+    // Test Planner Factory (the one registered in the container)
+    const plannerContainerFactory = factories['planner'];
+    if (plannerContainerFactory) {
+      const agentCreator = plannerContainerFactory() as (ws: IWorkspace) => PlannerAgent;
+      agentCreator(mockWorkspace as unknown as IWorkspace);
+      expect(MockPlannerAgent).toHaveBeenCalled();
+    }
 
     // Test Session Factory
     factories['session']?.();

@@ -44,9 +44,10 @@ describe('Multi-Agent Flow Integration', () => {
       'gemini',
       async (skill, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
         if (skill.name === 'architect') {
-          const prompt = (options?.params as { prompt: string } | undefined)?.prompt;
-          expect(prompt).toContain('MultiTest');
-          expect(prompt).toContain('staging');
+          const projectName = options?.params?.project_name as string;
+          const environment = options?.params?.environment as string;
+          expect(projectName).toContain('MultiTest');
+          expect(environment).toContain('staging');
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
         if (skill.name === 'planner') {

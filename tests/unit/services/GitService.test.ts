@@ -14,7 +14,6 @@ jest.unstable_mockModule('../../../src/services/ShellService.js', () => ({
 
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import type { GitService as GitServiceClass } from '../../../src/services/GitService.js';
-import type { ShellService } from '../../../src/services/ShellService.js';
 
 const { GitService } = await import('../../../src/services/GitService.js');
 

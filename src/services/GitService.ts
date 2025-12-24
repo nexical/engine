@@ -1,4 +1,3 @@
-import { IFileSystem } from '../domain/IFileSystem.js';
 import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { ShellService } from './ShellService.js';
 

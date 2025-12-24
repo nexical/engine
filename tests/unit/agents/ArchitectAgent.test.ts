@@ -2,25 +2,18 @@ import { jest } from '@jest/globals';
 
 import { ArchitectAgent } from '../../../src/agents/ArchitectAgent.js';
 import { Architecture } from '../../../src/domain/Architecture.js';
-import { IDriver } from '../../../src/domain/Driver.js';
 import { IProject } from '../../../src/domain/Project.js';
-import { Result } from '../../../src/domain/Result.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
-import { IDriverRegistry } from '../../../src/drivers/DriverRegistry.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
-import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 import { ISkillRunner } from '../../../src/services/SkillRunner.js';
 
 describe('ArchitectAgent', () => {
   let agent: ArchitectAgent;
   let mockProject: jest.Mocked<IProject>;
   let mockWorkspace: jest.Mocked<IWorkspace>;
-  let mockPromptEngine: jest.Mocked<IPromptEngine>;
-  let mockDriverRegistry: jest.Mocked<IDriverRegistry>;
   let mockSkillRunner: jest.Mocked<ISkillRunner>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
-  let mockDriver: jest.Mocked<IDriver>;
 
   beforeEach(() => {
     mockProject = {
@@ -38,23 +31,6 @@ describe('ArchitectAgent', () => {
       archiveArtifacts: jest.fn(),
       saveArchitecture: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
-
-    mockPromptEngine = {
-      render: jest.fn().mockReturnValue('rendered content'),
-    } as unknown as jest.Mocked<IPromptEngine>;
-
-    mockDriver = {
-      name: 'test_driver',
-      description: 'test description',
-      isSupported: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-      validateSkill: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-      execute: jest.fn(),
-    } as unknown as jest.Mocked<IDriver>;
-
-    mockDriverRegistry = {
-      get: jest.fn().mockReturnValue(mockDriver),
-      getDefault: jest.fn(),
-    } as unknown as jest.Mocked<IDriverRegistry>;
 
     mockEvolution = {
       getLogSummary: jest.fn().mockReturnValue('evolution log'),

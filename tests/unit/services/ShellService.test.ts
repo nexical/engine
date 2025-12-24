@@ -28,7 +28,7 @@ describe('ShellService', () => {
   let shell: ShellServiceClass;
   let mockHost: jest.Mocked<IRuntimeHost>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     jest.clearAllMocks();
     mockHost = {
       log: jest.fn(),

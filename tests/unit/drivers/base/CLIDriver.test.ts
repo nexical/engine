@@ -47,7 +47,7 @@ describe('CLIDriver', () => {
 
   it('should throw error on non-zero exit code', async () => {
     const driver = new TestCLIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
       .mockResolvedValue({ code: 1, stdout: '', stderr: 'error msg' });
@@ -63,7 +63,7 @@ describe('CLIDriver', () => {
 
   it('should log and rethrow on execution error', async () => {
     const driver = new TestCLIDriver(mockHost);
-    mockShell = (driver as unknown as { shell: jest.Mocked<ShellExecutor> }).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     const error = new Error('execution failed');
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
@@ -108,5 +108,13 @@ describe('CLIDriver', () => {
 
     await driver.run({ name: 'test' } as CLISkill, mockContext);
     expect(mockShell.execute).toHaveBeenCalledWith('cmd', [], expect.anything());
+  });
+
+  it('should throw error if promptEngine is missing', async () => {
+    const driver = new TestCLIDriver(mockHost);
+    const contextWithoutEngine = {} as unknown as IDriverContext;
+    await expect(driver.run({ name: 'test' } as CLISkill, contextWithoutEngine)).rejects.toThrow(
+      'PromptEngine is required for CLIDriver execution',
+    );
   });
 });

@@ -1,7 +1,6 @@
 import { z, ZodSafeParseResult } from 'zod';
 
 import { IDriverContext, ISkill } from '../../domain/Driver.js';
-import { ShellService } from '../../services/ShellService.js';
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
 
 export const AISkillSchema = CLISkillSchema.extend({

@@ -1,5 +1,4 @@
 import { IDriverContext } from '../domain/Driver.js';
-import { ShellService } from '../services/ShellService.js';
 import { AICLIDriver, AISkill } from './base/AICLIDriver.js';
 
 export class GeminiDriver extends AICLIDriver<IDriverContext> {

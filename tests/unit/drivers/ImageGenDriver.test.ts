@@ -4,6 +4,7 @@ import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { ImageGenDriver } from '../../../src/drivers/ImageGenDriver.js';
+import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 
 // Mock fetch
 const mockFetch = jest.fn<() => Promise<Response>>();
@@ -252,6 +253,53 @@ describe('ImageGenDriver', () => {
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
       'No image data returned from provider',
+    );
+  });
+
+  it('should throw error if promptEngine is missing', async () => {
+    const skill = { name: 'gen', prompt_template: 'Draw a cat' };
+    const contextWithoutEngine = { ...mockContext, promptEngine: undefined } as unknown as IDriverContext;
+    await expect(driver.run(skill, contextWithoutEngine)).rejects.toThrow(
+      'PromptEngine is required for ImageGenDriver execution',
+    );
+  });
+
+  it('should handle missing taskId and userPrompt in context', async () => {
+    mockFetch.mockResolvedValueOnce({
+      json: async () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                images: [{ image_url: { url: 'data:image/png;base64,DATA' } }],
+              },
+            },
+          ],
+        }),
+    } as Response);
+
+    const skill = { name: 'gen', prompt_template: 'Draw {user_request}' };
+    // context without userPrompt and taskId
+    const sparseContext = {
+      promptEngine: {
+        renderString: jest
+          .fn<IPromptEngine['renderString']>()
+          .mockImplementation((t: string, args: Record<string, unknown>) => {
+            const userRequest = (args.user_request as string) || '';
+            return t.replace('{user_request}', userRequest);
+          }),
+      },
+    } as unknown as IDriverContext;
+
+    await driver.run(skill, sparseContext);
+
+    const promptEngine = sparseContext.promptEngine as unknown as jest.Mocked<IPromptEngine>;
+    expect(promptEngine.renderString).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        user_request: '',
+        task_id: '',
+      }),
     );
   });
 });

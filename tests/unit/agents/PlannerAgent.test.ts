@@ -2,26 +2,19 @@ import { jest } from '@jest/globals';
 
 import { PlannerAgent } from '../../../src/agents/PlannerAgent.js';
 import { Architecture } from '../../../src/domain/Architecture.js';
-import { IDriver } from '../../../src/domain/Driver.js';
 import { Plan } from '../../../src/domain/Plan.js';
 import { IProject } from '../../../src/domain/Project.js';
-import { Result } from '../../../src/domain/Result.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
-import { IDriverRegistry } from '../../../src/drivers/DriverRegistry.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
-import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 import { ISkillRunner } from '../../../src/services/SkillRunner.js';
 
 describe('PlannerAgent', () => {
   let agent: PlannerAgent;
   let mockProject: jest.Mocked<IProject>;
   let mockWorkspace: jest.Mocked<IWorkspace>;
-  let mockPromptEngine: jest.Mocked<IPromptEngine>;
-  let mockDriverRegistry: jest.Mocked<IDriverRegistry>;
   let mockSkillRunner: jest.Mocked<ISkillRunner>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
-  let mockDriver: jest.Mocked<IDriver>;
   let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(() => {
@@ -42,23 +35,6 @@ describe('PlannerAgent', () => {
       loadPlan: jest.fn(),
       savePlan: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
-
-    mockPromptEngine = {
-      render: jest.fn().mockReturnValue('rendered prompt'),
-    } as unknown as jest.Mocked<IPromptEngine>;
-
-    mockDriver = {
-      name: 'test_driver',
-      description: 'test description',
-      isSupported: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-      validateSkill: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-      execute: jest.fn(),
-    } as unknown as jest.Mocked<IDriver>;
-
-    mockDriverRegistry = {
-      get: jest.fn().mockReturnValue(mockDriver),
-      getDefault: jest.fn(),
-    } as unknown as jest.Mocked<IDriverRegistry>;
 
     mockSkillRunner = {
       getSkills: jest.fn().mockReturnValue([]),
@@ -171,6 +147,12 @@ describe('PlannerAgent', () => {
       );
 
       spy.mockRestore();
+    });
+    it('should handle non-Error throw during skill execution', async () => {
+      const mockArch = { data: {} } as Architecture;
+      mockSkillRunner.executeNativeSkill.mockRejectedValue('String Error');
+
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
     });
   });
 });

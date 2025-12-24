@@ -4,6 +4,7 @@ import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { AISkill } from '../../../src/drivers/base/AICLIDriver.js';
 import { GeminiDriver } from '../../../src/drivers/GeminiDriver.js';
+import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 import { ShellService } from '../../../src/services/ShellService.js';
 
 // Mock ShellService
@@ -43,7 +44,12 @@ describe('GeminiDriver', () => {
   it('should execute skill', async () => {
     const context = {
       promptEngine: {
-        renderString: jest.fn().mockImplementation((t) => t),
+        renderString: jest.fn<IPromptEngine['renderString']>().mockImplementation((...args) => {
+          const [t, c] = args as [string, Record<string, unknown>];
+          const context = c as Record<string, string>;
+          if (t === '{prompt}') return context.prompt || '';
+          return t;
+        }),
       },
     } as unknown as IDriverContext;
     await driver.run({ name: 'test', prompt_template: 'Hello' }, context);

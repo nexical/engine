@@ -113,7 +113,8 @@ export class ServiceFactory {
         const evolution = container.resolve<IEvolutionService>('evolutionService');
         const host = container.resolve<IRuntimeHost>('host');
 
-        return (workspace: IWorkspace) => new ArchitectAgent(project, workspace, skillRunner, evolution, host);
+        return (workspace: IWorkspace): ArchitectAgent =>
+          new ArchitectAgent(project, workspace, skillRunner, evolution, host);
       });
 
       container.registerFactory('planner', () => {
@@ -122,7 +123,8 @@ export class ServiceFactory {
         const evolution = container.resolve<IEvolutionService>('evolutionService');
         const host = container.resolve<IRuntimeHost>('host');
 
-        return (workspace: IWorkspace) => new PlannerAgent(project, workspace, skillRunner, evolution, host);
+        return (workspace: IWorkspace): PlannerAgent =>
+          new PlannerAgent(project, workspace, skillRunner, evolution, host);
       });
 
       brain.registerAgent('architect', (workspace) =>

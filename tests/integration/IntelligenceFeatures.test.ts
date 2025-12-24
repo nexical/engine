@@ -77,9 +77,9 @@ describe('Intelligence Features Integration', () => {
           return Promise.resolve(true);
         },
         execute: async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
-          const prompt = (options?.params as { prompt: string } | undefined)?.prompt || '';
-          if (prompt.includes('PersonaTest')) {
-            capturedPrompt = prompt;
+          const projectName = (options?.params?.project_name as string) || '';
+          if (projectName.includes('PersonaTest')) {
+            capturedPrompt = projectName;
           }
           if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
           if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
@@ -111,7 +111,7 @@ describe('Intelligence Features Integration', () => {
 
     fixture.registerMockDriver('gemini', async (skill, ctx): Promise<Result<string, Error>> => {
       if (skill.name === 'architect') {
-        capturedArchitectPrompt = (ctx?.params as { prompt: string } | undefined)?.prompt || '';
+        capturedArchitectPrompt = (ctx?.params?.evolution_log as string) || '';
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
       if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));

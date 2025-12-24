@@ -46,7 +46,7 @@ describe('Agent Integration', () => {
       'gemini',
       async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
         if (skill.name === 'architect') {
-          capturedArchitectPrompt = (options?.params as { prompt: string } | undefined)?.prompt || '';
+          capturedArchitectPrompt = options?.userPrompt || '';
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult(['Component A', 'Component B'])));
         }
         return Promise.resolve(Result.ok('OK'));

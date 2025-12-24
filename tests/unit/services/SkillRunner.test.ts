@@ -300,4 +300,65 @@ describe('SkillRunner', () => {
       await expect(runner.runSkill(task, 'prompt')).rejects.toThrow('Unknown error during skill execution');
     });
   });
+
+  describe('executeNativeSkill', () => {
+    beforeEach(async () => {
+      await runner.init();
+    });
+
+    it('should execute native skill successfully', async () => {
+      mockDriverExecute.mockResolvedValue(Result.ok('native success'));
+      const result = await runner.executeNativeSkill('test-skill', { foo: 'bar' }, 'user prompt');
+      expect(result).toBe('native success');
+      expect(mockDriverExecute).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ userPrompt: 'user prompt', params: { foo: 'bar' } }),
+      );
+    });
+
+    it('should throw if skill not found', async () => {
+      await expect(runner.executeNativeSkill('unknown', {}, 'prompt')).rejects.toThrow("Skill 'unknown' not found.");
+    });
+
+    it('should throw if driver not found', async () => {
+      mockRegistryGet.mockReturnValue(undefined);
+      await expect(runner.executeNativeSkill('test-skill', {}, 'prompt')).rejects.toThrow(
+        "Driver 'mock-driver' not found.",
+      );
+    });
+
+    it('should throw if no driver found', async () => {
+      MockSkillSchema.parse.mockReturnValue({ name: 'no-provider' });
+      await runner.init();
+      mockRegistryGetDefault.mockReturnValue(undefined);
+      await expect(runner.executeNativeSkill('no-provider', {}, 'prompt')).rejects.toThrow(
+        'No driver found for execution.',
+      );
+    });
+
+    it('should throw if execution fails', async () => {
+      mockDriverExecute.mockResolvedValue(Result.fail(new Error('native fail')));
+      await expect(runner.executeNativeSkill('test-skill', {}, 'prompt')).rejects.toThrow('native fail');
+      expect(mockHostLog).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('An error occurred while executing the native skill'),
+      );
+    });
+
+    it('should throw "Unknown error" if execution fails without error object', async () => {
+      mockDriverExecute.mockResolvedValue(Result.fail<string, unknown>(null) as unknown as Result<string, Error>);
+      await expect(runner.executeNativeSkill('test-skill', {}, 'prompt')).rejects.toThrow(
+        'Unknown error during native skill execution',
+      );
+    });
+
+    it('should catch generic errors during execution', async () => {
+      mockDriverExecute.mockRejectedValue(new Error('crash'));
+      await expect(runner.executeNativeSkill('test-skill', {}, 'prompt')).rejects.toThrow('crash');
+      expect(mockHostLog).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('An error occurred while executing the native skill test-skill: Error: crash'),
+      );
+    });
+  });
 });
