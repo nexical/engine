@@ -49,7 +49,7 @@ const MockEvolutionService = jest.fn().mockReturnValue(mockEvolutionService);
 const MockDIContainer = jest.fn().mockReturnValue(mockContainer);
 const MockArchitectAgent = jest.fn<() => ArchitectAgent>();
 const MockPlannerAgent = jest.fn<() => PlannerAgent>();
-const MockDeveloperAgent = jest.fn();
+const MockExecutor = jest.fn();
 
 // Register Mocks
 jest.unstable_mockModule('../../../src/domain/Project.js', () => ({ Project: MockProject }));
@@ -68,7 +68,7 @@ jest.unstable_mockModule('../../../src/services/EvolutionService.js', () => ({
 jest.unstable_mockModule('../../../src/services/DIContainer.js', () => ({ DIContainer: MockDIContainer }));
 jest.unstable_mockModule('../../../src/agents/ArchitectAgent.js', () => ({ ArchitectAgent: MockArchitectAgent }));
 jest.unstable_mockModule('../../../src/agents/PlannerAgent.js', () => ({ PlannerAgent: MockPlannerAgent }));
-jest.unstable_mockModule('../../../src/agents/DeveloperAgent.js', () => ({ DeveloperAgent: MockDeveloperAgent }));
+jest.unstable_mockModule('../../../src/agents/Executor.js', () => ({ Executor: MockExecutor }));
 const MockGitService = jest.fn().mockImplementation(() => ({}));
 jest.unstable_mockModule('../../../src/services/GitService.js', () => ({ GitService: MockGitService }));
 
@@ -212,13 +212,13 @@ describe('ServiceFactory', () => {
     // Test Brain Agent Registration
     expect(mockBrain.registerAgent).toHaveBeenCalledWith('architect', expect.any(Function));
     expect(mockBrain.registerAgent).toHaveBeenCalledWith('planner', expect.any(Function));
-    expect(mockBrain.registerAgent).toHaveBeenCalledWith('developer', expect.any(Function));
+    expect(mockBrain.registerAgent).toHaveBeenCalledWith('executor', expect.any(Function));
 
     // Test Agent Factories (inside Brain registration)
     const agentCalls = mockBrain.registerAgent.mock.calls;
     const architectFactory = agentCalls.find((c) => c[0] === 'architect')?.[1];
     const plannerFactory = agentCalls.find((c) => c[0] === 'planner')?.[1];
-    const developerFactory = agentCalls.find((c) => c[0] === 'developer')?.[1];
+    const executorFactory = agentCalls.find((c) => c[0] === 'executor')?.[1];
 
     if (architectFactory) (architectFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockArchitectAgent).toHaveBeenCalled();
@@ -226,8 +226,8 @@ describe('ServiceFactory', () => {
     if (plannerFactory) (plannerFactory as (...args: unknown[]) => unknown)(mockWorkspace);
     expect(MockPlannerAgent).toHaveBeenCalled();
 
-    if (developerFactory) (developerFactory as (...args: unknown[]) => unknown)(mockWorkspace);
-    expect(MockDeveloperAgent).toHaveBeenCalled();
+    if (executorFactory) (executorFactory as (...args: unknown[]) => unknown)(mockWorkspace);
+    expect(MockExecutor).toHaveBeenCalled();
 
     // Test Architect Factory (the one registered in the container)
     const architectContainerFactory = factories['architect'];

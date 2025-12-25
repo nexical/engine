@@ -98,12 +98,12 @@ describe('Brain', () => {
       // Register mocks
       brain.registerAgent('architect', () => 'architect_instance');
       brain.registerAgent('planner', () => 'planner_instance');
-      brain.registerAgent('developer', () => 'developer_instance');
+      brain.registerAgent('executor', () => 'executor_instance');
 
       const workspace = {} as IWorkspace;
       expect(brain.createArchitect(workspace)).toBe('architect_instance');
       expect(brain.createPlanner(workspace)).toBe('planner_instance');
-      expect(brain.createDeveloper(workspace)).toBe('developer_instance');
+      expect(brain.createExecutor(workspace)).toBe('executor_instance');
     });
   });
 });

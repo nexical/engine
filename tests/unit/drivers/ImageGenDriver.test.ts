@@ -7,7 +7,7 @@ import { ImageGenDriver } from '../../../src/drivers/ImageGenDriver.js';
 import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 
 // Mock fetch
-const mockFetch = jest.fn<() => Promise<Response>>();
+const mockFetch = jest.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>();
 (global as unknown as { fetch: typeof mockFetch }).fetch = mockFetch;
 
 describe('ImageGenDriver', () => {
@@ -69,7 +69,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await driver.run(skill, { ...mockContext, userPrompt: 'cat' });
@@ -101,14 +101,14 @@ describe('ImageGenDriver', () => {
                 },
               ],
             }),
-        } as Response);
+        } as unknown as Response);
       }
       if (urlStr === 'https://example.com/image.png') {
         return Promise.resolve({
           arrayBuffer: async () => Promise.resolve(Buffer.from('image-data')),
-        } as Response);
+        } as unknown as Response);
       }
-      return Promise.resolve({} as Response);
+      return Promise.resolve({} as unknown as Response);
     });
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
@@ -129,7 +129,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await driver.run(skill, { ...mockContext, userPrompt: 'test', params: { output_path: 'custom.png' } });
@@ -140,7 +140,7 @@ describe('ImageGenDriver', () => {
   it('should throw error if no choices returned', async () => {
     mockFetch.mockResolvedValueOnce({
       json: async () => Promise.resolve({ choices: [] }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
@@ -170,7 +170,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, {
@@ -179,7 +179,7 @@ describe('ImageGenDriver', () => {
       params: { aspectRatio: '16:9', resolution: '2K' },
     });
 
-    const calls = mockFetch.mock.calls as [string, { body: string }][];
+    const calls = mockFetch.mock.calls as unknown as [string, { body: string }][];
     const body = JSON.parse(calls[0][1].body) as { image_config: { aspect_ratio: string; image_size: string } };
     expect(body.image_config.aspect_ratio).toBe('16:9');
     expect(body.image_config.image_size).toBe('2K');
@@ -197,7 +197,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, { ...mockContext, userPrompt: 'test' });
@@ -231,7 +231,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await driver.run(skill, { ...mockContext, userPrompt: '' });
@@ -248,7 +248,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
@@ -276,7 +276,7 @@ describe('ImageGenDriver', () => {
             },
           ],
         }),
-    } as Response);
+    } as unknown as Response);
 
     const skill = { name: 'gen', prompt_template: 'Draw {user_request}' };
     // context without userPrompt and taskId

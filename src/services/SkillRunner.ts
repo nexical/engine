@@ -199,12 +199,12 @@ export class SkillRunner implements ISkillRunner {
       }
     }
 
-    userPromptWithPersona = this.promptEngine.render(this.project.paths.skillPrompt, {
-      user_prompt: userPrompt,
-      persona_context: personaContext,
-    });
-
     try {
+      userPromptWithPersona = this.promptEngine.render(this.project.paths.skillPrompt, {
+        user_prompt: userPrompt,
+        persona_context: personaContext,
+      });
+
       const result = await driver.execute(profile, {
         userPrompt: userPromptWithPersona,
         taskId: task.id,

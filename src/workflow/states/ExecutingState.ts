@@ -10,8 +10,8 @@ export class ExecutingState extends State {
 
   async run(state: EngineState): Promise<Signal> {
     try {
-      const developer = this.brain.createDeveloper(this.workspace);
-      await developer.execute(state);
+      const executor = this.brain.createExecutor(this.workspace);
+      await executor.execute(state);
       return Signal.COMPLETE;
     } catch (error) {
       if (error instanceof SignalDetectedError) {

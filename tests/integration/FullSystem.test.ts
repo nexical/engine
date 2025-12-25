@@ -31,7 +31,7 @@ describe('Full System Integration (Smoke Test)', () => {
 
   test('should execute full workflow from prompt to success', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'SmokeTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
 
     const orchestrator = await fixture.initOrchestrator();
 
@@ -42,13 +42,11 @@ describe('Full System Integration (Smoke Test)', () => {
       if (skill.name === 'planner') {
         return Promise.resolve(
           Result.ok(
-            ProjectFixture.createPlanResult([
-              { id: 'task1', skill: 'developer', message: 'work', description: 'desc' },
-            ]),
+            ProjectFixture.createPlanResult([{ id: 'task1', skill: 'executor', message: 'work', description: 'desc' }]),
           ),
         );
       }
-      if (skill.name === 'developer') {
+      if (skill.name === 'executor') {
         // Simulate work by writing a file
         const { execSync } = await import('child_process');
         execSync('echo "content" > built.txt'); // Writes to cwd (worktree)
@@ -65,7 +63,7 @@ describe('Full System Integration (Smoke Test)', () => {
 
   test('should handle large payloads correctly (Scenario 16)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'LargePayloadTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
 
     const orchestrator = await fixture.initOrchestrator();
 
@@ -76,7 +74,7 @@ describe('Full System Integration (Smoke Test)', () => {
     // Create a large plan (e.g. 50 tasks)
     const tasks = Array.from({ length: 50 }, (_, i) => ({
       id: `task-${i}`,
-      skill: 'developer',
+      skill: 'executor',
       message: `Doing task ${i}`,
       description: `Work for task ${i}`,
       params: {},

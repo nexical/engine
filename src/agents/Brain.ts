@@ -7,7 +7,7 @@ import { IEvolutionService } from '../services/EvolutionService.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
 import { ISkillRunner } from '../services/SkillRunner.js';
 import type { ArchitectAgent } from './ArchitectAgent.js';
-import type { DeveloperAgent } from './DeveloperAgent.js';
+import type { Executor } from './Executor.js';
 import type { PlannerAgent } from './PlannerAgent.js';
 
 export class Brain {
@@ -80,7 +80,7 @@ export class Brain {
     return this.createAgent<PlannerAgent>('planner', workspace);
   }
 
-  public createDeveloper(workspace: IWorkspace): DeveloperAgent {
-    return this.createAgent<DeveloperAgent>('developer', workspace);
+  public createExecutor(workspace: IWorkspace): Executor {
+    return this.createAgent<Executor>('executor', workspace);
   }
 }

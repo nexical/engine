@@ -9,8 +9,8 @@ import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { GitService } from '../services/GitService.js';
 import { ISkillRunner } from '../services/SkillRunner.js';
 
-export class DeveloperAgent {
-  public readonly name = 'Developer';
+export class Executor {
+  public readonly name = 'Executor';
   public readonly description = 'Executes the implementation plan by running skills.';
 
   constructor(

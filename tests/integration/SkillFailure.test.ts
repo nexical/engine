@@ -98,7 +98,7 @@ describe('Skill Failure Scenarios', () => {
 
   test('should fail workflow if skill template rendering fails', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'RenderFailTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
 
     // Write a template that will fail to render (unclosed tag)
     await fixture.writePrompt('skill.md', 'Bad Template {{ unclosed');
@@ -120,6 +120,9 @@ describe('Skill Failure Scenarios', () => {
     // console.log('DEBUG LOG CALLS:', JSON.stringify(fixture.mockHost.log.mock.calls, null, 2));
 
     expect(orchestrator.session.state.status).toBe('FAILED');
-    expect(fixture.mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error rendering template'));
+    expect(fixture.mockHost.log).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('An error occurred while executing the skill'),
+    );
   });
 });

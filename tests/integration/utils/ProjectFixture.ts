@@ -133,7 +133,7 @@ export class ProjectFixture {
   }
 
   static createPlanResult(
-    tasks: Record<string, unknown>[] = [{ id: 't1', skill: 'developer', message: 'done', description: 'desc' }],
+    tasks: Record<string, unknown>[] = [{ id: 't1', skill: 'executor', message: 'done', description: 'desc' }],
   ): string {
     return yaml.dump({
       plan_name: 'Fixture Plan',

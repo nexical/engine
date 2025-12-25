@@ -2,13 +2,13 @@
  * @file GitIntegration.test.ts
  *
  * SCOPE:
- * This test verifies the integration between the DeveloperAgent and the Version Control System (Git).
+ * This test verifies the integration between the Executor and the Version Control System (Git).
  * It ensures that the agent automatically initializes a repo (if needed) and creates commits
  * after successful task execution.
  *
  * COVERAGE:
  * - GitService integration.
- * - DeveloperAgent post-execution hooks.
+ * - Executor post-execution hooks.
  * - Automatic commit message generation.
  */
 
@@ -45,7 +45,7 @@ describe('Git Integration', () => {
     );
 
     await fixture.writeConfig({ project_name: 'GitTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
 
     const orchestrator = await fixture.initOrchestrator();
 
@@ -55,12 +55,12 @@ describe('Git Integration', () => {
         return Promise.resolve(
           Result.ok(
             ProjectFixture.createPlanResult([
-              { id: 't1', skill: 'developer', message: 'Execute task', description: 'description' },
+              { id: 't1', skill: 'executor', message: 'Execute task', description: 'description' },
             ]),
           ),
         );
       }
-      if (skill.name === 'developer') {
+      if (skill.name === 'executor') {
         const fs = await import('node:fs');
         const path = await import('node:path');
         fs.writeFileSync(path.join(fixture.tmpDir, 'task_done.txt'), 'done');

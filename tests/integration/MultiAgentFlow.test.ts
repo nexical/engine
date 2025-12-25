@@ -35,7 +35,7 @@ describe('Multi-Agent Flow Integration', () => {
     );
     await fixture.writePrompt('planner.md', 'Planner for {{ project_name }}');
 
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     await fixture.writeConfig({ environment: 'staging', project_name: 'MultiTest' });
 
     const orchestrator = await fixture.initOrchestrator();
@@ -52,7 +52,7 @@ describe('Multi-Agent Flow Integration', () => {
         }
         if (skill.name === 'planner') {
           const planResult = ProjectFixture.createPlanResult([
-            { id: 'task1', skill: 'developer', message: 'work', description: 'work_description' },
+            { id: 'task1', skill: 'executor', message: 'work', description: 'work_description' },
           ]);
           return Promise.resolve(Result.ok(planResult));
         }

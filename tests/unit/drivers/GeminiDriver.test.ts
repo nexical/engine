@@ -63,10 +63,12 @@ describe('GeminiDriver', () => {
   it('should execute gemini model', async () => {
     const context = {
       promptEngine: {
-        renderString: jest.fn().mockImplementation((t: string, c: Record<string, unknown>) => {
-          if (t === '{prompt}') return (c.prompt as string) || t;
-          return t;
-        }),
+        renderString: jest
+          .fn<IPromptEngine['renderString']>()
+          .mockImplementation((t: string, c: Record<string, unknown>) => {
+            if (t === '{prompt}') return (c.prompt as string) || t;
+            return t;
+          }),
       },
     } as unknown as IDriverContext;
 
@@ -96,10 +98,12 @@ describe('GeminiDriver', () => {
       {
         userPrompt: 'User',
         promptEngine: {
-          renderString: jest.fn().mockImplementation((t: string, c: Record<string, unknown>) => {
-            if (t === '{prompt}') return (c.prompt as string) || t;
-            return t;
-          }),
+          renderString: jest
+            .fn<IPromptEngine['renderString']>()
+            .mockImplementation((t: string, c: Record<string, unknown>) => {
+              if (t === '{prompt}') return (c.prompt as string) || t;
+              return t;
+            }),
         },
       } as unknown as IDriverContext,
     );

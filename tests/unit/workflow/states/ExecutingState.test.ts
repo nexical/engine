@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 
 import { Brain } from '../../../../src/agents/Brain.js';
-import { DeveloperAgent } from '../../../../src/agents/DeveloperAgent.js';
+import { Executor } from '../../../../src/agents/Executor.js';
 import { IProject } from '../../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { EngineState } from '../../../../src/domain/State.js';
@@ -16,12 +16,12 @@ describe('ExecutingState', () => {
   let mockWorkspace: jest.Mocked<IWorkspace>;
   let engineState: EngineState;
   let state: ExecutingState;
-  let mockDeveloper: jest.Mocked<DeveloperAgent>;
+  let mockExecutor: jest.Mocked<Executor>;
 
   beforeEach(() => {
     mockHost = { log: jest.fn(), ask: jest.fn() } as unknown as jest.Mocked<IRuntimeHost>;
     mockBrain = {
-      createDeveloper: jest.fn<Brain['createDeveloper']>(),
+      createExecutor: jest.fn<Brain['createExecutor']>(),
     } as unknown as jest.Mocked<Brain>;
     mockWorkspace = {
       getArchitecture: jest.fn(),
@@ -31,10 +31,10 @@ describe('ExecutingState', () => {
     engineState.user_prompt = 'Do something';
     engineState.interactive = true;
 
-    mockDeveloper = {
-      execute: jest.fn<DeveloperAgent['execute']>().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<DeveloperAgent>;
-    mockBrain.createDeveloper.mockReturnValue(mockDeveloper);
+    mockExecutor = {
+      execute: jest.fn<Executor['execute']>().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<Executor>;
+    mockBrain.createExecutor.mockReturnValue(mockExecutor);
     state = new ExecutingState(mockBrain, {} as unknown as IProject, mockWorkspace, mockHost);
   });
 
@@ -45,27 +45,27 @@ describe('ExecutingState', () => {
   it('should execute and complete', async () => {
     const signal = await state.run(engineState);
 
-    expect(mockDeveloper.execute).toHaveBeenCalled();
+    expect(mockExecutor.execute).toHaveBeenCalled();
     expect(signal).toBe(Signal.COMPLETE);
   });
 
   it('should handle SignalDetectedError', async () => {
     const signal = new Signal(SignalType.FAIL, 'stop');
-    mockDeveloper.execute.mockRejectedValue(new SignalDetectedError(signal));
+    mockExecutor.execute.mockRejectedValue(new SignalDetectedError(signal));
 
     const result = await state.run(engineState);
     expect(result).toBe(signal);
   });
 
   it('should return fail on generic error', async () => {
-    mockDeveloper.execute.mockRejectedValue(new Error('fail'));
+    mockExecutor.execute.mockRejectedValue(new Error('fail'));
     const signal = await state.run(engineState);
     expect(signal.type).toBe(SignalType.FAIL);
   });
   it('should handle error object with code SIGNAL_DETECTED and signal property', async () => {
     const signal = new Signal(SignalType.FAIL, 'stop');
     const errObj = { code: 'SIGNAL_DETECTED', signal };
-    mockDeveloper.execute.mockRejectedValue(errObj);
+    mockExecutor.execute.mockRejectedValue(errObj);
 
     const result = await state.run(engineState);
     expect(result).toEqual(signal);
@@ -74,7 +74,7 @@ describe('ExecutingState', () => {
   it('should handle error object with raw signal data', async () => {
     const rawSignal = { type: 'REPLAN', reason: 'change', metadata: { foo: 'bar' } };
     const errObj = { code: 'SIGNAL_DETECTED', signal: rawSignal };
-    mockDeveloper.execute.mockRejectedValue(errObj);
+    mockExecutor.execute.mockRejectedValue(errObj);
 
     const result = await state.run(engineState);
     expect(result.type).toBe(SignalType.REPLAN);
@@ -84,7 +84,7 @@ describe('ExecutingState', () => {
 
   it('should return fail signal if signal data is invalid', async () => {
     const errObj = { code: 'SIGNAL_DETECTED', signal: undefined }; // Missing signal
-    mockDeveloper.execute.mockRejectedValue(errObj);
+    mockExecutor.execute.mockRejectedValue(errObj);
 
     const result = await state.run(engineState);
     expect(result.type).toBe(SignalType.FAIL);
@@ -94,7 +94,7 @@ describe('ExecutingState', () => {
   it('should handle signal in error metadata', async () => {
     const rawSignal = { type: 'REPLAN', reason: 'change from metadata', metadata: { foo: 'bar' } };
     const errObj = { message: 'Some error', metadata: { signal: rawSignal } };
-    mockDeveloper.execute.mockRejectedValue(errObj);
+    mockExecutor.execute.mockRejectedValue(errObj);
 
     const result = await state.run(engineState);
     expect(result.type).toBe(SignalType.REPLAN);
@@ -102,7 +102,7 @@ describe('ExecutingState', () => {
   });
 
   it('should handle non-object error', async () => {
-    mockDeveloper.execute.mockRejectedValue('String Error'); // Not an object
+    mockExecutor.execute.mockRejectedValue('String Error'); // Not an object
 
     // Should fall through to generic error handling
     const result = await state.run(engineState);
@@ -114,7 +114,7 @@ describe('ExecutingState', () => {
     // Only type provided, reason and metadata undefined
     const rawSignal = { type: 'REPLAN' };
     const errObj = { code: 'SIGNAL_DETECTED', signal: rawSignal };
-    mockDeveloper.execute.mockRejectedValue(errObj);
+    mockExecutor.execute.mockRejectedValue(errObj);
 
     const result = await state.run(engineState);
     expect(result.type).toBe(SignalType.REPLAN);

@@ -57,7 +57,7 @@ describe('Workflow Robustness Integration', () => {
 
   test('should retreat to PLANNING from EXECUTING when SignalDetectedError:REPLAN occurs (Scenario 8)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'RetreatTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     let replaned = false;
@@ -71,12 +71,12 @@ describe('Workflow Robustness Integration', () => {
         return Promise.resolve(
           Result.ok(
             ProjectFixture.createPlanResult([
-              { id: taskId, skill: 'developer', message: 'Execute', description: 'desc' },
+              { id: taskId, skill: 'executor', message: 'Execute', description: 'desc' },
             ]),
           ),
         );
       }
-      if (skill.name === 'developer' && !replaned) {
+      if (skill.name === 'executor' && !replaned) {
         replaned = true;
         throw new SignalDetectedError(Signal.replan('Need better plan'));
       }
@@ -97,7 +97,7 @@ describe('Workflow Robustness Integration', () => {
 
   test('should interrupt execution when an external signal is detected (Scenario 14)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'InterruptTest' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     fixture.registerMockDriver('gemini', async (skill: ISkill): Promise<Result<string, Error>> => {
@@ -105,10 +105,10 @@ describe('Workflow Robustness Integration', () => {
       if (skill.name === 'planner')
         return Promise.resolve(
           Result.ok(
-            ProjectFixture.createPlanResult([{ id: 't1', skill: 'developer', message: 'msg', description: 'desc' }]),
+            ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'msg', description: 'desc' }]),
           ),
         );
-      if (skill.name === 'developer') {
+      if (skill.name === 'executor') {
         const signalPath = path.join(fixture.tmpDir, '.ai/signals/interrupt.signal.yaml');
         await fs.ensureDir(path.dirname(signalPath));
         await fs.writeFile(signalPath, 'type: REPLAN\nreason: User changed mind');

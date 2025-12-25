@@ -46,7 +46,7 @@ describe('Orchestrator Initialization Integration', () => {
     const workspace = orchestrator.workspace;
     expect(orchestrator.brain.createArchitect(workspace)).toBeDefined();
     expect(orchestrator.brain.createPlanner(workspace)).toBeDefined();
-    expect(orchestrator.brain.createDeveloper(workspace)).toBeDefined();
+    expect(orchestrator.brain.createExecutor(workspace)).toBeDefined();
   });
 
   test('should register drivers during initialization', async (): Promise<void> => {

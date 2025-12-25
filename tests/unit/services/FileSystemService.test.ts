@@ -50,8 +50,8 @@ const mockFs = {
 } as unknown as jest.Mocked<typeof fs>;
 
 jest.unstable_mockModule('fs-extra', () => ({
-  default: mockFs,
   ...mockFs,
+  default: mockFs,
 }));
 
 // Re-import to ensure it uses the mock

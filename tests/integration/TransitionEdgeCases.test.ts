@@ -34,7 +34,7 @@ describe('Workflow Transition Edge Cases', () => {
 
   test('should transition from PLANNING back to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCase' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
@@ -73,7 +73,7 @@ describe('Workflow Transition Edge Cases', () => {
 
   test('should transition from EXECUTING to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCaseExec' });
-    await fixture.writeSkill('developer', { name: 'developer', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
@@ -85,7 +85,7 @@ describe('Workflow Transition Edge Cases', () => {
       if (skill.name === 'planner') {
         return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
       }
-      if (skill.name === 'developer') {
+      if (skill.name === 'executor') {
         if (!rearchitected) {
           rearchitected = true;
           // Properly use SignalDetectedError

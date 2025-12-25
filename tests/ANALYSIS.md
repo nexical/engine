@@ -39,7 +39,7 @@ This document provides a comprehensive analysis of the `astrical/engine` project
 *   **State Mutations**: Creates/Updates the `plan` artifact in the workspace.
 *   **Error Scenarios**: Driver failure, YAML parsing errors (critical, throws exception).
 
-#### `DeveloperAgent`
+#### `Executor`
 *   **Responsibility**: Executes the implementation plan by coordinating skills.
 *   **Key Interactions**:
     *   `Workspace`: Loads the `Plan`.
@@ -148,7 +148,7 @@ This document provides a comprehensive analysis of the `astrical/engine` project
         *   Rejected: `FAIL`
 
 *   **`ExecutingState`**:
-    *   **Action**: Invokes `DeveloperAgent.execute`.
+    *   **Action**: Invokes `Executor.execute`.
     *   **Signal Handling**: Catches `SignalDetectedError` (e.g., from user interruption or file triggers) and bubbles up the signal.
     *   **Transitions**:
         *   Success: `COMPLETE`
@@ -215,7 +215,7 @@ This document provides a comprehensive analysis of the `astrical/engine` project
     *   Generates `Plan` (Task 1: "Create hello.ts").
     *   Returns `NEXT`.
 4.  **State `EXECUTING`**:
-    *   `DeveloperAgent` runs. Reads Plan.
+    *   `Executor` runs. Reads Plan.
     *   Executes Task 1 via `SkillRunner`.
     *   Commits to Git.
     *   Returns `COMPLETE`.
@@ -229,7 +229,7 @@ This document provides a comprehensive analysis of the `astrical/engine` project
 2.  **Workflow Recovery**:
     *   Catches error. Checks Graph.
     *   Graph says: `EXECUTING` + `FAIL` -> (No auto transition defined for generic fail, but `SignalDetectedError` might carry `REPLAN`).
-    *   *Self-Correction*: `DeveloperAgent` logic could be enhanced to return `REPLAN` signal instead of throwing raw error for recoverable failures.
+    *   *Self-Correction*: `Executor` logic could be enhanced to return `REPLAN` signal instead of throwing raw error for recoverable failures.
     *   *Current Logic*: `EvolutionService` records failure. State updates to `FAILED`.
     *   *Implicit Re-run*: User sees failure, updates prompt "Fix the file path", re-runs.
     *   **Resumption**: Orchestrator loads state. Status is `FAILED`. Resets to `PLANNING` (or `ARCHITECTING` based on config).

@@ -5,7 +5,7 @@ jest.unstable_mockModule('child_process', () => ({
   execSync: mockExecSync,
 }));
 
-import { DeveloperAgent } from '../../../src/agents/DeveloperAgent.js';
+import { Executor } from '../../../src/agents/Executor.js';
 import { Plan } from '../../../src/domain/Plan.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
@@ -16,8 +16,8 @@ import { GitService } from '../../../src/services/GitService.js';
 import { ISkillRunner } from '../../../src/services/SkillRunner.js';
 import { Signal } from '../../../src/workflow/Signal.js';
 
-describe('DeveloperAgent', () => {
-  let agent: DeveloperAgent;
+describe('Executor', () => {
+  let agent: Executor;
   let mockProject: jest.Mocked<IProject>;
   let mockWorkspace: jest.Mocked<IWorkspace>;
   let mockSkillRunner: jest.Mocked<ISkillRunner>;
@@ -68,7 +68,7 @@ describe('DeveloperAgent', () => {
     state = new EngineState('test-session');
     state.initialize('prompt');
 
-    agent = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
+    agent = new Executor(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
   });
 
   it('should be defined', () => {
@@ -168,7 +168,7 @@ describe('DeveloperAgent', () => {
     });
 
     it('should throw if git is missing for parallel execution', async () => {
-      const agentNoGit = new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, undefined);
+      const agentNoGit = new Executor(mockProject, mockWorkspace, mockSkillRunner, mockHost, undefined);
       const mockPlan = new Plan('test plan', [
         new Task('1', 'task 1', 'desc 1', 'skill 1'),
         new Task('2', 'task 2', 'desc 2', 'skill 2'),
@@ -229,7 +229,7 @@ describe('DeveloperAgent', () => {
       mockGit.cleanStaleWorktrees.mockImplementation(() => {
         throw new Error('clean failed');
       });
-      new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
+      new Executor(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('Failed to clean stale worktrees: clean failed'),
@@ -364,7 +364,7 @@ describe('DeveloperAgent', () => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw 'constructor clean error string';
       });
-      new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
+      new Executor(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('Failed to clean stale worktrees: constructor clean error string'),
@@ -375,7 +375,7 @@ describe('DeveloperAgent', () => {
       mockGit.cleanStaleWorktrees.mockImplementation(() => {
         throw new Error('constructor clean error object');
       });
-      new DeveloperAgent(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
+      new Executor(mockProject, mockWorkspace, mockSkillRunner, mockHost, mockGit);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
         expect.stringContaining('Failed to clean stale worktrees: constructor clean error object'),

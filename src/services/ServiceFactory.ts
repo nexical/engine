@@ -1,6 +1,6 @@
 import { ArchitectAgent } from '../agents/ArchitectAgent.js';
 import { Brain } from '../agents/Brain.js';
-import { DeveloperAgent } from '../agents/DeveloperAgent.js';
+import { Executor } from '../agents/Executor.js';
 import { PlannerAgent } from '../agents/PlannerAgent.js';
 import { IFileSystem } from '../domain/IFileSystem.js';
 import { IProject, Project } from '../domain/Project.js';
@@ -133,9 +133,9 @@ export class ServiceFactory {
       brain.registerAgent('planner', (workspace) =>
         container.resolve<(workspace: IWorkspace) => PlannerAgent>('planner')(workspace),
       );
-      brain.registerAgent('developer', (workspace) => {
+      brain.registerAgent('executor', (workspace) => {
         const gitService = container.resolve<GitService>('gitService');
-        return new DeveloperAgent(project, workspace, skillRunner, host, gitService);
+        return new Executor(project, workspace, skillRunner, host, gitService);
       });
 
       return brain;
