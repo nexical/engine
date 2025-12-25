@@ -13,30 +13,30 @@ export type DriverConfig = Record<string, unknown> & { provider?: string };
  * Provides all necessary dependencies for the standardized 5-step pipeline.
  */
 export interface ISkillContext {
-    /**
-     * Handles CLARIFICATION_NEEDED signals.
-     * - ArchitectAgent: Prompts User via RuntimeHost.
-     * - Planner/Tasks: Writes to .ai/comms/inbox and polls outbox.
-     */
-    clarificationHandler: (question: string) => Promise<string>;
-    commandRunner: (command: string, args?: string[]) => Promise<string>;
-    promptEngine?: IPromptEngine; // Optional but recommended for drivers needing templates
+  /**
+   * Handles CLARIFICATION_NEEDED signals.
+   * - ArchitectAgent: Prompts User via RuntimeHost.
+   * - Planner/Tasks: Writes to .ai/comms/inbox and polls outbox.
+   */
+  clarificationHandler: (question: string) => Promise<string>;
+  commandRunner: (command: string, args?: string[]) => Promise<string>;
+  promptEngine?: IPromptEngine; // Optional but recommended for drivers needing templates
 
-    /**
-     * Injectable validators for the Verification Phase.
-     * - PlannerAgent: Injects PlanGraphValidator.
-     */
-    validators: Array<(context: ISkillContext) => Promise<Result<boolean, Error>>>;
+  /**
+   * Injectable validators for the Verification Phase.
+   * - PlannerAgent: Injects PlanGraphValidator.
+   */
+  validators: Array<(context: ISkillContext) => Promise<Result<boolean, Error>>>;
 
-    // Domain Services
-    fileSystem: any; // Using 'any' for now to avoid circular dependency, ideally IFileSystem
-    driverRegistry: any; // Using 'any' for now to avoid circular dependency
-    workspaceRoot: string;
+  // Domain Services
+  fileSystem: any; // Using 'any' for now to avoid circular dependency, ideally IFileSystem
+  driverRegistry: any; // Using 'any' for now to avoid circular dependency
+  workspaceRoot: string;
 
-    // Execution State
-    taskId: string;
-    logger: any;
-    [key: string]: unknown;
+  // Execution State
+  taskId: string;
+  logger: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -44,37 +44,38 @@ export interface ISkillContext {
  * Encapsulates Environment Setup, Process Config, and Driver Configs.
  */
 export interface ISkillConfig {
-    name: string;
-    description: string;
+  name: string;
+  description: string;
 
-    // Environment Config (Moved from Driver)
-    dependencies?: string[];
-    worktree_setup?: string[];
-    hydration?: string[];
-    sparse_checkout?: string[];
+  // Environment Config (Moved from Driver)
+  dependencies?: string[];
+  worktree_setup?: string[];
+  hydration?: string[];
+  sparse_checkout?: string[];
 
-    // Process Config
-    analysis_enabled?: boolean;
-    pre_analysis_commands?: string[];
-    post_execution_commands?: string[];
+  // Process Config
+  analysis_enabled?: boolean;
+  pre_analysis_commands?: string[];
+  post_execution_commands?: string[];
 
-    verification_strategy?: {
-        max_retries: number;
-    };
+  verification_strategy?: {
+    max_retries: number;
+  };
 
-    // Driver Configs (Polymorphic)
-    analysis?: DriverConfig;
-    execution?: DriverConfig;
-    verification?: DriverConfig;
+  // Driver Configs (Polymorphic)
+  analysis?: DriverConfig;
+  execution?: DriverConfig;
+  verification?: DriverConfig;
 
-    // Allow additional properties for polymorphism
-    [key: string]: unknown;
+  // Allow additional properties for polymorphism
+  [key: string]: unknown;
 }
 
 /**
  * Zod Schema for validation of ISkillConfig.
  */
-export const SkillSchema = z.object({
+export const SkillSchema = z
+  .object({
     name: z.string(),
     description: z.string().default(''),
 
@@ -89,12 +90,15 @@ export const SkillSchema = z.object({
     pre_analysis_commands: z.array(z.string()).optional(),
     post_execution_commands: z.array(z.string()).optional(),
 
-    verification_strategy: z.object({
+    verification_strategy: z
+      .object({
         max_retries: z.number().default(3),
-    }).optional(),
+      })
+      .optional(),
 
     // Drivers
     analysis: z.record(z.string(), z.unknown()).optional(),
     execution: z.record(z.string(), z.unknown()).optional(),
     verification: z.record(z.string(), z.unknown()).optional(),
-}).strict();
+  })
+  .strict();

@@ -31,7 +31,7 @@ describe('Index Exports', () => {
   // Checking index.ts content: "export { Brain } ... { PlannerAgent } ..."
   // It does NOT export EngineState.
   // So this test was failing because it expected it.
-  // We can remove it or import from domain/State.js if we want to ensure it works, 
+  // We can remove it or import from domain/State.js if we want to ensure it works,
   // but if index.ts doesn't export it, we shouldn't test index.ts for it.
   // BUT the previous test existed, identifying regression.
   // I will check if I should export it.

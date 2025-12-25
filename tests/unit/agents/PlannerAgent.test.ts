@@ -77,7 +77,7 @@ describe('PlannerAgent', () => {
       mockEvolution,
       mockHost,
       mockBus,
-      mockPromptEngine
+      mockPromptEngine,
     );
   });
 

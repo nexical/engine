@@ -39,7 +39,7 @@ export class ArchitectAgent {
     });
 
     // Keep process alive
-    return new Promise(() => { });
+    return new Promise(() => {});
   }
 
   private async handleInboxMessage(message: IBusMessage): Promise<void> {

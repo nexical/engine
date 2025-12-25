@@ -67,7 +67,6 @@ describe('ArchitectAgent', () => {
       renderString: jest.fn(),
     } as unknown as jest.Mocked<IPromptEngine>;
 
-
     agent = new ArchitectAgent(
       mockProject,
       mockWorkspace,
@@ -76,7 +75,7 @@ describe('ArchitectAgent', () => {
       mockEvolution,
       mockHost,
       mockBus,
-      mockPromptEngine
+      mockPromptEngine,
     );
   });
 

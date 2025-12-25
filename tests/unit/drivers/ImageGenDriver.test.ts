@@ -67,9 +67,10 @@ describe('ImageGenDriver', () => {
       if (typeof url === 'string' && url.includes('chat/completions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }]
-          })
+          json: () =>
+            Promise.resolve({
+              choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }],
+            }),
         });
       }
       if (typeof url === 'string' && url.includes('image.png')) {
@@ -92,9 +93,10 @@ describe('ImageGenDriver', () => {
       if (typeof url === 'string' && url.includes('completions')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({
-            choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }]
-          })
+          json: () =>
+            Promise.resolve({
+              choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }],
+            }),
         });
       }
       // second call for image
@@ -115,7 +117,7 @@ describe('ImageGenDriver', () => {
     (global.fetch as jest.Mock).mockImplementation(() => {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ choices: [] })
+        json: () => Promise.resolve({ choices: [] }),
       });
     });
 
@@ -129,7 +131,7 @@ describe('ImageGenDriver', () => {
     (global.fetch as jest.Mock).mockImplementation(() => {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ choices: [{ message: {} }] })
+        json: () => Promise.resolve({ choices: [{ message: {} }] }),
       });
     });
 

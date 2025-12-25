@@ -95,19 +95,32 @@ describe('ServiceFactory', () => {
     mockContainer.resolve.mockImplementation((...args: unknown[]) => {
       const key = args[0] as string;
       switch (key) {
-        case 'rootDirectory': return '/root';
-        case 'host': return mockHost;
-        case 'fileSystem': return mockFileSystem;
-        case 'project': return mockProject;
-        case 'workspace': return mockWorkspace;
-        case 'brain': return mockBrain;
-        case 'session': return mockSession;
-        case 'driverRegistry': return mockDriverRegistry;
-        case 'promptEngine': return mockPromptEngine;
-        case 'skillRegistry': return mockSkillRegistry;
-        case 'evolutionService': return mockEvolutionService;
-        case 'fileSystemBus': return mockFileSystemBus;
-        case 'gitService': return {};
+        case 'rootDirectory':
+          return '/root';
+        case 'host':
+          return mockHost;
+        case 'fileSystem':
+          return mockFileSystem;
+        case 'project':
+          return mockProject;
+        case 'workspace':
+          return mockWorkspace;
+        case 'brain':
+          return mockBrain;
+        case 'session':
+          return mockSession;
+        case 'driverRegistry':
+          return mockDriverRegistry;
+        case 'promptEngine':
+          return mockPromptEngine;
+        case 'skillRegistry':
+          return mockSkillRegistry;
+        case 'evolutionService':
+          return mockEvolutionService;
+        case 'fileSystemBus':
+          return mockFileSystemBus;
+        case 'gitService':
+          return {};
         case 'architect': {
           const factory = factories['architect'];
           return factory ? factory() : (): ArchitectAgent => MockArchitectAgent();
@@ -232,7 +245,7 @@ describe('ServiceFactory', () => {
         mockEvolutionService,
         mockHost,
         mockFileSystemBus,
-        mockPromptEngine
+        mockPromptEngine,
       );
     }
   });

@@ -15,7 +15,6 @@ import { ISkillRegistry } from '../services/SkillRegistry.js';
 import { Signal } from '../workflow/Signal.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
 
-
 export class PlannerAgent {
   private shell: ShellService;
 
@@ -74,7 +73,7 @@ export class PlannerAgent {
           correlationId,
           source: 'planner',
           type: 'request',
-          payload: Signal.clarificationNeeded([question])
+          payload: Signal.clarificationNeeded([question]),
         });
 
         const response = await this.bus.waitForResponse(correlationId);

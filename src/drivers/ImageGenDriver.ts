@@ -69,7 +69,7 @@ export class ImageGenDriver extends BaseDriver<ISkillContext, string> {
             },
           ],
           // OpenAI / OpenRouter specific payload for images often differs or uses DALL-E format
-          // Assuming OpenRouter supports this or check docs. 
+          // Assuming OpenRouter supports this or check docs.
           // Previous code used 'modalities' and 'image_config' which seems specific or hypothetic.
           // Standard OpenAI DALL-E is /v1/images/generations.
           // Chat completions with image output is newer.

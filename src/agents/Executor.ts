@@ -16,7 +16,6 @@ import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { FileSystemBus } from '../services/FileSystemBus.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
 
-
 export class Executor {
   public readonly name = 'Executor';
   public readonly description = 'Executes the implementation plan by running skills.';
@@ -168,7 +167,7 @@ export class Executor {
                 correlationId: corrId,
                 source: `task-${task.id}`,
                 type: 'request',
-                payload: Signal.clarificationNeeded([question])
+                payload: Signal.clarificationNeeded([question]),
               });
               const resp = await this.bus.waitForResponse(corrId);
               const data = resp.payload as { answers: Record<string, string> };

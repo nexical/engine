@@ -97,7 +97,6 @@ describe('Executor', () => {
       renderString: jest.fn(),
     } as unknown as jest.Mocked<IPromptEngine>;
 
-
     state = new EngineState('test-session');
     state.initialize('prompt');
 
@@ -109,7 +108,7 @@ describe('Executor', () => {
       mockHost,
       mockGit,
       mockBus,
-      mockPromptEngine
+      mockPromptEngine,
     );
   });
 
@@ -154,9 +153,7 @@ describe('Executor', () => {
 
     it('should handle parallel task failure', async () => {
       const state = new EngineState('test-session');
-      const plan = new Plan('test plan', [
-        new Task('1', 'task 1', 'msg1', 'skill1'),
-      ]);
+      const plan = new Plan('test plan', [new Task('1', 'task 1', 'msg1', 'skill1')]);
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       mockSkill.execute.mockResolvedValue(Result.fail(new Error('Task 1 failed')));
@@ -169,13 +166,17 @@ describe('Executor', () => {
 
     it('should throw if git is missing for parallel execution', async () => {
       const agentNoGit = new ExecutorClass(
-        mockProject, mockWorkspace, mockSkillRegistry, mockDriverRegistry, mockHost,
-        undefined as unknown as GitService, mockBus, mockPromptEngine
+        mockProject,
+        mockWorkspace,
+        mockSkillRegistry,
+        mockDriverRegistry,
+        mockHost,
+        undefined as unknown as GitService,
+        mockBus,
+        mockPromptEngine,
       );
 
-      const mockPlan = new Plan('test plan', [
-        new Task('1', 'task 1', 'desc 1', 'skill 1'),
-      ]);
+      const mockPlan = new Plan('test plan', [new Task('1', 'task 1', 'desc 1', 'skill 1')]);
       mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
 
       await expect(agentNoGit.execute(state)).rejects.toThrow('Git is required');
@@ -191,7 +192,7 @@ describe('Executor', () => {
 
       expect(mockExecSync).toHaveBeenCalledWith(
         'echo setup',
-        expect.objectContaining({ cwd: expect.stringContaining('.worktrees/1') })
+        expect.objectContaining({ cwd: expect.stringContaining('.worktrees/1') }),
       );
     });
 
