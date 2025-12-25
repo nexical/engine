@@ -172,7 +172,6 @@ export class ServiceFactory {
 
     // Note: Brain initialization is now the responsibility of the Orchestrator
 
-
     const workspace = container.resolve<IWorkspace>('workspace');
     const session = container.resolve<Session>('session');
 

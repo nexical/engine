@@ -66,7 +66,10 @@ describe('Skill Integration', () => {
 
   test('should trigger driver-level validation (Scenario 12)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'DriverValidTest' });
-    await fixture.writeSkill('test-validation', { name: 'test-validation', execution: { provider: 'validation-fail-driver' } });
+    await fixture.writeSkill('test-validation', {
+      name: 'test-validation',
+      execution: { provider: 'validation-fail-driver' },
+    });
 
     // Initialize without running init() immediately so we can register mocks
     const orchestrator = await fixture.initOrchestrator(true);
