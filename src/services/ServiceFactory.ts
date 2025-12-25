@@ -13,7 +13,8 @@ import { EvolutionService, IEvolutionService } from './EvolutionService.js';
 import { FileSystemService } from './FileSystemService.js';
 import { GitService } from './GitService.js';
 import { IPromptEngine, PromptEngine } from './PromptEngine.js';
-import { ISkillRunner, SkillRunner } from './SkillRunner.js';
+import { ISkillRegistry, SkillRegistry } from './SkillRegistry.js';
+import { FileSystemBus } from './FileSystemBus.js';
 
 export interface IEngineServices {
   project: IProject;
@@ -69,12 +70,11 @@ export class ServiceFactory {
       return new PromptEngine(config, host);
     });
 
-    container.registerFactory('skillRunner', () => {
+    container.registerFactory('skillRegistry', () => {
       const project = container.resolve<IProject>('project');
-      const driverRegistry = container.resolve<IDriverRegistry>('driverRegistry');
-      const promptEngine = container.resolve<IPromptEngine>('promptEngine');
+      const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
       const host = container.resolve<IRuntimeHost>('host');
-      return new SkillRunner(project, driverRegistry as DriverRegistry, promptEngine as PromptEngine, host);
+      return new SkillRegistry(project, driverRegistry, host);
     });
 
     container.registerFactory('evolutionService', () => {
@@ -89,6 +89,12 @@ export class ServiceFactory {
       return new GitService(host, rootDirectory);
     });
 
+    container.registerFactory('fileSystemBus', () => {
+      const project = container.resolve<IProject>('project');
+      const fs = container.resolve<IFileSystem>('fileSystem');
+      return new FileSystemBus(project, fs);
+    });
+
     // 5. Register Brain
     container.registerFactory('brain', () => {
       const project = container.resolve<IProject>('project');
@@ -96,35 +102,41 @@ export class ServiceFactory {
 
       const driverRegistry = container.resolve<IDriverRegistry>('driverRegistry');
       const promptEngine = container.resolve<IPromptEngine>('promptEngine');
-      const skillRunner = container.resolve<ISkillRunner>('skillRunner');
+      const skillRegistry = container.resolve<ISkillRegistry>('skillRegistry');
       const evolution = container.resolve<IEvolutionService>('evolutionService');
 
       const brain = new Brain(project, host, {
         driverRegistry,
         promptEngine,
-        skillRunner,
+        skillRegistry,
         evolution,
       });
 
       // Register Default Agents
       container.registerFactory('architect', () => {
         const project = container.resolve<IProject>('project');
-        const skillRunner = container.resolve<ISkillRunner>('skillRunner');
+        const skillRegistry = container.resolve<ISkillRegistry>('skillRegistry');
+        const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
         const evolution = container.resolve<IEvolutionService>('evolutionService');
         const host = container.resolve<IRuntimeHost>('host');
+        const bus = container.resolve<FileSystemBus>('fileSystemBus');
+        const promptEngine = container.resolve<IPromptEngine>('promptEngine');
 
         return (workspace: IWorkspace): ArchitectAgent =>
-          new ArchitectAgent(project, workspace, skillRunner, evolution, host);
+          new ArchitectAgent(project, workspace, skillRegistry, driverRegistry, evolution, host, bus, promptEngine);
       });
 
       container.registerFactory('planner', () => {
         const project = container.resolve<IProject>('project');
-        const skillRunner = container.resolve<ISkillRunner>('skillRunner');
+        const skillRegistry = container.resolve<ISkillRegistry>('skillRegistry');
+        const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
         const evolution = container.resolve<IEvolutionService>('evolutionService');
         const host = container.resolve<IRuntimeHost>('host');
+        const bus = container.resolve<FileSystemBus>('fileSystemBus');
+        const promptEngine = container.resolve<IPromptEngine>('promptEngine');
 
         return (workspace: IWorkspace): PlannerAgent =>
-          new PlannerAgent(project, workspace, skillRunner, evolution, host);
+          new PlannerAgent(project, workspace, skillRegistry, driverRegistry, evolution, host, bus, promptEngine);
       });
 
       brain.registerAgent('architect', (workspace) =>
@@ -135,7 +147,11 @@ export class ServiceFactory {
       );
       brain.registerAgent('executor', (workspace) => {
         const gitService = container.resolve<GitService>('gitService');
-        return new Executor(project, workspace, skillRunner, host, gitService);
+        const skillRegistry = container.resolve<ISkillRegistry>('skillRegistry');
+        const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
+        const bus = container.resolve<FileSystemBus>('fileSystemBus');
+        const promptEngine = container.resolve<IPromptEngine>('promptEngine');
+        return new Executor(project, workspace, skillRegistry, driverRegistry, host, gitService, bus, promptEngine);
       });
 
       return brain;

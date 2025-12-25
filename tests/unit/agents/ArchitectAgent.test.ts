@@ -1,51 +1,83 @@
 import { jest } from '@jest/globals';
-
 import { ArchitectAgent } from '../../../src/agents/ArchitectAgent.js';
 import { Architecture } from '../../../src/domain/Architecture.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
-import { ISkillRunner } from '../../../src/services/SkillRunner.js';
+import { ISkillRegistry } from '../../../src/services/SkillRegistry.js';
+import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
+import { FileSystemBus } from '../../../src/services/FileSystemBus.js';
+import { IPromptEngine } from '../../../src/services/PromptEngine.js';
+import { Result } from '../../../src/domain/Result.js';
 
 describe('ArchitectAgent', () => {
   let agent: ArchitectAgent;
   let mockProject: jest.Mocked<IProject>;
   let mockWorkspace: jest.Mocked<IWorkspace>;
-  let mockSkillRunner: jest.Mocked<ISkillRunner>;
+  let mockSkillRegistry: jest.Mocked<ISkillRegistry>;
+  let mockDriverRegistry: jest.Mocked<DriverRegistry>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
+  let mockBus: jest.Mocked<FileSystemBus>;
+  let mockPromptEngine: jest.Mocked<IPromptEngine>;
+  let mockSkill: any;
 
   beforeEach(() => {
+    mockHost = {
+      log: jest.fn(),
+      ask: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
     mockProject = {
       getConstraints: jest.fn().mockReturnValue('constraints'),
       paths: {
-        architecturePrompt: 'arch_prompt_path',
-        architectureCurrent: 'arch_current_path',
+        architecturePrompt: 'arch_prompt',
+        architectureCurrent: 'arch_current',
         personas: 'personas_path',
       },
-      getConfig: jest.fn().mockReturnValue({ agents: { architect: { skill: 'arch_skill', driver: 'test_driver' } } }),
+      getConfig: jest.fn().mockReturnValue({}),
+      rootDirectory: '/root',
     } as unknown as jest.Mocked<IProject>;
 
     mockWorkspace = {
-      getArchitecture: jest.fn(),
-      archiveArtifacts: jest.fn(),
       saveArchitecture: jest.fn(),
+      getArchitecture: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
 
+    mockSkill = {
+      execute: jest.fn(),
+    };
+
+    mockSkillRegistry = {
+      getSkill: jest.fn().mockReturnValue(mockSkill),
+    } as unknown as jest.Mocked<ISkillRegistry>;
+
+    mockDriverRegistry = {} as unknown as jest.Mocked<DriverRegistry>;
+
     mockEvolution = {
-      getLogSummary: jest.fn().mockReturnValue('evolution log'),
+      getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
-    const mockHost = {
-      log: jest.fn(),
-    } as unknown as jest.Mocked<IRuntimeHost>;
+    mockBus = {
+      watchInbox: jest.fn(),
+    } as unknown as jest.Mocked<FileSystemBus>;
 
-    mockSkillRunner = {
-      getSkills: jest.fn().mockReturnValue(['skill1']),
-      executeNativeSkill: jest.fn<ISkillRunner['executeNativeSkill']>().mockResolvedValue('markdown content'),
-    } as unknown as jest.Mocked<ISkillRunner>;
+    mockPromptEngine = {
+      renderString: jest.fn(),
+    } as unknown as jest.Mocked<IPromptEngine>;
 
-    agent = new ArchitectAgent(mockProject, mockWorkspace, mockSkillRunner, mockEvolution, mockHost);
+
+    agent = new ArchitectAgent(
+      mockProject,
+      mockWorkspace,
+      mockSkillRegistry,
+      mockDriverRegistry,
+      mockEvolution,
+      mockHost,
+      mockBus,
+      mockPromptEngine
+    );
   });
 
   it('should be defined', () => {
@@ -54,58 +86,22 @@ describe('ArchitectAgent', () => {
 
   describe('design', () => {
     it('should execute design process successfully', async () => {
-      mockSkillRunner.executeNativeSkill.mockResolvedValue('some data');
+      const mockArch = { data: {} } as Architecture;
+      const validYaml = 'architecture: valid';
 
-      const mockArchitecture = { id: 'arch1', data: {}, raw: '', content: '' } as unknown as Architecture;
-      mockWorkspace.getArchitecture.mockResolvedValue(mockArchitecture);
+      mockSkill.execute.mockResolvedValue(Result.ok(validYaml));
+      mockWorkspace.getArchitecture.mockResolvedValue(mockArch);
 
       const result = await agent.design('user request');
 
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith('architect', expect.anything(), 'user request');
-      expect(mockWorkspace.getArchitecture).toHaveBeenCalledWith('current');
-      expect(result).toBe(mockArchitecture);
+      expect(mockSkillRegistry.getSkill).toHaveBeenCalledWith('architect');
+      expect(mockSkill.execute).toHaveBeenCalled();
+      expect(result).toBe(mockArch);
     });
 
-    it('should throw if no driver available', async () => {
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('No driver available'));
-
-      await expect(agent.design('req')).rejects.toThrow('No driver available');
-    });
-
-    it('should throw if driver execution fails', async () => {
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('Driver failed'));
-
-      await expect(agent.design('req')).rejects.toThrow('Driver failed');
-    });
-
-    it('should use default values if config is missing', async () => {
-      mockSkillRunner.executeNativeSkill.mockResolvedValue('markdown');
-      mockWorkspace.getArchitecture.mockResolvedValue({} as unknown as Architecture);
-
-      mockProject.getConfig.mockReturnValue({}); // Empty config
-
-      await agent.design('req');
-
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith(
-        'architect',
-        expect.objectContaining({ user_request: 'req' }),
-        'req',
-      );
-    });
-
-    it('should fallback to default driver if requested driver not found', async () => {
-      // Test now ensures SkillRunner is called.
-      mockSkillRunner.executeNativeSkill.mockResolvedValue('markdown');
-      mockWorkspace.getArchitecture.mockResolvedValue({} as Architecture);
-
-      await agent.design('req');
-
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalled();
-    });
-    it('should throw if driver execution fails with non-Error result', async () => {
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('String error'));
-
-      await expect(agent.design('req')).rejects.toThrow('String error');
+    it('should throw if skill execution fails', async () => {
+      mockSkill.execute.mockResolvedValue(Result.fail(new Error('Skill failed')));
+      await expect(agent.design('req')).rejects.toThrow('Skill failed');
     });
   });
 });

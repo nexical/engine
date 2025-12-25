@@ -1,5 +1,5 @@
 import { EngineState } from '../../../src/domain/State.js';
-import { Signal } from '../../../src/workflow/Signal.js';
+import { Signal, SignalType } from '../../../src/workflow/Signal.js';
 
 describe('EngineState', () => {
   let state: EngineState;
@@ -69,7 +69,7 @@ describe('EngineState', () => {
       state.user_prompt = 'prompt';
       state.interactive = true;
       state.context = { key: 'value' };
-      const signal = Signal.fail('test');
+      const signal = new Signal(SignalType.FAIL, 'test');
       state.recordSignal(signal);
 
       const yaml = state.toYaml();

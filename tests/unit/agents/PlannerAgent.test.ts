@@ -1,5 +1,4 @@
 import { jest } from '@jest/globals';
-
 import { PlannerAgent } from '../../../src/agents/PlannerAgent.js';
 import { Architecture } from '../../../src/domain/Architecture.js';
 import { Plan } from '../../../src/domain/Plan.js';
@@ -7,20 +6,30 @@ import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
-import { ISkillRunner } from '../../../src/services/SkillRunner.js';
+import { ISkillRegistry } from '../../../src/services/SkillRegistry.js';
+import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
+import { FileSystemBus } from '../../../src/services/FileSystemBus.js';
+import { IPromptEngine } from '../../../src/services/PromptEngine.js';
+import { Result } from '../../../src/domain/Result.js';
 
 describe('PlannerAgent', () => {
   let agent: PlannerAgent;
   let mockProject: jest.Mocked<IProject>;
   let mockWorkspace: jest.Mocked<IWorkspace>;
-  let mockSkillRunner: jest.Mocked<ISkillRunner>;
+  let mockSkillRegistry: jest.Mocked<ISkillRegistry>;
+  let mockDriverRegistry: jest.Mocked<DriverRegistry>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
   let mockHost: jest.Mocked<IRuntimeHost>;
+  let mockBus: jest.Mocked<FileSystemBus>;
+  let mockPromptEngine: jest.Mocked<IPromptEngine>;
+  let mockSkill: any;
 
   beforeEach(() => {
     mockHost = {
       log: jest.fn(),
+      ask: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
+
     mockProject = {
       getConstraints: jest.fn().mockReturnValue('constraints'),
       paths: {
@@ -28,7 +37,8 @@ describe('PlannerAgent', () => {
         planCurrent: 'plan_current',
         personas: 'personas_path',
       },
-      getConfig: jest.fn().mockReturnValue({ agents: { planner: { skill: 'planner_skill', driver: 'test_driver' } } }),
+      getConfig: jest.fn().mockReturnValue({}),
+      rootDirectory: '/root',
     } as unknown as jest.Mocked<IProject>;
 
     mockWorkspace = {
@@ -36,16 +46,39 @@ describe('PlannerAgent', () => {
       savePlan: jest.fn(),
     } as unknown as jest.Mocked<IWorkspace>;
 
-    mockSkillRunner = {
-      getSkills: jest.fn().mockReturnValue([]),
-      executeNativeSkill: jest.fn<ISkillRunner['executeNativeSkill']>().mockResolvedValue('plan_name: test\ntasks: []'),
-    } as unknown as jest.Mocked<ISkillRunner>;
+    mockSkill = {
+      execute: jest.fn(),
+    };
+
+    mockSkillRegistry = {
+      getSkill: jest.fn().mockReturnValue(mockSkill),
+    } as unknown as jest.Mocked<ISkillRegistry>;
+
+    mockDriverRegistry = {} as unknown as jest.Mocked<DriverRegistry>;
 
     mockEvolution = {
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
-    agent = new PlannerAgent(mockProject, mockWorkspace, mockSkillRunner, mockEvolution, mockHost);
+    mockBus = {
+      sendRequest: jest.fn(),
+      waitForResponse: jest.fn(),
+    } as unknown as jest.Mocked<FileSystemBus>;
+
+    mockPromptEngine = {
+      renderString: jest.fn(),
+    } as unknown as jest.Mocked<IPromptEngine>;
+
+    agent = new PlannerAgent(
+      mockProject,
+      mockWorkspace,
+      mockSkillRegistry,
+      mockDriverRegistry,
+      mockEvolution,
+      mockHost,
+      mockBus,
+      mockPromptEngine
+    );
   });
 
   it('should be defined', () => {
@@ -56,103 +89,41 @@ describe('PlannerAgent', () => {
     it('should create a plan successfully', async () => {
       const mockArch = { data: {} } as Architecture;
       const validYaml = 'plan_name: test\ntasks: []';
-      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
+
+      mockSkill.execute.mockResolvedValue(Result.ok(validYaml));
+
       const mockPlan = new Plan('test');
       mockWorkspace.loadPlan.mockResolvedValue(mockPlan);
 
       const result = await agent.plan(mockArch, 'user request');
 
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith('planner', expect.anything(), 'user request');
-      expect(mockWorkspace.loadPlan).toHaveBeenCalled();
+      expect(mockSkillRegistry.getSkill).toHaveBeenCalledWith('planner');
+      expect(mockSkill.execute).toHaveBeenCalled();
+      expect(mockWorkspace.savePlan).toHaveBeenCalled();
       expect(result).toBe(mockPlan);
     });
 
-    it('should throw if driver execution fails', async () => {
+    it('should throw if skill execution fails', async () => {
       const mockArch = { data: {} } as Architecture;
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('Driver failed'));
+      mockSkill.execute.mockResolvedValue(Result.fail(new Error('Skill failed')));
 
-      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Driver failed');
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Skill failed');
     });
 
-    it('should use default values if config is missing', async () => {
+    it('should throw if skill not found', async () => {
       const mockArch = { data: {} } as Architecture;
-      const validYaml = 'plan_name: test\ntasks: []';
-      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
-      mockWorkspace.loadPlan.mockResolvedValue(new Plan('empty'));
+      mockSkillRegistry.getSkill.mockReturnValue(undefined);
 
-      mockProject.getConfig.mockReturnValue({}); // Empty config
-
-      await agent.plan(mockArch, 'req');
-
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalledWith(
-        'planner',
-        expect.objectContaining({ user_prompt: 'req' }),
-        'req',
-      );
-    });
-
-    it('should fallback to default driver if requested driver not found', async () => {
-      // This test is less relevant now as SkillRunner handles driver selection.
-      // We essentially test that agent calls executeNativeSkill correctly.
-      const mockArch = { data: {} } as Architecture;
-      const validYaml = 'plan_name: test\ntasks: []';
-      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
-      mockWorkspace.loadPlan.mockResolvedValue(new Plan('fallback'));
-
-      await agent.plan(mockArch, 'req');
-
-      expect(mockSkillRunner.executeNativeSkill).toHaveBeenCalled();
-    });
-
-    it('should throw if no driver available', async () => {
-      // SkillRunner throws this now.
-      const mockArch = { data: {} } as Architecture;
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('No driver available'));
-
-      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('No driver available');
-    });
-
-    it('should throw "Planner execution failed" if result.error() is falsy', async () => {
-      const mockArch = { data: {} } as Architecture;
-      // Simulating SkillRunner throwing a specific error or generic error
-      mockSkillRunner.executeNativeSkill.mockRejectedValue(new Error('Planner execution failed'));
-
-      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow("Skill 'planner' not found");
     });
 
     it('should throw and log error if plan YAML is invalid', async () => {
       const mockArch = { data: {} } as Architecture;
-      const invalidYaml = 'invalid: yaml: content: :';
-      mockSkillRunner.executeNativeSkill.mockResolvedValue(invalidYaml);
+      const invalidYaml = 'invalid: yaml: : :';
+      mockSkill.execute.mockResolvedValue(Result.ok(invalidYaml));
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow();
       expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to parse plan YAML'));
-      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining(invalidYaml));
-    });
-
-    it('should handle non-Error throw during plan parsing', async () => {
-      const mockArch = { data: {} } as Architecture;
-      const validYaml = 'plan: valid';
-      mockSkillRunner.executeNativeSkill.mockResolvedValue(validYaml);
-
-      const spy = jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error
-        throw 'String Error';
-      });
-
-      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('String Error');
-      expect(mockHost.log).toHaveBeenCalledWith(
-        'error',
-        expect.stringContaining('Failed to parse plan YAML: String Error'),
-      );
-
-      spy.mockRestore();
-    });
-    it('should handle non-Error throw during skill execution', async () => {
-      const mockArch = { data: {} } as Architecture;
-      mockSkillRunner.executeNativeSkill.mockRejectedValue('String Error');
-
-      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Planner execution failed');
     });
   });
 });

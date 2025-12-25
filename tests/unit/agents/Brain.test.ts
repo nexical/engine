@@ -1,6 +1,5 @@
 import { jest } from '@jest/globals';
 
-// ArchitectAgent import removed as it was unused
 import { Brain } from '../../../src/agents/Brain.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
@@ -8,7 +7,7 @@ import { IWorkspace } from '../../../src/domain/Workspace.js';
 import { IDriverRegistry } from '../../../src/drivers/DriverRegistry.js';
 import { IEvolutionService } from '../../../src/services/EvolutionService.js';
 import { IPromptEngine } from '../../../src/services/PromptEngine.js';
-import { ISkillRunner } from '../../../src/services/SkillRunner.js';
+import { ISkillRegistry } from '../../../src/services/SkillRegistry.js';
 
 describe('Brain', () => {
   let brain: Brain;
@@ -16,7 +15,7 @@ describe('Brain', () => {
   let mockHost: jest.Mocked<IRuntimeHost>;
   let mockDriverRegistry: jest.Mocked<IDriverRegistry>;
   let mockPromptEngine: jest.Mocked<IPromptEngine>;
-  let mockSkillRunner: jest.Mocked<ISkillRunner>;
+  let mockSkillRegistry: jest.Mocked<ISkillRegistry>;
   let mockEvolution: jest.Mocked<IEvolutionService>;
 
   beforeEach(() => {
@@ -35,16 +34,16 @@ describe('Brain', () => {
       getDefault: jest.fn(),
     } as unknown as jest.Mocked<IDriverRegistry>;
     mockPromptEngine = {} as unknown as jest.Mocked<IPromptEngine>;
-    mockSkillRunner = {
+    mockSkillRegistry = {
       init: jest.fn(),
-      validateAvailableSkills: jest.fn(),
-    } as unknown as jest.Mocked<ISkillRunner>;
+      getSkill: jest.fn(),
+    } as unknown as jest.Mocked<ISkillRegistry>;
     mockEvolution = {} as unknown as jest.Mocked<IEvolutionService>;
 
     brain = new Brain(mockProject, mockHost, {
       driverRegistry: mockDriverRegistry,
       promptEngine: mockPromptEngine,
-      skillRunner: mockSkillRunner,
+      skillRegistry: mockSkillRegistry,
       evolution: mockEvolution,
     });
   });
@@ -57,15 +56,14 @@ describe('Brain', () => {
     it('should initialize components', async () => {
       await brain.init();
       expect(mockDriverRegistry.load).toHaveBeenCalledWith('drivers_path');
-      expect(mockSkillRunner.init).toHaveBeenCalled();
-      expect(mockSkillRunner.validateAvailableSkills).toHaveBeenCalled();
+      expect(mockSkillRegistry.init).toHaveBeenCalled();
     });
   });
 
   describe('accessors', () => {
     it('should return dependencies', () => {
       expect(brain.getPromptEngine()).toBe(mockPromptEngine);
-      expect(brain.getSkillRunner()).toBe(mockSkillRunner);
+      expect(brain.getSkillRegistry()).toBe(mockSkillRegistry);
       expect(brain.getEvolution()).toBe(mockEvolution);
     });
 
@@ -94,7 +92,7 @@ describe('Brain', () => {
       expect(() => brain.createAgent('unknown', workspace)).toThrow("Agent type 'unknown' not registered");
     });
 
-    it('should create architect, planner, and developer agents', () => {
+    it('should create architect, planner, and executor agents', () => {
       // Register mocks
       brain.registerAgent('architect', () => 'architect_instance');
       brain.registerAgent('planner', () => 'planner_instance');

@@ -5,7 +5,7 @@ import { IWorkspace } from '../domain/Workspace.js';
 import { IDriverRegistry } from '../drivers/DriverRegistry.js';
 import { IEvolutionService } from '../services/EvolutionService.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
-import { ISkillRunner } from '../services/SkillRunner.js';
+import { ISkillRegistry } from '../services/SkillRegistry.js';
 import type { ArchitectAgent } from './ArchitectAgent.js';
 import type { Executor } from './Executor.js';
 import type { PlannerAgent } from './PlannerAgent.js';
@@ -13,7 +13,7 @@ import type { PlannerAgent } from './PlannerAgent.js';
 export class Brain {
   private promptEngine: IPromptEngine;
   private driverRegistry: IDriverRegistry;
-  private skillRunner: ISkillRunner;
+  private skillRegistry: ISkillRegistry;
   private evolution: IEvolutionService;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private agentFactories: Map<string, (workspace: IWorkspace) => any> = new Map();
@@ -24,13 +24,13 @@ export class Brain {
     dependencies: {
       promptEngine: IPromptEngine;
       driverRegistry: IDriverRegistry;
-      skillRunner: ISkillRunner;
+      skillRegistry: ISkillRegistry;
       evolution: IEvolutionService;
     },
   ) {
     this.promptEngine = dependencies.promptEngine;
     this.driverRegistry = dependencies.driverRegistry;
-    this.skillRunner = dependencies.skillRunner;
+    this.skillRegistry = dependencies.skillRegistry;
     this.evolution = dependencies.evolution;
   }
 
@@ -48,16 +48,16 @@ export class Brain {
 
   public async init(): Promise<void> {
     await this.driverRegistry.load(this.project.paths.drivers);
-    await this.skillRunner.init();
-    await this.skillRunner.validateAvailableSkills();
+    await this.skillRegistry.init();
+    // validation happens in init
   }
 
   public getPromptEngine(): IPromptEngine {
     return this.promptEngine;
   }
 
-  public getSkillRunner(): ISkillRunner {
-    return this.skillRunner;
+  public getSkillRegistry(): ISkillRegistry {
+    return this.skillRegistry;
   }
 
   public getEvolution(): IEvolutionService {

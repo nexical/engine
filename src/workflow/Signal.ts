@@ -6,14 +6,24 @@ export enum SignalType {
   RETRY = 'RETRY',
   REPLAN = 'REPLAN',
   REARCHITECT = 'REARCHITECT',
+  CLARIFICATION_NEEDED = 'CLARIFICATION_NEEDED',
 }
 
-export class Signal {
+export interface SignalJSON {
+  type: SignalType;
+  reason: string;
+  metadata: Record<string, unknown>;
+}
+
+export class Signal extends Error {
   constructor(
     public readonly type: SignalType,
     public readonly reason: string = '',
     public readonly metadata: Record<string, unknown> = {},
-  ) {}
+  ) {
+    super(reason);
+    this.name = 'Signal';
+  }
 
   static NEXT = new Signal(SignalType.NEXT);
   static COMPLETE = new Signal(SignalType.COMPLETE);
@@ -33,5 +43,21 @@ export class Signal {
 
   static rearchitect(reason: string, metadata: Record<string, unknown> = {}): Signal {
     return new Signal(SignalType.REARCHITECT, reason, metadata);
+  }
+
+  static clarificationNeeded(questions: string[], context: Record<string, unknown> = {}): Signal {
+    return new Signal(SignalType.CLARIFICATION_NEEDED, 'Clarification needed', { ...context, questions });
+  }
+
+  toJSON(): SignalJSON {
+    return {
+      type: this.type,
+      reason: this.reason,
+      metadata: this.metadata,
+    };
+  }
+
+  static fromJSON(json: SignalJSON): Signal {
+    return new Signal(json.type, json.reason, json.metadata);
   }
 }

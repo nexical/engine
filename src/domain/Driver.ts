@@ -6,55 +6,26 @@ import { ShellService } from '../services/ShellService.js';
 import { IFileSystem } from './IFileSystem.js';
 import { Result } from './Result.js';
 import { IRuntimeHost } from './RuntimeHost.js';
+import { DriverConfig, ISkillContext } from './SkillConfig.js';
 
-export interface ISkill {
-  name: string;
-  description?: string;
-  provider?: string;
-  dependencies?: string[];
-  worktree_setup?: string[];
-  hydration?: string[];
-  sparse_checkout?: string[];
-  [key: string]: unknown;
+export interface IDriverContext extends ISkillContext {
+  // Extends the base context with potential driver-specific extras if needed
+  // For now ISkillContext is the source of truth.
+  // But legacy code might expect IDriverContext properties.
+  // We can alias or extend.
 }
 
-export interface IDriverContext {
-  userPrompt?: string;
-  taskId?: string;
-  taskPrompt?: string;
-  cwd?: string;
-  params?: Record<string, unknown>;
-  promptEngine?: IPromptEngine;
-  env?: Record<string, string>;
-}
-
-export interface IDriver<TContext = IDriverContext, TResult = string> {
+export interface IDriver<TContext = ISkillContext, TResult = string> {
   name: string;
   description: string;
   isSupported(): Promise<boolean>;
-  validateSkill(skill: ISkill): Promise<boolean>;
-  execute(skill: ISkill, context?: TContext): Promise<Result<TResult, Error>>;
+  validateConfig(config: DriverConfig): Promise<boolean>;
+  execute(config: DriverConfig, context?: TContext): Promise<Result<TResult, Error>>;
 }
 
-export const SkillSchema = z
-  .object({
-    name: z.string(),
-    description: z.string().optional(),
-    provider: z.string().optional(),
-    dependencies: z.array(z.string()).optional(),
-    worktree_setup: z.array(z.string()).optional(),
-    hydration: z.array(z.string()).optional(),
-    sparse_checkout: z.array(z.string()).optional(),
-  })
-  .passthrough();
+// Legacy ISkill is removed. Use Skill class and ISkillConfig.
 
-export interface IDriverConfig {
-  rootDirectory: string;
-  defaultDriver?: string;
-  [key: string]: unknown;
-}
-
-export abstract class BaseDriver<TContext = IDriverContext, TResult = string> implements IDriver<TContext, TResult> {
+export abstract class BaseDriver<TContext = ISkillContext, TResult = string> implements IDriver<TContext, TResult> {
   abstract name: string;
   abstract description: string;
 
@@ -63,7 +34,9 @@ export abstract class BaseDriver<TContext = IDriverContext, TResult = string> im
 
   constructor(
     protected host: IRuntimeHost,
-    protected config: IDriverConfig = { rootDirectory: process.cwd() },
+    // config in constructor is typically for the DRIVER instance (e.g. timeout), NOT the skill execution config.
+    // We keep this for system-level driver config.
+    protected systemConfig: Record<string, unknown> = {},
     fileSystem?: IFileSystem,
   ) {
     this.shell = new ShellService(host);
@@ -72,29 +45,21 @@ export abstract class BaseDriver<TContext = IDriverContext, TResult = string> im
 
   abstract isSupported(): Promise<boolean>;
 
-  protected parseSchema(skill: ISkill): ZodSafeParseResult<ISkill> {
-    return SkillSchema.safeParse(skill);
+  // Validates the per-execution config (from YAML)
+  validateConfig(config: DriverConfig): Promise<boolean> {
+    // Default implementation: check if provider matches?
+    // Or just return true (polymorphic passthrough)
+    return Promise.resolve(true);
   }
 
-  async validateSkill(skill: ISkill): Promise<boolean> {
-    const result = await Promise.resolve(this.parseSchema(skill));
-    if (!result.success) {
-      this.host.log(
-        'warn',
-        `Validation failed for ${this.name} skill '${skill.name}': ${JSON.stringify(z.treeifyError(result.error))}`,
-      );
-    }
-    return result.success;
-  }
+  abstract run(config: DriverConfig, context?: TContext): Promise<TResult>;
 
-  abstract run(skill: ISkill, context?: TContext): Promise<TResult>;
-
-  async execute(skill: ISkill, context?: TContext): Promise<Result<TResult, Error>> {
-    if (!(await this.validateSkill(skill))) {
-      return Result.fail(new Error(`Invalid skill for ${this.name} driver: ${skill.name}`));
+  async execute(config: DriverConfig, context?: TContext): Promise<Result<TResult, Error>> {
+    if (!(await this.validateConfig(config))) {
+      return Result.fail(new Error(`Invalid config for ${this.name} driver`));
     }
     try {
-      const output = await this.run(skill, context);
+      const output = await this.run(config, context);
       return Result.ok(output);
     } catch (e) {
       return Result.fail(e instanceof Error ? e : new Error(String(e)));
@@ -112,9 +77,5 @@ export abstract class BaseDriver<TContext = IDriverContext, TResult = string> im
 
   protected checkEnvironment(key: string): boolean {
     return !!process.env[key];
-  }
-
-  protected checkConfig(key: string): unknown {
-    return this.config[key];
   }
 }

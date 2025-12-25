@@ -1,6 +1,6 @@
 import { z, ZodSafeParseResult } from 'zod';
 
-import { IDriverContext, ISkill } from '../../domain/Driver.js';
+import { ISkillConfig, ISkillContext, DriverConfig } from '../../domain/SkillConfig.js';
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
 
 export const AISkillSchema = CLISkillSchema.extend({
@@ -9,20 +9,20 @@ export const AISkillSchema = CLISkillSchema.extend({
 
 export type AISkill = z.infer<typeof AISkillSchema>;
 
-export abstract class AICLIDriver<TContext extends IDriverContext = IDriverContext> extends CLIDriver<TContext> {
+export abstract class AICLIDriver<TContext extends ISkillContext = ISkillContext> extends CLIDriver<TContext> {
   async isSupported(): Promise<boolean> {
     return await Promise.resolve(false);
   }
 
-  protected parseSchema(skill: ISkill): ZodSafeParseResult<AISkill> {
+  protected parseSchema(skill: ISkillConfig): ZodSafeParseResult<AISkill> {
     return AISkillSchema.safeParse(skill);
   }
 
-  protected abstract getExecutable(skill: AISkill): string;
-  protected abstract getArguments(skill: AISkill): string[];
+  protected abstract getExecutable(skill: ISkillConfig): string;
+  protected abstract getArguments(skill: ISkillConfig): string[];
 
-  async run(skill: ISkill, context?: TContext): Promise<string> {
-    const aiSkill = skill as AISkill;
+  async run(config: DriverConfig, context?: TContext): Promise<string> {
+    const aiSkill = config as unknown as AISkill;
     const promptTemplate = aiSkill.prompt_template || '';
     const params = (context?.params as Record<string, unknown>) || {};
     const promptEngine = context?.promptEngine;

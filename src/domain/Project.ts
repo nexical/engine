@@ -20,6 +20,7 @@ export const ProjectConfigurationSchema = z
       })
       .optional(),
     // Add other known config fields here
+    max_worktrees: z.number().optional().default(5),
   })
   .passthrough();
 
@@ -62,7 +63,7 @@ export class Project implements IProject {
 
   private loadProfile(path: string): ProjectProfile {
     if (!this.fileSystem.exists(path)) {
-      return {};
+      return ProjectConfigurationSchema.parse({});
     }
     try {
       const content = this.fileSystem.readFile(path);
@@ -84,6 +85,9 @@ export class Project implements IProject {
     this.fileSystem.ensureDir(this.paths.drivers);
     this.fileSystem.ensureDir(this.paths.skills);
     this.fileSystem.ensureDir(this.paths.signals);
+    this.fileSystem.ensureDir(this.paths.comms);
+    this.fileSystem.ensureDir(this.paths.inbox);
+    this.fileSystem.ensureDir(this.paths.outbox);
     this.fileSystem.ensureDir(this.paths.archive);
   }
 }
@@ -112,6 +116,9 @@ class ProjectPaths {
   public readonly drivers: string;
   public readonly skills: string;
   public readonly signals: string;
+  public readonly comms: string;
+  public readonly inbox: string;
+  public readonly outbox: string;
   public readonly archive: string;
 
   constructor(root: string) {
@@ -138,6 +145,9 @@ class ProjectPaths {
     this.drivers = path.join(this.ai, 'drivers');
     this.skills = path.join(this.ai, 'skills');
     this.signals = path.join(this.ai, 'signals');
+    this.comms = path.join(this.ai, 'comms');
+    this.inbox = path.join(this.comms, 'inbox');
+    this.outbox = path.join(this.comms, 'outbox');
     this.archive = path.join(this.ai, 'archive');
   }
 }
