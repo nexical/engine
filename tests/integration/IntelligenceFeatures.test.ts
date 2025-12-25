@@ -17,8 +17,9 @@ import { jest } from '@jest/globals';
 import fs from 'fs-extra';
 
 import { Architecture } from '../../src/domain/Architecture.js';
-import { IDriverContext, ISkill } from '../../src/domain/Driver.js';
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { Signal } from '../../src/workflow/Signal.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
@@ -41,9 +42,9 @@ describe('Intelligence Features Integration', () => {
     await fixture.writeConfig({ project_name: 'EvolutionTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
@@ -76,13 +77,15 @@ describe('Intelligence Features Integration', () => {
         validateSkill: async (): Promise<boolean> => {
           return Promise.resolve(true);
         },
-        execute: async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
-          const projectName = (options?.params?.project_name as string) || '';
+        execute: async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          const projectName = ((options?.params as any)?.project_name as string) || '';
           if (projectName.includes('PersonaTest')) {
             capturedPrompt = projectName;
           }
-          if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-          if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+          if (config.provider === 'architect')
+            return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+          if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
           return Promise.resolve(Result.ok('OK'));
         },
       },
@@ -109,14 +112,27 @@ describe('Intelligence Features Integration', () => {
 
     let capturedArchitectPrompt = '';
 
-    fixture.registerMockDriver('gemini', async (skill, ctx): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
-        capturedArchitectPrompt = (ctx?.params?.evolution_log as string) || '';
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
+        if (config.provider === 'architect') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          capturedArchitectPrompt = ((options as any)?.params?.evolution_log as string) || '';
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        if (config.provider === 'architect') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          expect((options as any)?.params?.evolution_log).toContain('Strategic memory established');
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        if (config.provider === 'planner') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          expect((options as any)?.params?.project_name).toBe('IntelTest');
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     // Run Architect (Scenario 5)
     const architect = orchestrator.brain.createArchitect(orchestrator.workspace);

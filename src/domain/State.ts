@@ -112,6 +112,8 @@ export class EngineState {
   }
 
   toYaml(): string {
-    return yaml.dump(this);
+    // We use JSON stringify/parse to ensure all objects (like Signals which are Errors)
+    // are converted to plain objects via their toJSON methods before YAML dumping.
+    return yaml.dump(JSON.parse(JSON.stringify(this)));
   }
 }

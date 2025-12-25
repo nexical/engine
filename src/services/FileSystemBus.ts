@@ -1,17 +1,16 @@
 import chokidar from 'chokidar';
-import fs from 'fs-extra';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-import { IProject } from '../domain/Project.js';
 import { IFileSystem } from '../domain/IFileSystem.js';
+import { IProject } from '../domain/Project.js';
 
 export interface IBusMessage {
   id: string;
   correlationId?: string;
   source: string;
   type?: string;
-  payload: any;
+  payload: unknown;
   timestamp?: number;
 }
 
@@ -39,7 +38,7 @@ export class FileSystemBus {
     }
 
     this.watcher = chokidar.watch(this.inboxPath, {
-      ignored: /(^|[\/\\])\../, // ignore dotfiles
+      ignored: /(^|[/\\])\../, // ignore dotfiles
       persistent: true,
       ignoreInitial: false,
       depth: 0,
@@ -71,21 +70,17 @@ export class FileSystemBus {
     });
   }
 
-  public stop(): void {
+  public async stop(): Promise<void> {
     if (this.watcher) {
-      this.watcher.close();
+      await this.watcher.close();
       this.watcher = null;
     }
-  }
-
-  private generateCorrelationId(): string {
-    return uuidv4();
   }
 
   /**
    * Sends a request to the Inbox (Planner/Task -> Architect).
    */
-  public async sendRequest(message: IBusMessage): Promise<void> {
+  public sendRequest(message: IBusMessage): void {
     const fileName = `req_${message.source}_${message.correlationId || message.id}.json`;
     const filePath = path.join(this.inboxPath, fileName);
 
@@ -96,7 +91,7 @@ export class FileSystemBus {
   /**
    * Writes a response to the Outbox (Architect -> Planner/Task).
    */
-  public async sendResponse(correlationId: string, payload: Record<string, unknown>): Promise<void> {
+  public sendResponse(correlationId: string, payload: Record<string, unknown>): void {
     const id = uuidv4();
     const message: IBusMessage = {
       id,
@@ -131,7 +126,7 @@ export class FileSystemBus {
           this.project.fileSystem.deleteFile(filePath);
 
           return message;
-        } catch (e) {
+        } catch {
           // ignore parse error, retry
         }
       }

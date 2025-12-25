@@ -1,6 +1,6 @@
 import { z, ZodSafeParseResult } from 'zod';
 
-import { ISkillConfig, ISkillContext, DriverConfig } from '../../domain/SkillConfig.js';
+import { DriverConfig, ISkillConfig, ISkillContext } from '../../domain/SkillConfig.js';
 import { CLIDriver, CLISkillSchema } from './CLIDriver.js';
 
 export const AISkillSchema = CLISkillSchema.extend({

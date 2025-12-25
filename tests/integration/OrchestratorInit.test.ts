@@ -12,7 +12,6 @@
  * - Pre-init access guards.
  */
 
-import { ISkill } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { Orchestrator } from '../../src/orchestrator.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -63,7 +62,8 @@ describe('Orchestrator Initialization Integration', () => {
     const result = orchestrator.brain.getDriver('gemini'); // Changed to 'gemini'
     expect(result).toBeDefined();
     if (result) {
-      await result.execute({ name: 'test', description: 'test', provider: 'gemini' } as unknown as ISkill); // Changed to 'gemini'
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+      await result.execute({ name: 'test', description: 'test', provider: 'gemini' } as any); // Changed to 'gemini'
       expect(driverExecuted).toBe(true);
     }
   });

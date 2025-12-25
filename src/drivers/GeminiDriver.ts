@@ -1,4 +1,4 @@
-import { ISkillContext, ISkillConfig } from '../domain/SkillConfig.js';
+import { ISkillConfig, ISkillContext } from '../domain/SkillConfig.js';
 import { AICLIDriver, AISkill } from './base/AICLIDriver.js';
 
 export class GeminiDriver extends AICLIDriver<ISkillContext> {

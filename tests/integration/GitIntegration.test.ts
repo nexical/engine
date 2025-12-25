@@ -15,6 +15,7 @@
 import { execSync } from 'child_process';
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Git Integration', () => {
@@ -49,22 +50,17 @@ describe('Git Integration', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill: { name: string }): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') {
         return Promise.resolve(
           Result.ok(
-            ProjectFixture.createPlanResult([
-              { id: 't1', skill: 'executor', message: 'Execute task', description: 'description' },
-            ]),
+            ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'exec', description: 'desc' }]),
           ),
         );
       }
-      if (skill.name === 'executor') {
-        const fs = await import('node:fs');
-        const path = await import('node:path');
-        fs.writeFileSync(path.join(fixture.tmpDir, 'task_done.txt'), 'done');
-        return Promise.resolve(Result.ok('OK'));
+      if (config.provider === 'executor') {
+        return Promise.resolve(Result.ok('Executed'));
       }
       return Promise.resolve(Result.ok('OK'));
     });

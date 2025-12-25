@@ -1,5 +1,6 @@
+import { describe, expect, it } from '@jest/globals';
+
 import { BaseDriver, Project, Signal, SignalType, Workspace } from '../../src/index.js';
-import { EngineState } from '../../src/domain/State.js'; // Import directly if not exported in index, OR fix index.ts
 
 describe('Index Exports', () => {
   // Orchestrator no longer exported

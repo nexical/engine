@@ -13,6 +13,7 @@
  */
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Interactive Feedback Integration', () => {
@@ -32,12 +33,19 @@ describe('Interactive Feedback Integration', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     let architectCalls = 0;
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      // In SkillRegistry, the provider might be 'architect' or 'planner' but here we check the name from params if available,
+      // or we assume the first param is the config.provider for this mock's logic.
+      // Actually, Skill.ts calls driver.execute(driverConfig, context).
+      // driverConfig has provider.
+      // The mock logic here was checking config.provider.
+      // SkillRegistry puts the config.provider in DriverConfig.params if we want, OR we can check provider.
+      // Wait, in integration tests, we usually name the provider same as the skill for simplicity.
+      if (config.provider === 'architect') {
         architectCalls++;
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult([`Iter ${architectCalls}`])));
       }
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 

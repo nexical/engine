@@ -15,8 +15,8 @@
 import fs from 'fs-extra';
 import path from 'path';
 
-import { ISkill } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { SignalDetectedError } from '../../src/errors/SignalDetectedError.js';
 import { Signal } from '../../src/workflow/Signal.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -42,8 +42,8 @@ describe('Workflow Robustness Integration', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     // Mock Architect to always return failing signal via error
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.fail(new Error('Infinite loop trigger')));
       }
       return Promise.resolve(Result.ok('OK'));
@@ -62,11 +62,11 @@ describe('Workflow Robustness Integration', () => {
 
     let replaned = false;
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
-      if (skill.name === 'planner') {
+      if (config.provider === 'planner') {
         const taskId = replaned ? 't2' : 't1';
         return Promise.resolve(
           Result.ok(
@@ -76,7 +76,7 @@ describe('Workflow Robustness Integration', () => {
           ),
         );
       }
-      if (skill.name === 'executor' && !replaned) {
+      if (config.provider === 'executor' && !replaned) {
         replaned = true;
         throw new SignalDetectedError(Signal.replan('Need better plan'));
       }
@@ -100,15 +100,15 @@ describe('Workflow Robustness Integration', () => {
     await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill: ISkill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner')
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner')
         return Promise.resolve(
           Result.ok(
             ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'msg', description: 'desc' }]),
           ),
         );
-      if (skill.name === 'executor') {
+      if (config.provider === 'executor') {
         const signalPath = path.join(fixture.tmpDir, '.ai/signals/interrupt.signal.yaml');
         await fs.ensureDir(path.dirname(signalPath));
         await fs.writeFile(signalPath, 'type: REPLAN\nreason: User changed mind');

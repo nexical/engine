@@ -1,6 +1,9 @@
 import { z } from 'zod';
-import { Result } from './Result.js';
+
 import { IPromptEngine } from '../services/PromptEngine.js';
+import { IFileSystem } from './IFileSystem.js';
+import { Result } from './Result.js';
+import { IRuntimeHost } from './RuntimeHost.js';
 
 /**
  * Generic configuration for any driver, validated by the driver itself.
@@ -29,13 +32,14 @@ export interface ISkillContext {
   validators: Array<(context: ISkillContext) => Promise<Result<boolean, Error>>>;
 
   // Domain Services
-  fileSystem: any; // Using 'any' for now to avoid circular dependency, ideally IFileSystem
+  fileSystem: IFileSystem;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   driverRegistry: any; // Using 'any' for now to avoid circular dependency
   workspaceRoot: string;
 
   // Execution State
   taskId: string;
-  logger: any;
+  logger: IRuntimeHost;
   [key: string]: unknown;
 }
 

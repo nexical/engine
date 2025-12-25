@@ -1,7 +1,8 @@
-import { ISkillContext } from '../domain/SkillConfig.js';
-import { Result } from '../domain/Result.js';
 import { Plan } from '../domain/Plan.js';
+import { Result } from '../domain/Result.js';
+import { ISkillContext } from '../domain/SkillConfig.js';
 
+// eslint-disable-next-line @typescript-eslint/require-await
 export const PlanGraphValidator = async (context: ISkillContext): Promise<Result<boolean, Error>> => {
   const yamlContent = context['executionResult'] as string;
   if (!yamlContent) {
@@ -28,7 +29,7 @@ function validateAcyclic(plan: Plan): void {
   const tasks = plan.tasks;
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
 
-  function visit(taskId: string) {
+  function visit(taskId: string): void {
     if (recursionStack.has(taskId)) {
       throw new Error(`Cycle detected involving task ${taskId}`);
     }

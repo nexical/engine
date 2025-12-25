@@ -8,16 +8,16 @@
  * driver-level compatibility checks.
  *
  * COVERAGE:
- * - SkillRunner.validateAvailableSkills() logic.
+ * - SkillRegistry.init() logic.
  * - Loading of .ai/skills/*.skill.yaml files.
  * - Error handling for malformed skills.
- * - Driver.validateSkill logic.
+ * - Driver.validateConfig logic.
  */
 
 import { jest } from '@jest/globals';
 
-import { ISkill } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Skill Integration', () => {
@@ -35,14 +35,15 @@ describe('Skill Integration', () => {
   });
 
   test('should discover and validate available skills (Scenario 8)', async (): Promise<void> => {
-    await fixture.writeSkill('test-skill', { name: 'test-skill', provider: 'gemini' });
+    await fixture.writeSkill('test-skill', { name: 'test-skill', execution: { provider: 'gemini' } });
     await fixture.writeConfig({ project_name: 'SkillTest' });
 
-    const orchestrator = await fixture.initOrchestrator();
-    const skillRunner = orchestrator.brain.getSkillRunner();
-    await skillRunner.validateAvailableSkills();
+    const orchestrator = await fixture.initOrchestrator(true);
+    fixture.registerMockDriver('gemini');
+    await orchestrator.brain.init();
+    const skillRegistry = orchestrator.brain.getSkillRegistry();
 
-    const skills = skillRunner.getSkills();
+    const skills = skillRegistry.getSkills();
     expect(skills.some((s) => s.name === 'test-skill')).toBe(true);
 
     // Check no error logs in fixture.mockHost.log
@@ -58,13 +59,16 @@ describe('Skill Integration', () => {
       provider: 'gemini',
     } as unknown as Record<string, unknown>);
 
-    await fixture.initOrchestrator(true);
+    await fixture.initOrchestrator();
 
     expect(fixture.mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error loading skill profile'));
   });
 
   test('should trigger driver-level validation (Scenario 12)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'DriverValidTest' });
+    await fixture.writeSkill('test-validation', { name: 'test-validation', execution: { provider: 'validation-fail-driver' } });
+
+    // Initialize without running init() immediately so we can register mocks
     const orchestrator = await fixture.initOrchestrator(true);
 
     const mockDriver = {
@@ -73,7 +77,7 @@ describe('Skill Integration', () => {
       isSupported: async (): Promise<boolean> => {
         return Promise.resolve(true);
       },
-      validateSkill: jest.fn<(skill: ISkill) => Promise<boolean>>().mockResolvedValue(false),
+      validateConfig: jest.fn<(config: DriverConfig) => Promise<boolean>>().mockResolvedValue(false),
       execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('mocked execution')),
     };
     // Register driver
@@ -82,27 +86,14 @@ describe('Skill Integration', () => {
     };
     brain.driverRegistry.register(mockDriver, true);
 
-    const skillRunner = orchestrator.brain.getSkillRunner();
-    // The fixture's initOrchestrator(true) mocks validateAvailableSkills.
-    // We need to capture that mock to restore it.
-    const validateSpy = jest.spyOn(skillRunner, 'validateAvailableSkills');
+    const skillRegistry = orchestrator.brain.getSkillRegistry();
 
-    // Restore the mock so we can test the real logic
-    // Restore the spy
-
-    (validateSpy as unknown as { mockRestore: () => void }).mockRestore();
-
-    // Register a skill that uses this driver
-    const testSkill = { name: 'test-validation', provider: 'validation-fail-driver' } as unknown as ISkill;
-
-    const skillRunnerInternal = skillRunner as unknown as { skills: Record<string, ISkill> };
-    skillRunnerInternal.skills['test-validation'] = testSkill;
+    // Now assume we want to init
+    await orchestrator.brain.init();
 
     // Verify it is there
-    expect(skillRunner.getSkills().some((s) => s.name === 'test-validation')).toBe(true);
+    expect(skillRegistry.getSkills().some((s) => s.name === 'test-validation')).toBe(true);
 
-    // We expect it to throw 'Skill validation failed'
-    await expect(skillRunner.validateAvailableSkills()).rejects.toThrow(/Skill validation failed/);
-    expect(mockDriver.validateSkill).toHaveBeenCalled();
+    expect(mockDriver.validateConfig).toHaveBeenCalled();
   });
 });

@@ -5,15 +5,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { Skill } from '../domain/Skill.js';
-import { ISkillConfig, SkillSchema } from '../domain/SkillConfig.js';
 import { IProject } from '../domain/Project.js';
 import { IRuntimeHost } from '../domain/RuntimeHost.js';
+import { Skill } from '../domain/Skill.js';
+import { ISkillConfig, SkillSchema } from '../domain/SkillConfig.js';
 import { DriverRegistry } from '../drivers/DriverRegistry.js'; // Assuming this location is correct based on imports
 
 export interface ISkillRegistry {
   init(): Promise<void>;
   getSkill(name: string): Skill | undefined;
+  getSkills(): Skill[];
 }
 
 export class SkillRegistry implements ISkillRegistry {
@@ -28,14 +29,19 @@ export class SkillRegistry implements ISkillRegistry {
   ) {}
 
   async init(): Promise<void> {
-    await this.loadYamlSkills();
+    this.loadYamlSkills();
+    return Promise.resolve();
   }
 
   getSkill(name: string): Skill | undefined {
     return this.skills.get(name);
   }
 
-  private async loadYamlSkills(): Promise<void> {
+  getSkills(): Skill[] {
+    return Array.from(this.skills.values());
+  }
+
+  private loadYamlSkills(): void {
     const searchConfig: { path: string; name: string }[] = [
       { path: path.join(__dirname, '../skills'), name: 'Default' },
       { path: this.project.paths.skills, name: 'User' },

@@ -15,8 +15,9 @@
 import { jest } from '@jest/globals';
 
 import { Architecture } from '../../src/domain/Architecture.js';
-import { IDriverContext, ISkill } from '../../src/domain/Driver.js';
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Agent Integration', () => {
@@ -44,9 +45,10 @@ describe('Agent Integration', () => {
     let capturedArchitectPrompt: string = '';
     fixture.registerMockDriver(
       'gemini',
-      async (skill: ISkill, options?: IDriverContext): Promise<Result<string, Error>> => {
-        if (skill.name === 'architect') {
-          capturedArchitectPrompt = options?.userPrompt || '';
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        if (config.provider === 'architect') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+          capturedArchitectPrompt = (options as any)?.userPrompt || '';
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult(['Component A', 'Component B'])));
         }
         return Promise.resolve(Result.ok('OK'));

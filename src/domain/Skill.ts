@@ -1,6 +1,7 @@
+import { Signal, SignalType } from '../workflow/Signal.js';
+import { IDriver } from './Driver.js';
 import { Result } from './Result.js';
 import { ISkillConfig, ISkillContext, SkillSchema } from './SkillConfig.js';
-import { Signal, SignalType } from '../workflow/Signal.js';
 
 /**
  * Domain entity representing a Skill.
@@ -21,7 +22,12 @@ export class Skill {
     return this.config.description;
   }
 
-  public getEnvironmentSpec() {
+  public getEnvironmentSpec(): {
+    dependencies: string[];
+    worktree_setup: string[];
+    hydration: string[];
+    sparse_checkout: string[];
+  } {
     return {
       dependencies: this.config.dependencies || [],
       worktree_setup: this.config.worktree_setup || [],
@@ -39,14 +45,16 @@ export class Skill {
    */
   public async execute(context: ISkillContext): Promise<Result<string, Error>> {
     const { logger, clarificationHandler, validators, taskId, commandRunner } = context;
-    logger?.info(`Starting execution of skill: ${this.name}`, { taskId });
+    logger.log('info', `Starting execution of skill: ${this.name}`, { taskId });
 
     // 1. Pre-Analysis
     if (this.config.pre_analysis_commands?.length) {
       try {
         await this.runCommands(this.config.pre_analysis_commands, commandRunner);
       } catch (error) {
-        return Result.fail(error instanceof Error ? error : new Error(`Pre-analysis commands failed: ${error}`));
+        return Result.fail(
+          error instanceof Error ? error : new Error(`Pre-analysis commands failed: ${String(error)}`),
+        );
       }
     }
 
@@ -104,7 +112,7 @@ export class Skill {
           await this.runCommands(this.config.post_execution_commands, commandRunner);
         } catch (error) {
           cycleFailed = true;
-          feedback = `Post-execution command failed: ${error}`;
+          feedback = `Post-execution command failed: ${error instanceof Error ? error.message : String(error)}`;
         }
       }
 
@@ -119,7 +127,7 @@ export class Skill {
             const vResult = await validator(context);
             if (vResult.isFail()) {
               cycleFailed = true;
-              feedback = `Validator failed: ${vResult.error()?.message}`;
+              feedback = `Validator failed: ${vResult.error()?.message || 'Unknown error'}`;
               break;
             }
           }
@@ -130,17 +138,17 @@ export class Skill {
         const vResult = await this.runDriver('verification', context);
         if (vResult.isFail()) {
           cycleFailed = true;
-          feedback = `Verification driver failed: ${vResult.error()?.message}`;
+          feedback = `Verification driver failed: ${vResult.error()?.message || 'Unknown error'}`;
         }
       }
 
       if (!cycleFailed) {
-        return Result.ok('Skill completed successfully');
+        return Result.ok(context['executionResult'] as string);
       }
 
       // Feedback for next loop
       context['last_error'] = feedback;
-      logger?.warn(`Skill execution cycle ${executionAttempts} failed: ${feedback}. Retrying...`);
+      logger.log('warn', `Skill execution cycle ${executionAttempts} failed: ${feedback}. Retrying...`);
     }
 
     return Result.fail(new Error(`Skill failed after ${maxRetries} attempts`));
@@ -157,7 +165,8 @@ export class Skill {
     }
 
     // Resolve driver from registry
-    const driver = context.driverRegistry.getDriver(driverConfig.provider);
+    const driverRegistry = context.driverRegistry as { get(name: string): IDriver | undefined };
+    const driver = driverRegistry.get(driverConfig.provider);
     if (!driver) return Result.fail(new Error(`Driver provider '${driverConfig.provider}' not found`));
 
     return driver.execute(driverConfig, context); // Passing ISkillConfig as per new Driver signature

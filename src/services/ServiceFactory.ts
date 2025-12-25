@@ -10,11 +10,11 @@ import { IWorkspace, Workspace } from '../domain/Workspace.js';
 import { DriverRegistry, IDriverRegistry } from '../drivers/DriverRegistry.js';
 import { DIContainer } from './DIContainer.js';
 import { EvolutionService, IEvolutionService } from './EvolutionService.js';
+import { FileSystemBus } from './FileSystemBus.js';
 import { FileSystemService } from './FileSystemService.js';
 import { GitService } from './GitService.js';
 import { IPromptEngine, PromptEngine } from './PromptEngine.js';
 import { ISkillRegistry, SkillRegistry } from './SkillRegistry.js';
-import { FileSystemBus } from './FileSystemBus.js';
 
 export interface IEngineServices {
   project: IProject;
@@ -169,7 +169,9 @@ export class ServiceFactory {
     // Resolve and Initialize what needs initialization
     const project = container.resolve<IProject>('project');
     const brain = container.resolve<Brain>('brain');
-    await brain.init();
+
+    // Note: Brain initialization is now the responsibility of the Orchestrator
+
 
     const workspace = container.resolve<IWorkspace>('workspace');
     const session = container.resolve<Session>('session');

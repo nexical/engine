@@ -4,10 +4,10 @@ import yaml from 'js-yaml';
 import os from 'os';
 import path from 'path';
 
-import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
+import { IDriverContext } from '../../../src/domain/Driver.js';
 import { Result } from '../../../src/domain/Result.js';
+import { DriverConfig } from '../../../src/domain/SkillConfig.js';
 import { Orchestrator } from '../../../src/orchestrator.js';
-import { SkillRunner } from '../../../src/services/SkillRunner.js';
 
 export class ProjectFixture {
   public tmpDir: string;
@@ -88,24 +88,21 @@ export class ProjectFixture {
     await fs.writeFile(path.join(this.tmpDir, '.ai/skills', `${name}.skill.yaml`), yaml.dump(content));
   }
 
-  async initOrchestrator(bypassValidation = true): Promise<Orchestrator> {
-    if (bypassValidation) {
-      jest.spyOn(SkillRunner.prototype, 'validateAvailableSkills').mockResolvedValue(undefined);
-    }
+  async initOrchestrator(skipBrainInit = false): Promise<Orchestrator> {
     this.orchestrator = new Orchestrator(this.tmpDir, this.mockHost);
-    await this.orchestrator.init();
+    await this.orchestrator.init(skipBrainInit);
     return this.orchestrator;
   }
 
   registerMockDriver(
     name: string,
-    executeImpl?: (skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>,
+    executeImpl?: (config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>,
   ): {
     name: string;
     description: string;
     isSupported: () => Promise<boolean>;
-    validateSkill: jest.Mock<(skill: ISkill) => Promise<boolean>>;
-    execute: jest.Mock<(skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>>;
+    validateConfig: jest.Mock<(config: DriverConfig) => Promise<boolean>>;
+    execute: jest.Mock<(config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>>;
   } {
     const mockDriver = {
       name,
@@ -113,11 +110,11 @@ export class ProjectFixture {
       isSupported: async (): Promise<boolean> => {
         return Promise.resolve(true);
       },
-      validateSkill: jest.fn<(skill: ISkill) => Promise<boolean>>().mockResolvedValue(true),
+      validateConfig: jest.fn<(config: DriverConfig) => Promise<boolean>>().mockResolvedValue(true),
       execute: jest
-        .fn<(skill: ISkill, options?: IDriverContext) => Promise<Result<string, Error>>>()
-        .mockImplementation(async (skill, options) => {
-          if (executeImpl) return executeImpl(skill, options);
+        .fn<(config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>>()
+        .mockImplementation(async (config, options) => {
+          if (executeImpl) return executeImpl(config, options);
           return Result.ok('OK');
         }),
     };

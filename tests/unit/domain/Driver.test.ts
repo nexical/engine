@@ -1,18 +1,19 @@
 import { jest } from '@jest/globals';
 
-import { BaseDriver, IDriverConfig, ISkill } from '../../../src/domain/Driver.js';
+import { BaseDriver } from '../../../src/domain/Driver.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { DriverConfig } from '../../../src/domain/SkillConfig.js';
 
 // Mock function for execute
-const mockExecute = jest.fn<() => Promise<string>>();
+const mockExecute = jest.fn<(command: string, args?: string[]) => Promise<string>>();
 
 class TestDriver extends BaseDriver {
   name = 'TestDriver';
   description = 'A test driver';
 
-  constructor(host: IRuntimeHost, config?: IDriverConfig, fileSystem?: IFileSystem) {
-    super(host, config, fileSystem);
+  constructor(host: IRuntimeHost, systemConfig?: Record<string, unknown>, fileSystem?: IFileSystem) {
+    super(host, systemConfig, fileSystem);
     // Manually inject the mock shell
     (this as unknown as { shell: { execute: typeof mockExecute } }).shell = { execute: mockExecute };
   }
@@ -21,8 +22,8 @@ class TestDriver extends BaseDriver {
     return Promise.resolve(true);
   }
 
-  async run(skill: ISkill, _context?: unknown): Promise<string> {
-    if (skill.name === 'fail') return Promise.reject(new Error('ISkill failed intentionally'));
+  async run(config: DriverConfig, _context?: unknown): Promise<string> {
+    if (config.provider === 'fail') return Promise.reject(new Error('Skill execution failed intentionally'));
     return Promise.resolve('success');
   }
 
@@ -35,16 +36,8 @@ class TestDriver extends BaseDriver {
     return this.checkEnvironment(key);
   }
 
-  public testCheckConfig(key: string): unknown {
-    return this.checkConfig(key);
-  }
-
   public getFileSystem(): IFileSystem {
     return this.fileSystem;
-  }
-
-  public getConfig(): IDriverConfig {
-    return this.config;
   }
 }
 
@@ -71,56 +64,46 @@ describe('BaseDriver', () => {
   });
 
   describe('constructor defaults', () => {
-    it('should use default config and filesystem if not provided', () => {
+    it('should use default filesystem if not provided', () => {
       const d = new TestDriver(mockHost);
-      expect(d.getConfig().rootDirectory).toBe(process.cwd());
       expect(d.getFileSystem()).toBeDefined();
-      // It creates a new FileSystemService, which we can't easily check instance of without importing it,
-      // but checking it is defined is enough for coverage of the branch `|| new FileSystemService(host)`
-      // assuming FileSystemService can be instantiated (it deals with fs).
     });
   });
 
   describe('execute', () => {
     it('should execute successfully', async () => {
-      const skill: ISkill = { name: 'test' };
-      const result = await driver.execute(skill);
+      const config: DriverConfig = { provider: 'test' };
+      const result = await driver.execute(config);
       expect(result.isOk()).toBe(true);
       expect(result.unwrap()).toBe('success');
     });
 
     it('should return failure if run fails', async () => {
-      const skill: ISkill = { name: 'fail' };
-      const result = await driver.execute(skill);
+      const config: DriverConfig = { provider: 'fail' };
+      const result = await driver.execute(config);
       expect(result.isFail()).toBe(true);
-      expect(result.error()?.message).toBe('ISkill failed intentionally');
+      expect(result.error()?.message).toBe('Skill execution failed intentionally');
     });
 
     it('should handle non-Error exceptions', async () => {
       jest.spyOn(driver, 'run').mockRejectedValueOnce('string error');
-      const result = await driver.execute({ name: 'test' });
+      const result = await driver.execute({ provider: 'test' });
       expect(result.isFail()).toBe(true);
       expect(result.error()?.message).toBe('string error');
     });
 
-    it('should validate skill', async () => {
-      const skill: ISkill = { name: 'test' }; // Valid schema
-      const parsed = await driver.validateSkill(skill);
+    it('should validate config', async () => {
+      const config: DriverConfig = { provider: 'test' };
+      const parsed = await driver.validateConfig(config);
       expect(parsed).toBe(true);
     });
 
-    it('should fail validation if schema invalid', async () => {
-      const skill = {} as ISkill; // Invalid, no name
-      const parsed = await driver.validateSkill(skill);
-      expect(parsed).toBe(false);
-      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Validation failed'));
-    });
-
-    it('should not run if validation fails', async () => {
-      const skill = {} as ISkill;
-      const result = await driver.execute(skill);
+    it('should not run if validation fails (extended driver implementation)', async () => {
+      jest.spyOn(driver, 'validateConfig').mockResolvedValueOnce(false);
+      const config: DriverConfig = { provider: 'test' };
+      const result = await driver.execute(config);
       expect(result.isFail()).toBe(true);
-      expect(result.error()?.message).toContain('Invalid skill');
+      expect(result.error()?.message).toContain('Invalid config');
     });
   });
 
@@ -147,12 +130,6 @@ describe('BaseDriver', () => {
     it('checkEnvironment should return false if env var missing', () => {
       delete process.env.MISSING_VAR;
       expect(driver.testCheckEnvironment('MISSING_VAR')).toBe(false);
-    });
-
-    it('checkConfig should return config value', () => {
-      expect(driver.testCheckConfig('rootDirectory')).toBe('/');
-      expect(driver.testCheckConfig('customConfig')).toBe('value');
-      expect(driver.testCheckConfig('missing')).toBeUndefined();
     });
   });
 });

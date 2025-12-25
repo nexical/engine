@@ -1,20 +1,20 @@
+import { execSync } from 'child_process';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { execSync } from 'child_process';
 
 import { IProject } from '../domain/Project.js';
 import { IRuntimeHost } from '../domain/RuntimeHost.js';
+import { ISkillContext } from '../domain/SkillConfig.js';
 import { EngineState } from '../domain/State.js';
 import { Task } from '../domain/Task.js';
 import { IWorkspace } from '../domain/Workspace.js';
-import { GitService } from '../services/GitService.js';
-import { ISkillRegistry } from '../services/SkillRegistry.js';
-import { ISkillContext } from '../domain/SkillConfig.js';
 import { DriverRegistry } from '../drivers/DriverRegistry.js';
-import { SignalType, Signal } from '../workflow/Signal.js';
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { FileSystemBus } from '../services/FileSystemBus.js';
+import { GitService } from '../services/GitService.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
+import { ISkillRegistry } from '../services/SkillRegistry.js';
+import { Signal } from '../workflow/Signal.js';
 
 export class Executor {
   public readonly name = 'Executor';
@@ -69,7 +69,6 @@ export class Executor {
   }
 
   private async executeLayer(tasks: Task[], userPrompt: string, state: EngineState): Promise<void> {
-    if (tasks.length === 0) return;
     await this.executeParallelLayer(tasks, userPrompt, state);
   }
 
@@ -157,12 +156,12 @@ export class Executor {
             commandRunner: async (cmd: string, args: string[] = []) => {
               const fullCmd = `${cmd} ${args.join(' ')}`;
               const out = execSync(fullCmd, { cwd: worktreePath, encoding: 'utf-8' });
-              return out;
+              return Promise.resolve(out);
             },
 
             clarificationHandler: async (question: string) => {
               const corrId = uuidv4();
-              await this.bus.sendRequest({
+              this.bus.sendRequest({
                 id: uuidv4(),
                 correlationId: corrId,
                 source: `task-${task.id}`,
@@ -179,7 +178,7 @@ export class Executor {
 
           const result = await skill.execute(context);
           if (result.isFail()) {
-            throw result.error();
+            throw result.error() || new Error('Skill execution failed');
           }
 
           // 7. Check workspace signals
@@ -189,7 +188,7 @@ export class Executor {
           }
 
           // 8. Commit
-          this.git.add('.', worktreePath);
+          this.git.runCommand(['add', '--sparse', '.'], worktreePath);
           this.git.commit(`[nexical] Task complete: ${task.id}`, worktreePath);
 
           state.completeTask(task.id);
@@ -207,6 +206,16 @@ export class Executor {
 
       // Merge Back Phase
       const currentBranch = this.git.getCurrentBranch();
+
+      // Stash local changes (including new files) to avoid merge conflicts
+      let stashed = false;
+      try {
+        const stashOut = this.git.runCommand(['stash', 'push', '-u', '-m', 'Executor-Auto-Stash']);
+        stashed = !stashOut.includes('No local changes to save');
+      } catch (e) {
+        this.host.log('warn', `Failed to stash changes: ${e instanceof Error ? e.message : String(e)}`);
+      }
+
       for (const res of results) {
         this.host.log('info', `Merging ${res.branch} into ${currentBranch}`);
         try {
@@ -215,6 +224,18 @@ export class Executor {
           const errMsg = e instanceof Error ? e.message : String(e);
           this.host.log('error', `Merge failed for task ${res.taskId} from branch ${res.branch}: ${errMsg}`);
           throw new Error(`Merge conflict detected for task ${res.taskId}. Manual resolution required.`);
+        }
+      }
+
+      // Restore stashed changes
+      if (stashed) {
+        try {
+          this.git.runCommand(['stash', 'pop']);
+        } catch (e) {
+          // Pop conflict is possible if merged content differs from stashed.
+          // But since task branch contains the stashed content (copied), it should be fine mostly.
+          // If conflict occurs, it's a real conflict.
+          this.host.log('warn', `Stash pop failed (conflict?): ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     } finally {

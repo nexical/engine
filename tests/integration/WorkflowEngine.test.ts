@@ -13,6 +13,7 @@
  */
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Workflow Engine Integration', () => {
@@ -31,9 +32,9 @@ describe('Workflow Engine Integration', () => {
     await fixture.writeConfig({ project_name: 'WorkflowTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
@@ -50,8 +51,8 @@ describe('Workflow Engine Integration', () => {
     await fixture.writeConfig({ project_name: 'FailTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.fail(new Error('Architectural meltdown')));
       }
       return Promise.resolve(Result.ok('OK'));

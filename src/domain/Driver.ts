@@ -1,18 +1,12 @@
-import { z, ZodSafeParseResult } from 'zod';
-
 import { FileSystemService } from '../services/FileSystemService.js';
-import { IPromptEngine } from '../services/PromptEngine.js';
 import { ShellService } from '../services/ShellService.js';
 import { IFileSystem } from './IFileSystem.js';
 import { Result } from './Result.js';
 import { IRuntimeHost } from './RuntimeHost.js';
-import { DriverConfig, ISkillContext } from './SkillConfig.js';
+import { DriverConfig, ISkillConfig, ISkillContext } from './SkillConfig.js';
 
 export interface IDriverContext extends ISkillContext {
-  // Extends the base context with potential driver-specific extras if needed
-  // For now ISkillContext is the source of truth.
-  // But legacy code might expect IDriverContext properties.
-  // We can alias or extend.
+  [key: string]: unknown;
 }
 
 export interface IDriver<TContext = ISkillContext, TResult = string> {
@@ -23,7 +17,8 @@ export interface IDriver<TContext = ISkillContext, TResult = string> {
   execute(config: DriverConfig, context?: TContext): Promise<Result<TResult, Error>>;
 }
 
-// Legacy ISkill is removed. Use Skill class and ISkillConfig.
+// Legacy ISkill is restored for test compatibility. Use Skill class and ISkillConfig for new code.
+export type ISkill = ISkillConfig;
 
 export abstract class BaseDriver<TContext = ISkillContext, TResult = string> implements IDriver<TContext, TResult> {
   abstract name: string;
@@ -46,7 +41,7 @@ export abstract class BaseDriver<TContext = ISkillContext, TResult = string> imp
   abstract isSupported(): Promise<boolean>;
 
   // Validates the per-execution config (from YAML)
-  validateConfig(config: DriverConfig): Promise<boolean> {
+  validateConfig(_config: DriverConfig): Promise<boolean> {
     // Default implementation: check if provider matches?
     // Or just return true (polymorphic passthrough)
     return Promise.resolve(true);

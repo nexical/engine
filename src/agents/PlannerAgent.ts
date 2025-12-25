@@ -10,10 +10,10 @@ import { DriverRegistry } from '../drivers/DriverRegistry.js';
 import { IEvolutionService } from '../services/EvolutionService.js';
 import { FileSystemBus } from '../services/FileSystemBus.js';
 import { PlanGraphValidator } from '../services/PlanGraphValidator.js';
+import { IPromptEngine } from '../services/PromptEngine.js';
 import { ShellService } from '../services/ShellService.js';
 import { ISkillRegistry } from '../services/SkillRegistry.js';
 import { Signal } from '../workflow/Signal.js';
-import { IPromptEngine } from '../services/PromptEngine.js';
 
 export class PlannerAgent {
   private shell: ShellService;
@@ -68,7 +68,7 @@ export class PlannerAgent {
 
         this.host.log('info', `Planner requesting clarification: ${question}`);
 
-        await this.bus.sendRequest({
+        this.bus.sendRequest({
           id: uuidv4(),
           correlationId,
           source: 'planner',
@@ -97,7 +97,7 @@ export class PlannerAgent {
     const result = await skill.execute(context);
 
     if (result.isFail()) {
-      throw result.error();
+      throw result.error() || new Error('Skill execution failed');
     }
 
     const planStr = result.unwrap();

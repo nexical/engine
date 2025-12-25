@@ -1,8 +1,10 @@
+/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import { jest } from '@jest/globals';
-import { BaseDriver, IDriverContext } from '../../../src/domain/Driver.js';
-import { ISkillConfig, ISkillContext } from '../../../src/domain/SkillConfig.js';
+
+import { Result } from '../../../src/domain/Result.js';
+import { ISkillContext } from '../../../src/domain/SkillConfig.js';
 import { ImageGenDriver } from '../../../src/drivers/ImageGenDriver.js';
-import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 
 describe('ImageGenDriver', () => {
   let driver: ImageGenDriver;
@@ -30,40 +32,41 @@ describe('ImageGenDriver', () => {
       userPrompt: 'user request',
       promptEngine: mockPromptEngine,
       fileSystem: mockFileSystem,
+      params: {},
     } as unknown as ISkillContext;
 
     driver = new ImageGenDriver(mockHost, mockConfig, mockFileSystem);
+    // Explicitly mock process.env for isSupported
+    process.env.OPENROUTER_API_KEY = 'test-key';
+  });
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY;
+    jest.restoreAllMocks();
   });
 
   it('should be defined', () => {
     expect(driver).toBeDefined();
   });
 
-  it('should handle HTTP image URLs', async () => {
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        json: jest.fn(() =>
-          Promise.resolve({
-            choices: [
-              {
-                message: {
-                  images: [
-                    {
-                      image_url: {
-                        url: 'http://example.com/image.png',
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          }),
-        ),
-      }),
-    ) as any;
+  it('should check for support via environment variable', async () => {
+    expect(await driver.isSupported()).toBe(true);
+    delete process.env.OPENROUTER_API_KEY;
+    expect(await driver.isSupported()).toBe(false);
+  });
 
-    // Mock specific fetch for image download
-    (global.fetch as jest.Mock).mockImplementation((url: unknown) => {
+  it('should validate schema', () => {
+    const valid = { name: 'gen', prompt_template: 'test' };
+    const res = (driver as any).parseSchema(valid);
+    expect(res.success).toBe(true);
+
+    const invalid = { name: 'gen' }; // missing prompt_template
+    const res2 = (driver as any).parseSchema(invalid);
+    expect(res2.success).toBe(false);
+  });
+
+  it('should handle HTTP image URLs', async () => {
+    global.fetch = jest.fn((url: unknown) => {
       if (typeof url === 'string' && url.includes('chat/completions')) {
         return Promise.resolve({
           ok: true,
@@ -71,16 +74,16 @@ describe('ImageGenDriver', () => {
             Promise.resolve({
               choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }],
             }),
-        });
+        } as unknown as Response);
       }
       if (typeof url === 'string' && url.includes('image.png')) {
         return Promise.resolve({
           ok: true,
           arrayBuffer: () => Promise.resolve(Buffer.from('image-data')),
-        });
+        } as unknown as Response);
       }
-      return Promise.reject('Unknown url');
-    });
+      return Promise.reject(new Error('Unknown url'));
+    }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await driver.run(skill, { ...mockContext, userPrompt: 'test' });
@@ -89,7 +92,7 @@ describe('ImageGenDriver', () => {
   });
 
   it('should use provided output path', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: unknown) => {
+    global.fetch = jest.fn((url: unknown) => {
       if (typeof url === 'string' && url.includes('completions')) {
         return Promise.resolve({
           ok: true,
@@ -97,14 +100,13 @@ describe('ImageGenDriver', () => {
             Promise.resolve({
               choices: [{ message: { images: [{ image_url: { url: 'http://example.com/image.png' } }] } }],
             }),
-        });
+        } as unknown as Response);
       }
-      // second call for image
       return Promise.resolve({
         ok: true,
         arrayBuffer: () => Promise.resolve(Buffer.from('image-data')),
-      });
-    });
+      } as unknown as Response);
+    }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     const params = { output_path: 'custom.png' };
@@ -114,12 +116,12 @@ describe('ImageGenDriver', () => {
   });
 
   it('should throw error if no choices returned', async () => {
-    (global.fetch as jest.Mock).mockImplementation(() => {
+    global.fetch = jest.fn(() => {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ choices: [] }),
-      });
-    });
+      } as unknown as Response);
+    }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
     await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
@@ -128,16 +130,109 @@ describe('ImageGenDriver', () => {
   });
 
   it('should handle missing images property in response', async () => {
-    (global.fetch as jest.Mock).mockImplementation(() => {
+    global.fetch = jest.fn(() => {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ choices: [{ message: {} }] }),
-      });
-    });
+      } as unknown as Response);
+    }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
     await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
       'No image data returned from provider',
     );
+  });
+
+  it('should handle data: image URLs', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { images: [{ image_url: { url: 'data:image/png;base64,ZGF0YQ==' } }] } }],
+          }),
+      } as unknown as Response);
+    }) as any;
+
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    await driver.run(skill, mockContext);
+    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(expect.anything(), Buffer.from('data', 'utf-8'));
+  });
+
+  it('should handle raw base64 data fallback', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { images: [{ image_url: { url: 'ZGF0YQ==' } }] } }],
+          }),
+      } as unknown as Response);
+    }) as any;
+
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    await driver.run(skill, mockContext);
+    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(expect.anything(), Buffer.from('ZGF0YQ==', 'base64'));
+  });
+
+  it('should throw if promptEngine is missing', async () => {
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    await expect(driver.run(skill, { ...mockContext, promptEngine: undefined })).rejects.toThrow(
+      'PromptEngine is required',
+    );
+  });
+
+  it('should use default model and dimensions if not specified', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { images: [{ image_url: { url: 'data:image/png;base64,ZGF0YQ==' } }] } }],
+          }),
+      } as unknown as Response);
+    }) as any;
+
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    await driver.run(skill, mockContext);
+
+    const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+    const options = fetchCall[1] as RequestInit;
+    const body = JSON.parse(options.body as string);
+    expect(body.model).toBe('google/gemini-2.0-flash-exp');
+    expect(body.image_config.aspect_ratio).toBe('1:1');
+    expect(body.image_config.image_size).toBe('1024x1024');
+  });
+
+  it('should handle fetch/API errors gracefully', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.reject(new Error('Network error'));
+    }) as any;
+
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    await expect(driver.run(skill, mockContext)).rejects.toThrow('Network error');
+    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Image generation failed'));
+  });
+
+  it('should handle undefined context and missing rootDirectory in systemConfig', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { images: [{ image_url: { url: 'data:image/png;base64,ZGF0YQ==' } }] } }],
+          }),
+      } as unknown as Response);
+    }) as any;
+
+    // Create driver with empty systemConfig
+    const driverNoRoot = new ImageGenDriver(mockHost, {}, mockFileSystem);
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+
+    // Pass empty context
+    await driverNoRoot.run(skill, { promptEngine: mockPromptEngine } as any);
+
+    // Verify it used process.cwd() or ran without crashing when rootDirectory is missing
+    expect(mockHost.log).toHaveBeenCalledWith('info', expect.stringContaining('Image saved to:'));
   });
 });

@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals';
 
 import { ArchitectAgent } from '../../../src/agents/ArchitectAgent.js';
-import { PlannerAgent } from '../../../src/agents/PlannerAgent.js';
 import { Executor } from '../../../src/agents/Executor.js';
+import { PlannerAgent } from '../../../src/agents/PlannerAgent.js';
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
@@ -247,6 +247,77 @@ describe('ServiceFactory', () => {
         mockFileSystemBus,
         mockPromptEngine,
       );
+    }
+
+    // Test Planner Factory
+    const plannerFactory = factories['planner'];
+    if (plannerFactory) {
+      const creator = plannerFactory() as (w: IWorkspace) => PlannerAgent;
+      creator(mockWorkspace as unknown as IWorkspace);
+      expect(MockPlannerAgent).toHaveBeenCalledWith(
+        mockProject,
+        mockWorkspace,
+        mockSkillRegistry,
+        mockDriverRegistry,
+        mockEvolutionService,
+        mockHost,
+        mockFileSystemBus,
+        mockPromptEngine,
+      );
+    }
+
+    // Test Workspace Factory
+    factories['workspace']?.();
+    expect(MockWorkspace).toHaveBeenCalledWith(mockProject);
+
+    // Test Session Factory
+    factories['session']?.();
+    expect(MockSession).toHaveBeenCalledWith(mockProject, mockWorkspace, mockBrain, mockHost);
+
+    // Test GitService Factory
+    factories['gitService']?.();
+    expect(MockGitService).toHaveBeenCalledWith(mockHost, '/root');
+
+    // Test EvolutionService Factory
+    factories['evolutionService']?.();
+    expect(MockEvolutionService).toHaveBeenCalledWith(mockProject, mockFileSystem);
+
+    // Test Executor Factory (via Brain registration)
+    // We need to capture the callback passed to brain.registerAgent('executor', cb)
+    const registerCalls = mockBrain.registerAgent.mock.calls;
+    const executorCall = registerCalls.find((c) => c[0] === 'executor');
+    if (executorCall) {
+      const executorFactory = executorCall[1] as (w: IWorkspace) => Executor;
+      executorFactory(mockWorkspace as unknown as IWorkspace);
+
+      expect(MockExecutor).toHaveBeenCalledWith(
+        mockProject,
+        mockWorkspace,
+        mockSkillRegistry,
+        mockDriverRegistry,
+        mockHost,
+        expect.anything(), // gitService (mocked as {})
+        mockFileSystemBus,
+        mockPromptEngine,
+      );
+    }
+
+    // Test brain.registerAgent callbacks
+    // Architect Registration
+    const archRegCall = registerCalls.find((c) => c[0] === 'architect');
+    if (archRegCall) {
+      const cb = archRegCall[1] as (w: IWorkspace) => unknown;
+      cb(mockWorkspace as unknown as IWorkspace);
+      // This triggers container.resolve('architect')(workspace)
+      expect(mockContainer.resolve).toHaveBeenCalledWith('architect');
+    }
+
+    // Planner Registration
+    const plannerRegCall = registerCalls.find((c) => c[0] === 'planner');
+    if (plannerRegCall) {
+      const cb = plannerRegCall[1] as (w: IWorkspace) => unknown;
+      cb(mockWorkspace as unknown as IWorkspace);
+      expect(mockContainer.resolve).toHaveBeenCalledWith('planner');
     }
   });
 });

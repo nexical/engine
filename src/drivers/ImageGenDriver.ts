@@ -2,7 +2,7 @@ import path from 'path';
 import { z, ZodSafeParseResult } from 'zod';
 
 import { BaseDriver } from '../domain/Driver.js';
-import { ISkillConfig, SkillSchema, ISkillContext, DriverConfig } from '../domain/SkillConfig.js';
+import { DriverConfig, ISkillConfig, ISkillContext, SkillSchema } from '../domain/SkillConfig.js';
 
 export const ImageGenSkillSchema = SkillSchema.extend({
   prompt_template: z.string(),

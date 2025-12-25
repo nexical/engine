@@ -50,7 +50,7 @@ export class Orchestrator extends EventEmitter {
     };
   }
 
-  async init(): Promise<void> {
+  async init(skipBrainInit = false): Promise<void> {
     const services = await ServiceFactory.createServices(this.rootDirectory, this.host);
 
     // Wire up services
@@ -58,6 +58,10 @@ export class Orchestrator extends EventEmitter {
     this._brain = services.brain;
     this._workspace = services.workspace;
     this._session = services.session;
+
+    if (!skipBrainInit) {
+      await this._brain.init();
+    }
   }
 
   async start(prompt: string, interactive: boolean = true): Promise<void> {

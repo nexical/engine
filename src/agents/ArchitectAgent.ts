@@ -7,12 +7,11 @@ import { ISkillContext } from '../domain/SkillConfig.js';
 import { IWorkspace } from '../domain/Workspace.js';
 import { DriverRegistry } from '../drivers/DriverRegistry.js';
 import { IEvolutionService } from '../services/EvolutionService.js';
+import { FileSystemBus, IBusMessage } from '../services/FileSystemBus.js';
+import { IPromptEngine } from '../services/PromptEngine.js';
 import { ShellService } from '../services/ShellService.js';
 import { ISkillRegistry } from '../services/SkillRegistry.js';
-
-import { FileSystemBus, IBusMessage } from '../services/FileSystemBus.js';
-import { SignalType } from '../workflow/Signal.js';
-import { IPromptEngine } from '../services/PromptEngine.js';
+import { ISignalJSON, SignalType } from '../workflow/Signal.js';
 
 export class ArchitectAgent {
   private shell: ShellService;
@@ -47,7 +46,10 @@ export class ArchitectAgent {
     this.host.log('info', `Received request from ${source} (ID: ${id})`);
 
     try {
-      const signalData = payload as any;
+      const signalData = payload as ISignalJSON;
+      if (!signalData || typeof signalData !== 'object') {
+        return;
+      }
 
       if (signalData.type === SignalType.CLARIFICATION_NEEDED) {
         const questions = (signalData.metadata?.questions as string[]) || [signalData.reason];
@@ -65,7 +67,7 @@ export class ArchitectAgent {
 
         // Send response
         if (correlationId) {
-          await this.messageBus.sendResponse(correlationId, {
+          this.messageBus.sendResponse(correlationId, {
             answers,
           });
           this.host.log('info', `Sent response to ${source} for ${correlationId}`);
@@ -74,7 +76,10 @@ export class ArchitectAgent {
         this.host.log('warn', `Unknown message type: ${signalData.type}`);
       }
     } catch (error) {
-      this.host.log('error', `Failed to handle inbox message: ${error}`);
+      this.host.log(
+        'error',
+        `Failed to handle inbox message: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -125,7 +130,7 @@ export class ArchitectAgent {
     const result = await skill.execute(context);
 
     if (result.isFail()) {
-      throw result.error();
+      throw result.error() || new Error('Skill execution failed');
     }
 
     const docStr = result.unwrap();

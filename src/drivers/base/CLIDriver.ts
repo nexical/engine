@@ -1,7 +1,7 @@
 import { z, ZodSafeParseResult } from 'zod';
 
 import { BaseDriver } from '../../domain/Driver.js';
-import { ISkillConfig, SkillSchema, ISkillContext, DriverConfig } from '../../domain/SkillConfig.js';
+import { DriverConfig, ISkillConfig, ISkillContext, SkillSchema } from '../../domain/SkillConfig.js';
 
 export const CLISkillSchema = SkillSchema.extend({
   name: z.string(),
@@ -57,8 +57,11 @@ export abstract class CLIDriver<TContext extends ISkillContext = ISkillContext> 
     try {
       const result = await this.shell.execute(commandBin, args, {
         cwd: rootDir,
-        // Merge context.env with process.env? access unknown prop
-        env: { ...process.env, ...((context as any)?.env || {}) },
+        // Merge context.env with process.env
+        env: {
+          ...process.env,
+          ...(((context as Record<string, unknown> | undefined)?.env as Record<string, string>) || {}),
+        },
       });
 
       this.host.log('debug', '--- stdout ---');

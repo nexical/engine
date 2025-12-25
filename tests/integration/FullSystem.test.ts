@@ -15,6 +15,7 @@
 import fs from 'fs-extra';
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Full System Integration (Smoke Test)', () => {
@@ -35,18 +36,14 @@ describe('Full System Integration (Smoke Test)', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
-      if (skill.name === 'planner') {
-        return Promise.resolve(
-          Result.ok(
-            ProjectFixture.createPlanResult([{ id: 'task1', skill: 'executor', message: 'work', description: 'desc' }]),
-          ),
-        );
+      if (config.provider === 'planner') {
+        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       }
-      if (skill.name === 'executor') {
+      if (config.provider === 'executor') {
         // Simulate work by writing a file
         const { execSync } = await import('child_process');
         execSync('echo "content" > built.txt'); // Writes to cwd (worktree)
@@ -81,9 +78,9 @@ describe('Full System Integration (Smoke Test)', () => {
     }));
     const largePlan = ProjectFixture.createPlanResult(tasks);
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(largeArchitecture));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(largePlan));
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(largeArchitecture));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(largePlan));
       return Promise.resolve(Result.ok('OK'));
     });
 

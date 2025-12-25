@@ -9,7 +9,7 @@ export enum SignalType {
   CLARIFICATION_NEEDED = 'CLARIFICATION_NEEDED',
 }
 
-export interface SignalJSON {
+export interface ISignalJSON {
   type: SignalType;
   reason: string;
   metadata: Record<string, unknown>;
@@ -49,7 +49,7 @@ export class Signal extends Error {
     return new Signal(SignalType.CLARIFICATION_NEEDED, 'Clarification needed', { ...context, questions });
   }
 
-  toJSON(): SignalJSON {
+  toJSON(): ISignalJSON {
     return {
       type: this.type,
       reason: this.reason,
@@ -57,7 +57,7 @@ export class Signal extends Error {
     };
   }
 
-  static fromJSON(json: SignalJSON): Signal {
+  static fromJSON(json: ISignalJSON): Signal {
     return new Signal(json.type, json.reason, json.metadata);
   }
 }

@@ -13,6 +13,7 @@
  */
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Driver Management Integration', () => {
@@ -39,10 +40,10 @@ describe('Driver Management Integration', () => {
     await fixture.initOrchestrator();
 
     let defaultDriverCalled = false;
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
       defaultDriverCalled = true;
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      if (config.provider === 'architect') return Promise.resolve(Result.ok('{}'));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok('[]'));
       return Promise.resolve(Result.ok('OK'));
     });
 

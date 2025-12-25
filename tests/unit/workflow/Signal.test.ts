@@ -32,4 +32,26 @@ describe('Signal', () => {
     expect(Signal.COMPLETE.type).toBe(SignalType.COMPLETE);
     expect(Signal.WAIT.type).toBe(SignalType.WAIT);
   });
+
+  it('should support clarificationNeeded', () => {
+    const signal = Signal.clarificationNeeded(['Question?'], { context: 'stuff' });
+    expect(signal.type).toBe(SignalType.CLARIFICATION_NEEDED);
+    expect(signal.metadata.questions).toEqual(['Question?']);
+    expect(signal.metadata.context).toBe('stuff');
+  });
+
+  it('should serialize to and from JSON', () => {
+    const signal = new Signal(SignalType.FAIL, 'error', { detail: 'high' });
+    const json = signal.toJSON();
+    expect(json).toEqual({
+      type: SignalType.FAIL,
+      reason: 'error',
+      metadata: { detail: 'high' },
+    });
+
+    const fromJson = Signal.fromJSON(json);
+    expect(fromJson.type).toBe(SignalType.FAIL);
+    expect(fromJson.reason).toBe('error');
+    expect(fromJson.metadata).toEqual({ detail: 'high' });
+  });
 });

@@ -28,7 +28,7 @@ describe('Project', () => {
   });
 
   it('should ensure directory structure on initialization', () => {
-    expect(mockFileSystem.ensureDir).toHaveBeenCalledTimes(9); // count of ensureDir calls in ensureStructure
+    expect(mockFileSystem.ensureDir).toHaveBeenCalledTimes(12); // count of ensureDir calls in ensureStructure
   });
 
   describe('getConstraints', () => {
@@ -47,7 +47,7 @@ describe('Project', () => {
   describe('getConfig', () => {
     it('should return empty config if file does not exist', () => {
       mockFileSystem.exists.mockReturnValue(false);
-      expect(project.getConfig()).toEqual({});
+      expect(project.getConfig()).toEqual({ max_worktrees: 5 });
     });
 
     it('should return parsed config if file exists', () => {

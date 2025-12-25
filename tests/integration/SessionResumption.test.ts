@@ -17,8 +17,8 @@ import fs from 'fs-extra';
 import yaml from 'js-yaml';
 import path from 'path';
 
-import { ISkill } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { EngineState } from '../../src/domain/State.js';
 import { Orchestrator } from '../../src/orchestrator.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -39,9 +39,9 @@ describe('Session Resumption Integration', () => {
     await fixture.writeConfig({ project_name: 'ResumptionTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
@@ -61,9 +61,9 @@ describe('Session Resumption Integration', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     // Mock a partial run: Architecting -> Planning -> STOP
-    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+    fixture.registerMockDriver('gemini', (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
@@ -86,9 +86,9 @@ describe('Session Resumption Integration', () => {
     const orchestrator1: Orchestrator = await fixture.initOrchestrator();
 
     // Setup Mock Driver to stop after first state
-    fixture.registerMockDriver('gemini', async (skill: ISkill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (skill.name === 'planner') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      if (config.provider === 'planner') {
         // Force state save before crashing
         await orchestrator1.workspace.saveState(orchestrator1.session.state);
         return Promise.resolve(Result.fail(new Error('Stop here'))); // Simulate crash
@@ -116,8 +116,8 @@ describe('Session Resumption Integration', () => {
     fixture.mockHost.emit.mockClear();
     const orchestrator2: Orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', (skill: ISkill): Promise<Result<string, Error>> => {
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+    fixture.registerMockDriver('gemini', (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 

@@ -14,6 +14,7 @@
 
 import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Multi-Agent Flow Integration', () => {
@@ -35,30 +36,40 @@ describe('Multi-Agent Flow Integration', () => {
     );
     await fixture.writePrompt('planner.md', 'Planner for {{ project_name }}');
 
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    // Write missing skills
+    await fixture.writeSkill('architect', { name: 'architect', execution: { provider: 'architect' } });
+    await fixture.writeSkill('planner', { name: 'planner', execution: { provider: 'planner' } });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
     await fixture.writeConfig({ environment: 'staging', project_name: 'MultiTest' });
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver(
-      'gemini',
-      async (skill, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
-        if (skill.name === 'architect') {
-          const projectName = options?.params?.project_name as string;
-          const environment = options?.params?.environment as string;
-          expect(projectName).toContain('MultiTest');
-          expect(environment).toContain('staging');
-          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        }
-        if (skill.name === 'planner') {
-          const planResult = ProjectFixture.createPlanResult([
-            { id: 'task1', skill: 'executor', message: 'work', description: 'work_description' },
-          ]);
-          return Promise.resolve(Result.ok(planResult));
-        }
-        return Promise.resolve(Result.ok('OK'));
-      },
-    );
+    const mockDriverImpl = async (
+      config: DriverConfig,
+      options: IDriverContext | undefined,
+    ): Promise<Result<string, Error>> => {
+      // Logic for each agent type based on provider (or use config.type if preferred, but existing code used provider)
+      if (config.provider === 'architect') {
+        const params = options?.params as Record<string, unknown>;
+        const projectName = params?.project_name as string;
+
+        const environment = params?.environment as string;
+        expect(projectName).toContain('MultiTest');
+        expect(environment).toContain('staging');
+        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+      }
+      if (config.provider === 'planner') {
+        const planResult = ProjectFixture.createPlanResult([
+          { id: 'task1', skill: 'executor', message: 'work', description: 'work_description' },
+        ]);
+        return Promise.resolve(Result.ok(planResult));
+      }
+      return Promise.resolve(Result.ok('OK'));
+    };
+
+    fixture.registerMockDriver('gemini', mockDriverImpl);
+    fixture.registerMockDriver('architect', mockDriverImpl);
+    fixture.registerMockDriver('planner', mockDriverImpl);
 
     await orchestrator.start('Build something');
 

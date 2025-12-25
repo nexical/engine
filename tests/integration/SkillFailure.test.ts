@@ -14,6 +14,7 @@
  */
 
 import { Result } from '../../src/domain/Result.js';
+import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
 
 describe('Skill Failure Scenarios', () => {
@@ -32,8 +33,8 @@ describe('Skill Failure Scenarios', () => {
     await fixture.writeConfig({ project_name: 'FailureTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.fail(new Error('LLM connection timed out')));
       }
       return Promise.resolve(Result.ok('OK'));
@@ -57,7 +58,8 @@ describe('Skill Failure Scenarios', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     const mockDriver = fixture.registerMockDriver('gemini');
-    mockDriver.validateSkill.mockResolvedValue(false);
+
+    mockDriver.validateConfig.mockResolvedValue(false);
 
     // We need to bypass the initial validation in initOrchestrator to set up this mock
     // ProjectFixture already does this by default (bypassValidation = true).
@@ -78,13 +80,13 @@ describe('Skill Failure Scenarios', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     let attempt = 0;
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         attempt++;
         if (attempt < 2) return Promise.resolve(Result.fail(new Error('Temporary error')));
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
-      if (skill.name === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
       return Promise.resolve(Result.ok('OK'));
     });
 
@@ -105,11 +107,11 @@ describe('Skill Failure Scenarios', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (skill): Promise<Result<string, Error>> => {
-      if (skill.name === 'architect') {
+    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
+      if (config.provider === 'architect') {
         return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
       }
-      if (skill.name === 'planner') {
+      if (config.provider === 'planner') {
         return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
       }
       return Promise.resolve(Result.ok('OK'));
