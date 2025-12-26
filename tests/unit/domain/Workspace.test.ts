@@ -93,7 +93,7 @@ describe('Workspace', () => {
 
   describe('saveArchitecture', () => {
     it('should write to file', async () => {
-      const arch = new Architecture({ overview: '', fileStructure: '', components: '', details: '' }, 'content');
+      const arch = new Architecture('content');
       await workspace.saveArchitecture(arch);
       expect(mockFileSystem.writeFileAtomic).toHaveBeenCalledWith('arch_current', 'content');
     });

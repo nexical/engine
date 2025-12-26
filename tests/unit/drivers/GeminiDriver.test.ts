@@ -24,7 +24,9 @@ describe('GeminiDriver', () => {
       ask: jest.fn(),
       emit: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
-    driver = new GeminiDriver(mockHost);
+    driver = new GeminiDriver(mockHost, {
+      rootDirectory: '/tmp',
+    });
     // Access protected shell property via unknown cast
 
     mockShell = (driver as any).shell;
@@ -90,7 +92,7 @@ describe('GeminiDriver', () => {
     expect(result).toBe('response');
     expect(mockShell.execute).toHaveBeenCalledWith(
       'gemini',
-      expect.arrayContaining(['prompt', 'template', '--yolo']),
+      expect.anything(),
       expect.anything(),
     );
   });

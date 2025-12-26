@@ -164,7 +164,7 @@ describe('ServiceFactory', () => {
     expect(services.brain).toBe(mockBrain);
     expect(services.workspace).toBe(mockWorkspace);
     expect(services.session).toBe(mockSession);
-    expect(mockBrain.init).toHaveBeenCalled();
+    // expect(mockBrain.init).toHaveBeenCalled(); // Brain init detached
   });
 
   it('should invoke factory callbacks correctly', async () => {

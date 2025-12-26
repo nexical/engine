@@ -69,12 +69,16 @@ describe('ArchitectAgent', () => {
     };
 
     mockSkillRegistry = {
-      getSkill: jest.fn().mockReturnValue(mockSkill),
+      getSkill: jest.fn((name: string) => {
+        if (name === 'architect') return mockSkill;
+        return undefined;
+      }),
     } as unknown as jest.Mocked<ISkillRegistry>;
 
     mockDriverRegistry = {} as unknown as jest.Mocked<DriverRegistry>;
 
     mockEvolution = {
+      retrieve: jest.fn(),
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
@@ -105,7 +109,7 @@ describe('ArchitectAgent', () => {
 
   describe('design', () => {
     it('should execute design process successfully', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = { data: {} } as unknown as Architecture;
       const validYaml = 'architecture: valid';
 
       mockSkill.execute.mockResolvedValue(Result.ok(validYaml));

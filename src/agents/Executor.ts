@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import fs from 'fs-extra';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,8 +14,10 @@ import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { FileSystemBus } from '../services/FileSystemBus.js';
 import { GitService } from '../services/GitService.js';
 import { IPromptEngine } from '../services/PromptEngine.js';
+import { SignalService } from '../services/SignalService.js';
 import { ISkillRegistry } from '../services/SkillRegistry.js';
 import { Signal } from '../workflow/Signal.js';
+import { AnalystAgent } from './AnalystAgent.js';
 
 export class Executor {
   public readonly name = 'Executor';
@@ -29,6 +32,7 @@ export class Executor {
     private git: GitService,
     private bus: FileSystemBus,
     private promptEngine: IPromptEngine,
+    private signalService: SignalService,
   ) {
     if (this.git) {
       try {
@@ -121,8 +125,8 @@ export class Executor {
             for (const item of skillDef.hydration) {
               const source = path.join(this.project.paths.root, item);
               const target = path.join(worktreePath, item);
-              execSync(`mkdir -p "${path.dirname(target)}"`);
-              execSync(`cp -r "${source}" "${target}"`);
+              fs.ensureDirSync(path.dirname(target));
+              fs.copySync(source, target);
             }
           }
 
@@ -136,7 +140,7 @@ export class Executor {
           // 5. Copy .ai directory
           const aiDir = path.join(this.project.paths.root, '.ai');
           const aiTarget = path.join(worktreePath, '.ai');
-          execSync(`cp -r "${aiDir}" "${aiTarget}"`);
+          fs.copySync(aiDir, aiTarget);
 
           // 6. Run Skill
           const context: ISkillContext = {
@@ -182,7 +186,10 @@ export class Executor {
           }
 
           // 7. Check workspace signals
-          const signal = await this.workspace.detectSignal(path.join(worktreePath, '.ai/signals'));
+          // Use SignalService to detect priority signals in the task's .ai/signals dir
+          const signalsDir = path.join(worktreePath, '.ai/signals');
+          const signal = await this.signalService.getHighestPrioritySignal(signalsDir);
+
           if (signal) {
             throw new SignalDetectedError(signal, task.id);
           }
@@ -223,6 +230,15 @@ export class Executor {
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : String(e);
           this.host.log('error', `Merge failed for task ${res.taskId} from branch ${res.branch}: ${errMsg}`);
+
+          // Attempt to abort the merge to return to a clean state
+          try {
+            this.git.runCommand(['merge', '--abort']);
+            this.host.log('info', 'Merge aborted successfully.');
+          } catch (abortErr) {
+            this.host.log('warn', 'Failed to abort merge (maybe no merge was in progress).');
+          }
+
           throw new Error(`Merge conflict detected for task ${res.taskId}. Manual resolution required.`);
         }
       }
@@ -256,6 +272,20 @@ export class Executor {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.host.log('warn', `Failed to prune worktrees: ${msg}`);
+      }
+
+      // Metadata Analysis Phase
+      try {
+        const analyst = new AnalystAgent(
+          this.project,
+          this.skillRegistry,
+          this.driverRegistry,
+          this.host,
+          this.promptEngine,
+        );
+        await analyst.analyze();
+      } catch (e) {
+        this.host.log('warn', `AnalystAgent failed to run: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }

@@ -49,7 +49,7 @@ describe('Orchestrator', () => {
     it('should initialize services via ServiceFactory', async () => {
       const mockServices = {
         project: {},
-        brain: {},
+        brain: { init: jest.fn() },
         workspace: {},
         session: {},
         container: {},
@@ -104,7 +104,7 @@ describe('Orchestrator', () => {
           getConfig: jest.fn(),
           getConstraints: jest.fn(),
         } as unknown as jest.Mocked<IProject>,
-        brain: {} as unknown as jest.Mocked<Brain>,
+        brain: { init: jest.fn() } as unknown as jest.Mocked<Brain>,
         workspace: {} as unknown as jest.Mocked<IWorkspace>,
         session: mockSession,
         container: {},

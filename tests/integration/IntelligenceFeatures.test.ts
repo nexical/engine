@@ -42,11 +42,16 @@ describe('Intelligence Features Integration', () => {
     await fixture.writeConfig({ project_name: 'EvolutionTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        // @ts-ignore
+        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Learn something');
 
@@ -83,9 +88,10 @@ describe('Intelligence Features Integration', () => {
           if (projectName.includes('PersonaTest')) {
             capturedPrompt = projectName;
           }
-          if (config.provider === 'architect')
+          if ((options?.params as any)?.user_request)
             return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-          if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+          if ((options?.params as any)?.user_prompt)
+            return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
           return Promise.resolve(Result.ok('OK'));
         },
       },
@@ -108,24 +114,21 @@ describe('Intelligence Features Integration', () => {
 
     // 1. Manually add a failure record to evolution service
     const evolution = orchestrator.brain.getEvolution();
-    await evolution.recordFailure('PREVIOUS_STATE', { type: 'FAIL', reason: 'Too much coffee' } as unknown as Signal);
+    await evolution.recordEvent('PREVIOUS_STATE', { type: 'FAIL', reason: 'Too much coffee' } as unknown as Signal);
 
     let capturedArchitectPrompt = '';
 
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
-        if (config.provider === 'architect') {
+        // Architect Skill Detection
+        if ((options?.params as any)?.user_request) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
           capturedArchitectPrompt = ((options as any)?.params?.evolution_log as string) || '';
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
-        if (config.provider === 'architect') {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-          expect((options as any)?.params?.evolution_log).toContain('Strategic memory established');
-          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        }
-        if (config.provider === 'planner') {
+        // Planner Skill Detection
+        if ((options?.params as any)?.user_prompt) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
           expect((options as any)?.params?.project_name).toBe('IntelTest');
           return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
@@ -148,7 +151,7 @@ describe('Intelligence Features Integration', () => {
     // 1. First run records a failure
     const orchestrator1 = await fixture.initOrchestrator();
     const evolution1 = orchestrator1.brain.getEvolution();
-    await evolution1.recordFailure('TEST_STATE', { type: 'REPLAN', reason: 'Need more detail' } as unknown as Signal);
+    await evolution1.recordEvent('TEST_STATE', { type: 'REPLAN', reason: 'Need more detail' } as unknown as Signal);
 
     const logFile = orchestrator1.project.paths.log;
     expect(fs.existsSync(logFile)).toBe(true);
@@ -157,7 +160,7 @@ describe('Intelligence Features Integration', () => {
     const orchestrator2 = await fixture.initOrchestrator();
     const evolution2 = orchestrator2.brain.getEvolution();
     // Force load logic or check summary
-    const summary = evolution2.getLogSummary();
+    const summary = evolution2.retrieve('context');
 
     expect(summary).toContain('Need more detail');
     expect(summary).toContain('REPLAN');

@@ -12,6 +12,7 @@
  * - SignalDetectedError propagation from deep within agents.
  */
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { SignalDetectedError } from '../../src/errors/SignalDetectedError.js';
@@ -40,15 +41,20 @@ describe('Workflow Transition Edge Cases', () => {
 
     let rearchitected = false;
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (config.provider === 'planner') {
-        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        // @ts-ignore
+        if (options?.params?.user_prompt) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     // Trigger REARCHITECT via interaction
     fixture.mockHost.ask.mockImplementation(async (msg: string): Promise<string> => {
@@ -79,23 +85,26 @@ describe('Workflow Transition Edge Cases', () => {
 
     let rearchitected = false;
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (config.provider === 'planner') {
-        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
-      }
-      if (config.provider === 'executor') {
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        // @ts-ignore
+        if (options?.params?.user_prompt) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
+        }
+        // Executor logic
         if (!rearchitected) {
           rearchitected = true;
           // Properly use SignalDetectedError
           throw new SignalDetectedError(Signal.rearchitect('Need more structure'));
         }
         return Promise.resolve(Result.ok('OK'));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+      },
+    );
 
     await orchestrator.start('Complex task');
 

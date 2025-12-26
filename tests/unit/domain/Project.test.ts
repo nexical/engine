@@ -28,7 +28,7 @@ describe('Project', () => {
   });
 
   it('should ensure directory structure on initialization', () => {
-    expect(mockFileSystem.ensureDir).toHaveBeenCalledTimes(12); // count of ensureDir calls in ensureStructure
+    expect(mockFileSystem.ensureDir).toHaveBeenCalledTimes(14); // count of ensureDir calls in ensureStructure
   });
 
   describe('getConstraints', () => {

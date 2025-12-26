@@ -1,4 +1,6 @@
-import yaml from 'js-yaml';
+import fs from 'fs';
+import readline from 'readline';
+import path from 'path';
 import { z } from 'zod';
 
 import { IFileSystem } from '../domain/IFileSystem.js';
@@ -12,42 +14,29 @@ export const EvolutionEntrySchema = z.object({
   reason: z.string(),
   feedback: z.string().optional(),
   tasks_at_failure: z.array(z.string()).optional(),
+  context_tags: z.array(z.string()).optional(),
 });
 
 export type EvolutionEntry = z.infer<typeof EvolutionEntrySchema>;
 
 export interface IEvolutionService {
-  recordFailure(stateName: string, signal: Signal, completedTasks?: string[]): Promise<void>;
-  getLogSummary(): string;
+  recordEvent(stateName: string, signal: Signal, completedTasks?: string[], contextTags?: string[]): Promise<void>;
+  retrieve(context: string): Promise<string>;
 }
 
 export class EvolutionService implements IEvolutionService {
   constructor(
     private project: IProject,
     private disk: IFileSystem,
-  ) {}
+  ) { }
 
-  public async recordFailure(stateName: string, signal: Signal, completedTasks: string[] = []): Promise<void> {
+  public async recordEvent(
+    stateName: string,
+    signal: Signal,
+    completedTasks: string[] = [],
+    contextTags: string[] = [],
+  ): Promise<void> {
     const logPath = this.project.paths.log;
-    let logs: EvolutionEntry[] = [];
-
-    if (this.disk.exists(logPath)) {
-      try {
-        const content = this.disk.readFile(logPath);
-        const raw = yaml.load(content);
-        const result = z.array(EvolutionEntrySchema).safeParse(raw);
-        if (result.success) {
-          logs = result.data;
-        } else {
-          // eslint-disable-next-line no-console
-          console.error('Evolution log corrupted or invalid:', result.error);
-          // Decide whether to overwrite or backup. For now, we start fresh but log error.
-        }
-      } catch (_e) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to load evolution log:', _e);
-      }
-    }
 
     const newEntry: EvolutionEntry = {
       timestamp: new Date().toISOString(),
@@ -56,42 +45,127 @@ export class EvolutionService implements IEvolutionService {
       reason: signal.reason,
       feedback: signal.metadata?.feedback as string | undefined,
       tasks_at_failure: completedTasks,
+      context_tags: contextTags,
     };
 
-    logs.push(newEntry);
-    this.disk.writeFileAtomic(logPath, yaml.dump(logs));
-    await Promise.resolve();
+    // Append as JSON Line
+    const line = JSON.stringify(newEntry) + '\n';
+
+    // We use fs.appendFile via project.fileSystem if supported, or raw fs if IFileSystem assumes overwrites.
+    // IFileSystem usually has writeFile, not appendFile.
+    // So we use native fs for append optimization, assuming local environment (engine is local).
+    // The previous implementation loaded the whole file.
+
+    // Check if IFileSystem has append support? No.
+    // We'll use fs directly for efficiency if path is local.
+    await fs.promises.appendFile(logPath, line, 'utf8');
   }
 
-  public getLogSummary(): string {
-    const logPath = this.project.paths.log;
-    if (!this.disk.exists(logPath)) {
-      return 'No historical failures recorded.';
+  public async retrieve(context: string): Promise<string> {
+    const sections: string[] = [];
+
+    // 1. Short-Term Memory (Current Log)
+    const logSummary = await this.getShortTermMemory();
+    if (logSummary) {
+      sections.push(`## Recent Events (Short-Term Memory)\n${logSummary}`);
     }
 
+    // 2. Long-Term Wisdom (Topic-Based)
+    const wisdom = this.getLongTermWisdom(context);
+    if (wisdom) {
+      sections.push(`## Established Wisdom (Long-Term Memory)\n${wisdom}`);
+    }
+
+    if (sections.length === 0) {
+      return 'No historical failures or wisdom recorded.';
+    }
+
+    return sections.join('\n\n');
+  }
+
+  private async getShortTermMemory(): Promise<string | null> {
+    const logPath = this.project.paths.log;
+    if (!fs.existsSync(logPath)) return null;
+
+    const entries: EvolutionEntry[] = [];
+    const maxEntries = 20; // Keep last 20 events in context
+
     try {
-      const content = this.disk.readFile(logPath);
-      const raw = yaml.load(content);
-      const result = z.array(EvolutionEntrySchema).safeParse(raw);
+      const fileStream = fs.createReadStream(logPath);
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
 
-      if (!result.success) {
-        return 'Error reading evolution log (Invalid Schema).';
+      // Rolling buffer
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        try {
+          const entry = JSON.parse(line);
+          entries.push(entry);
+          if (entries.length > maxEntries) {
+            entries.shift();
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
 
-      const logs = result.data;
-      if (logs.length === 0) {
-        return 'No historical failures recorded.';
-      }
+      if (entries.length === 0) return null;
 
-      return logs
+      return entries
         .map((log, index) => {
-          let entry = `[Attempt ${index + 1}] At ${log.timestamp} during ${log.state}: ${log.signal_type} - ${log.reason}`;
+          let entry = `[Event ${index + 1}] At ${log.timestamp} during ${log.state}: ${log.signal_type} - ${log.reason}`;
           if (log.feedback) entry += `\nUser Feedback: ${log.feedback}`;
           return entry;
         })
         .join('\n\n');
-    } catch {
-      return 'Error reading evolution log.';
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to read evolution log:', e);
+      return null;
+    }
+  }
+
+  private getLongTermWisdom(context: string): string | null {
+    const indexPath = this.project.paths.evolutionIndex;
+    if (!this.disk.exists(indexPath)) return null;
+
+    try {
+      // Load Index
+      const indexContent = this.disk.readFile(indexPath);
+      const index = JSON.parse(indexContent) as Record<string, string>;
+
+      // Extract unique topics based on keyword matching
+      const foundTopics = new Set<string>();
+      const contextLower = context.toLowerCase();
+
+      for (const [keyword, topic] of Object.entries(index)) {
+        if (contextLower.includes(keyword.toLowerCase())) {
+          foundTopics.add(topic);
+        }
+      }
+
+      // Always include 'general' topic if it exists
+      foundTopics.add('general');
+
+      if (foundTopics.size === 0) return null;
+
+      // Read Topic Files
+      const wisdoms: string[] = [];
+      for (const topic of foundTopics) {
+        const topicPath = path.join(this.project.paths.evolutionTopics, `${topic}.md`);
+        if (this.disk.exists(topicPath)) {
+          const content = this.disk.readFile(topicPath);
+          wisdoms.push(`### Topic: ${topic}\n${content}`);
+        }
+      }
+
+      return wisdoms.join('\n\n');
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to retrieve long-term wisdom:', error);
+      return null;
     }
   }
 }

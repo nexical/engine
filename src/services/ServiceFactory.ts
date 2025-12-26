@@ -14,6 +14,7 @@ import { FileSystemBus } from './FileSystemBus.js';
 import { FileSystemService } from './FileSystemService.js';
 import { GitService } from './GitService.js';
 import { IPromptEngine, PromptEngine } from './PromptEngine.js';
+import { SignalService } from './SignalService.js';
 import { ISkillRegistry, SkillRegistry } from './SkillRegistry.js';
 
 export interface IEngineServices {
@@ -95,6 +96,11 @@ export class ServiceFactory {
       return new FileSystemBus(project, fs);
     });
 
+    container.registerFactory('signalService', () => {
+      const fs = container.resolve<IFileSystem>('fileSystem');
+      return new SignalService(fs as FileSystemService);
+    });
+
     // 5. Register Brain
     container.registerFactory('brain', () => {
       const project = container.resolve<IProject>('project');
@@ -151,7 +157,18 @@ export class ServiceFactory {
         const driverRegistry = container.resolve<DriverRegistry>('driverRegistry');
         const bus = container.resolve<FileSystemBus>('fileSystemBus');
         const promptEngine = container.resolve<IPromptEngine>('promptEngine');
-        return new Executor(project, workspace, skillRegistry, driverRegistry, host, gitService, bus, promptEngine);
+        const signalService = container.resolve<SignalService>('signalService');
+        return new Executor(
+          project,
+          workspace,
+          skillRegistry,
+          driverRegistry,
+          host,
+          gitService,
+          bus,
+          promptEngine,
+          signalService,
+        );
       });
 
       return brain;

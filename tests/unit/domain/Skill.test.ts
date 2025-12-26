@@ -28,7 +28,7 @@ describe('Skill', () => {
     mockClarificationHandler = jest.fn<(question: string) => Promise<string>>();
     mockCommandRunner = jest.fn<(command: string, args?: string[]) => Promise<string>>();
     mockDriverRegistry = {
-      getDriver: jest.fn(),
+      get: jest.fn(),
     };
     mockFileSystem = {};
 
@@ -102,7 +102,7 @@ describe('Skill', () => {
       const mockDriver = {
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('executed')),
       };
-      mockDriverRegistry.getDriver.mockReturnValue(mockDriver);
+      mockDriverRegistry.get.mockReturnValue(mockDriver);
 
       const result = await skill.execute(context);
 
@@ -122,7 +122,7 @@ describe('Skill', () => {
           execution: { provider: 'test-driver' },
         };
         const skill = new Skill(config);
-        mockDriverRegistry.getDriver.mockReturnValue({
+        mockDriverRegistry.get.mockReturnValue({
           execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
         });
 
@@ -181,7 +181,7 @@ describe('Skill', () => {
           execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('executed')),
         };
 
-        mockDriverRegistry.getDriver.mockReturnValueOnce(mockAnalysisDriver).mockReturnValueOnce(mockExeDriver);
+        mockDriverRegistry.get.mockReturnValueOnce(mockAnalysisDriver).mockReturnValueOnce(mockExeDriver);
 
         await skill.execute(context);
 
@@ -210,7 +210,7 @@ describe('Skill', () => {
           execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('executed')),
         };
 
-        mockDriverRegistry.getDriver
+        mockDriverRegistry.get
           .mockReturnValueOnce(mockAnalysisDriver)
           .mockReturnValueOnce(mockAnalysisDriver)
           .mockReturnValueOnce(mockExeDriver);
@@ -234,7 +234,7 @@ describe('Skill', () => {
         };
         const skill = new Skill(config);
 
-        mockDriverRegistry.getDriver.mockReturnValue({
+        mockDriverRegistry.get.mockReturnValue({
           execute: jest
             .fn<() => Promise<Result<string, Error>>>()
             .mockResolvedValue(Result.fail(new Error('analysis failed'))),
@@ -268,7 +268,7 @@ describe('Skill', () => {
           execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('executed')),
         };
 
-        mockDriverRegistry.getDriver
+        mockDriverRegistry.get
           .mockReturnValueOnce(mockAnalysisDriver)
           .mockReturnValueOnce(mockAnalysisDriver)
           .mockReturnValueOnce(mockExeDriver);
@@ -293,7 +293,7 @@ describe('Skill', () => {
       it('should fail if driver provider not found', async () => {
         const config: ISkillConfig = { name: 'test', description: 'desc', execution: { provider: 'missing' } };
         const skill = new Skill(config);
-        mockDriverRegistry.getDriver.mockReturnValue(undefined);
+        mockDriverRegistry.get.mockReturnValue(undefined);
 
         const result = await skill.execute(context);
         expect(result.isFail()).toBe(true);
@@ -320,7 +320,7 @@ describe('Skill', () => {
         const skill = new Skill({ ...config, analysis: { provider: '' } } as any);
         // If provider is empty string, it's falsey.
 
-        mockDriverRegistry.getDriver.mockReturnValue({
+        mockDriverRegistry.get.mockReturnValue({
           execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('exe')),
         });
 
@@ -350,7 +350,7 @@ describe('Skill', () => {
         // analysis_enabled false by default
       };
       const skill = new Skill(config);
-      mockDriverRegistry.getDriver.mockReturnValue({
+      mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('exe')),
       });
 
@@ -369,7 +369,7 @@ describe('Skill', () => {
         post_execution_commands: ['post-cmd'],
       };
       const skill = new Skill(config);
-      mockDriverRegistry.getDriver.mockReturnValue({
+      mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
       });
 
@@ -386,7 +386,7 @@ describe('Skill', () => {
         verification_strategy: { max_retries: 1 },
       };
       const skill = new Skill(config);
-      mockDriverRegistry.getDriver.mockReturnValue({
+      mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
       });
 
@@ -416,7 +416,7 @@ describe('Skill', () => {
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('verified')),
       };
 
-      mockDriverRegistry.getDriver.mockReturnValueOnce(mockExeDriver).mockReturnValueOnce(mockVerDriver);
+      mockDriverRegistry.get.mockReturnValueOnce(mockExeDriver).mockReturnValueOnce(mockVerDriver);
 
       const result = await skill.execute(context);
       expect(result.isOk()).toBe(true);
@@ -430,7 +430,7 @@ describe('Skill', () => {
         execution: { provider: 'exe' },
       };
       const skill = new Skill(config);
-      mockDriverRegistry.getDriver.mockReturnValue({
+      mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
       });
 
@@ -460,7 +460,7 @@ describe('Skill', () => {
           .mockResolvedValueOnce(Result.ok('verified')),
       };
 
-      mockDriverRegistry.getDriver
+      mockDriverRegistry.get
         .mockReturnValueOnce(mockExeDriver) // Try 1: Exe
         .mockReturnValueOnce(mockVerDriver) // Try 1: Ver
         .mockReturnValueOnce(mockExeDriver) // Try 2: Exe
@@ -484,7 +484,7 @@ describe('Skill', () => {
         verification_strategy: { max_retries: 1 },
       };
       const skill = new Skill(config);
-      mockDriverRegistry.getDriver.mockReturnValue({
+      mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
       });
       const mockValidator = jest

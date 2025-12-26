@@ -9,8 +9,38 @@ export interface IGitService {
   init(cwd?: string): void;
 }
 
+class SimpleMutex {
+  private queue: Promise<void> = Promise.resolve();
+
+  async run<T>(task: () => T | Promise<T>): Promise<T> {
+    const previous = this.queue;
+    let release: () => void;
+
+    const taskPromise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Append to queue, catching errors to ensure chain continuity
+    this.queue = this.queue.then(() => taskPromise).catch(() => taskPromise);
+
+    // Wait for previous
+    try {
+      await previous;
+    } catch {
+      // ignore previous errors
+    }
+
+    try {
+      return await task();
+    } finally {
+      release!();
+    }
+  }
+}
+
 export class GitService implements IGitService {
   private shell: ShellService;
+  private mutex = new SimpleMutex();
 
   constructor(
     private host: IRuntimeHost,

@@ -105,4 +105,4 @@ export const SkillSchema = z
     execution: z.record(z.string(), z.unknown()).optional(),
     verification: z.record(z.string(), z.unknown()).optional(),
   })
-  .strict();
+  .passthrough();

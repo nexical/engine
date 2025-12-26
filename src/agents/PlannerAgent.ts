@@ -33,19 +33,30 @@ export class PlannerAgent {
 
   public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {
     const constraints = this.project.getConstraints();
-    const evolutionLog = this.evolutionService.getLogSummary();
+    const evolutionLog = this.evolutionService.retrieve(userRequest);
+
+    const availableSkills = this.skillRegistry.getSkills().map((s) => ({
+      name: s.name,
+      description: s.description,
+    }));
 
     const params = {
       ...this.project.getConfig(),
       user_prompt: userRequest,
-      agent_skills: '[]', // Placeholder
+      agent_skills: JSON.stringify(availableSkills),
       plan_file: this.project.paths.planCurrent,
-      architecture: architecture.data,
+      architecture: architecture.content,
       global_constraints: constraints,
       personas_dir: this.project.paths.personas,
       active_signal: 'None',
       completed_tasks: 'None',
       evolution_log: evolutionLog,
+      allowed_signals: {
+        COMPLETE: 'Plan generated successfully.',
+        FAIL: 'Planning failed.',
+        CLARIFICATION_NEEDED: 'Clarification needed from user/architect on requirements.',
+        REARCHITECTURE: 'Current architecture cannot support the request; redesign needed.',
+      },
     };
 
     const skill = this.skillRegistry.getSkill('planner');

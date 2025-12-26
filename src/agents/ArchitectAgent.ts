@@ -29,19 +29,19 @@ export class ArchitectAgent {
     this.shell = new ShellService(host);
   }
 
-  public async runOracleMode(): Promise<void> {
-    this.host.log('info', 'Starting Architect Agent in Oracle Mode (watching inbox)...');
+  public async runOracleMode(mode: 'interactive' | 'non_interactive' = 'interactive'): Promise<void> {
+    this.host.log('info', `Starting Architect Agent in Oracle Mode (${mode}) (watching inbox)...`);
 
     // Watch inbox with sequential handler
     this.messageBus.watchInbox(async (msg) => {
-      await this.handleInboxMessage(msg);
+      await this.handleInboxMessage(msg, mode);
     });
 
     // Keep process alive
-    return new Promise(() => {});
+    return new Promise(() => { });
   }
 
-  private async handleInboxMessage(message: IBusMessage): Promise<void> {
+  private async handleInboxMessage(message: IBusMessage, mode: 'interactive' | 'non_interactive'): Promise<void> {
     const { id, correlationId, payload, source } = message;
     this.host.log('info', `Received request from ${source} (ID: ${id})`);
 
@@ -51,18 +51,73 @@ export class ArchitectAgent {
         return;
       }
 
-      if (signalData.type === SignalType.CLARIFICATION_NEEDED) {
+      if (signalData.status === SignalType.CLARIFICATION_NEEDED) {
         const questions = (signalData.metadata?.questions as string[]) || [signalData.reason];
-        // const context = signalData.metadata || {};
 
         this.host.log('info', `Processing clarification request for ${questions.length} questions.`);
 
         const answers: Record<string, string> = {};
 
+        // Load Feedback Skill
+        const feedbackSkill = this.skillRegistry.getSkill('feedback');
+        if (!feedbackSkill) {
+          this.host.log('warn', 'Feedback skill not found. Falling back to simple passthrough.');
+        }
+
         for (const q of questions) {
-          const answer = await this.host.ask(q);
-          const ansStr = typeof answer === 'string' ? answer : String(answer);
-          answers[q] = ansStr;
+          let finalAnswer = '';
+
+          // 1. Try to answer internally if skill exists
+          if (feedbackSkill) {
+            // Retrieve Context
+            const wisdom = this.evolution.retrieve(q);
+            const config = JSON.stringify(this.project.getConfig());
+
+            const context: ISkillContext = {
+              taskId: uuidv4(),
+              logger: this.host,
+              fileSystem: this.project.fileSystem,
+              driverRegistry: this.driverRegistry,
+              workspaceRoot: this.project.rootDirectory,
+              params: {
+                question: q,
+                context_summary: wisdom,
+                mode,
+                config,
+              },
+              userPrompt: 'Decide if you can answer this question.',
+              promptEngine: this.promptEngine,
+              clarificationHandler: async () => '', // No recursion
+              commandRunner: async () => '',
+              validators: [],
+            };
+
+            const result = await feedbackSkill.execute(context);
+            if (result.isOk()) {
+              try {
+                const decision = JSON.parse(result.unwrap());
+                if (decision.action === 'ANSWER') {
+                  finalAnswer = decision.response;
+                  this.host.log('info', `Architect answered autonomously: ${q}`);
+                }
+              } catch (e) {
+                this.host.log('error', `Failed to parse feedback skill response: ${e}`);
+              }
+            }
+          }
+
+          // 2. Fallback to User if no answer and interactive
+          if (!finalAnswer) {
+            if (mode === 'interactive') {
+              const answer = await this.host.ask(q);
+              finalAnswer = typeof answer === 'string' ? answer : String(answer);
+            } else {
+              finalAnswer = 'I cannot answer this in non-interactive mode and no autonomous answer was found.';
+              this.host.log('warn', `Non-interactive mode: Failed to answer '${q}' autonomously.`);
+            }
+          }
+
+          answers[q] = finalAnswer;
         }
 
         // Send response
@@ -73,7 +128,7 @@ export class ArchitectAgent {
           this.host.log('info', `Sent response to ${source} for ${correlationId}`);
         }
       } else {
-        this.host.log('warn', `Unknown message type: ${signalData.type}`);
+        this.host.log('warn', `Unknown message type: ${signalData.status}`);
       }
     } catch (error) {
       this.host.log(
@@ -85,7 +140,7 @@ export class ArchitectAgent {
 
   public async design(userRequest: string): Promise<Architecture> {
     const constraints = this.project.getConstraints();
-    const evolutionLog = this.evolution.getLogSummary();
+    const evolutionLog = this.evolution.retrieve(userRequest);
     const config = this.project.getConfig();
 
     const params = {
@@ -97,6 +152,11 @@ export class ArchitectAgent {
       architecture_file: this.project.paths.architectureCurrent,
       personas_dir: this.project.paths.personas,
       evolution_log: evolutionLog,
+      allowed_signals: {
+        COMPLETE: 'Design completed successfully.',
+        FAIL: 'Validation failed or unrecoverable error.',
+        CLARIFICATION_NEEDED: 'Ambiguities in the user request require clarification.',
+      },
     };
 
     const skill = this.skillRegistry.getSkill('architect');

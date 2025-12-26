@@ -13,6 +13,7 @@
  * - Driver execution exception handling.
  */
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -33,12 +34,16 @@ describe('Skill Failure Scenarios', () => {
     await fixture.writeConfig({ project_name: 'FailureTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.fail(new Error('LLM connection timed out')));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          return Promise.resolve(Result.fail(new Error('LLM connection timed out')));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('This will fail');
 
@@ -80,15 +85,20 @@ describe('Skill Failure Scenarios', () => {
     const orchestrator = await fixture.initOrchestrator();
 
     let attempt = 0;
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        attempt++;
-        if (attempt < 2) return Promise.resolve(Result.fail(new Error('Temporary error')));
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          attempt++;
+          if (attempt < 2) return Promise.resolve(Result.fail(new Error('Temporary error')));
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        // @ts-ignore
+        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Retry test');
 
@@ -107,15 +117,20 @@ describe('Skill Failure Scenarios', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (config.provider === 'planner') {
-        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        // @ts-ignore
+        if (options?.params?.user_prompt) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Template failure test');
 

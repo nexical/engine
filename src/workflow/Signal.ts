@@ -1,5 +1,5 @@
 export enum SignalType {
-  NEXT = 'NEXT',
+  NEXT = 'STATUS_NEXT',
   WAIT = 'WAIT',
   FAIL = 'FAIL',
   COMPLETE = 'COMPLETE',
@@ -10,9 +10,10 @@ export enum SignalType {
 }
 
 export interface ISignalJSON {
-  type: SignalType;
+  status: string; // Mapped from SignalType
   reason: string;
-  metadata: Record<string, unknown>;
+  artifacts?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export class Signal extends Error {
@@ -20,6 +21,7 @@ export class Signal extends Error {
     public readonly type: SignalType,
     public readonly reason: string = '',
     public readonly metadata: Record<string, unknown> = {},
+    public readonly artifacts: string[] = [],
   ) {
     super(reason);
     this.name = 'Signal';
@@ -51,13 +53,24 @@ export class Signal extends Error {
 
   toJSON(): ISignalJSON {
     return {
-      type: this.type,
+      status: this.type,
       reason: this.reason,
+      artifacts: this.artifacts,
       metadata: this.metadata,
     };
   }
 
   static fromJSON(json: ISignalJSON): Signal {
-    return new Signal(json.type, json.reason, json.metadata);
+    // Map status string back to SignalType if needed, or cast if 1:1
+    // We assume the JSON 'status' field holds values matching SignalType enum values (or their string representations)
+    // The plan implies 'status' property in JSON.
+
+    // Reverse lookup or direct cast.
+    // Let's assume strict mapping for now.
+    const type = Object.values(SignalType).includes(json.status as SignalType)
+      ? (json.status as SignalType)
+      : SignalType.FAIL; // Fallback?
+
+    return new Signal(type, json.reason, json.metadata, json.artifacts);
   }
 }

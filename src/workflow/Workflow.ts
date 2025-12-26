@@ -104,7 +104,7 @@ export class Workflow {
 
       // Record Signal in Evolution Log if it's a departure from normal flow
       if ([SignalType.FAIL, SignalType.REPLAN, SignalType.REARCHITECT].includes(signal.type)) {
-        await this.brain.getEvolution().recordFailure(this.currentState.name, signal, state.tasks.completed);
+        await this.brain.getEvolution().recordEvent(this.currentState.name, signal, state.tasks.completed);
         state.incrementLoop();
         await this.workspace.saveState(state);
       }

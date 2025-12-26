@@ -76,11 +76,13 @@ describe('PlannerAgent', () => {
 
     mockSkillRegistry = {
       getSkill: jest.fn().mockReturnValue(mockSkill),
+      getSkills: jest.fn().mockReturnValue([]),
     } as unknown as jest.Mocked<ISkillRegistry>;
 
     mockDriverRegistry = {} as unknown as jest.Mocked<DriverRegistry>;
 
     mockEvolution = {
+      retrieve: jest.fn(),
       getLogSummary: jest.fn(),
     } as unknown as jest.Mocked<IEvolutionService>;
 
@@ -111,7 +113,7 @@ describe('PlannerAgent', () => {
 
   describe('plan', () => {
     it('should create a plan successfully', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       const validYaml = 'plan_name: test\ntasks: []';
 
       mockSkill.execute.mockResolvedValue(Result.ok(validYaml));
@@ -128,21 +130,21 @@ describe('PlannerAgent', () => {
     });
 
     it('should throw if skill execution fails', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       mockSkill.execute.mockResolvedValue(Result.fail(new Error('Skill failed')));
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Skill failed');
     });
 
     it('should throw if skill not found', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       mockSkillRegistry.getSkill.mockReturnValue(undefined);
 
       await expect(agent.plan(mockArch, 'req')).rejects.toThrow("Skill 'planner' not found");
     });
 
     it('should throw and log error if plan YAML is invalid', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       const invalidYaml = 'invalid: yaml: : :';
       mockSkill.execute.mockResolvedValue(Result.ok(invalidYaml));
 
@@ -156,7 +158,7 @@ describe('PlannerAgent', () => {
         capturedContext = context;
         return Result.ok('plan_name: ok\ntasks: []');
       });
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       mockWorkspace.loadPlan.mockResolvedValue(new Plan('ok'));
 
       await agent.plan(mockArch, 'req');
@@ -207,7 +209,7 @@ describe('PlannerAgent', () => {
     });
 
     it('should handle non-Error exceptions during plan parsing', async () => {
-      const mockArch = { data: {} } as Architecture;
+      const mockArch = new Architecture('');
       mockSkill.execute.mockResolvedValue(Result.ok('plan_name: ok\ntasks: []'));
       // Mock Plan.fromYaml using spyOn since it's a static method on the imported class
       const planSpy = jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {

@@ -81,6 +81,8 @@ export class Project implements IProject {
     this.fileSystem.ensureDir(this.paths.prompts);
     this.fileSystem.ensureDir(this.paths.architecture);
     this.fileSystem.ensureDir(this.paths.plan);
+    this.fileSystem.ensureDir(this.paths.evolution);
+    this.fileSystem.ensureDir(this.paths.evolutionTopics);
     this.fileSystem.ensureDir(this.paths.personas);
     this.fileSystem.ensureDir(this.paths.drivers);
     this.fileSystem.ensureDir(this.paths.skills);
@@ -104,6 +106,10 @@ class ProjectPaths {
   public readonly plannerPrompt: string;
   public readonly skillPrompt: string;
 
+  public readonly evolution: string;
+  public readonly evolutionIndex: string;
+  public readonly evolutionTopics: string;
+
   public readonly constraints: string;
 
   public readonly architecture: string;
@@ -126,12 +132,16 @@ class ProjectPaths {
     this.ai = path.join(root, '.ai');
     this.config = path.join(this.ai, 'config.yml');
     this.state = path.join(this.ai, 'state.yml');
-    this.log = path.join(this.ai, 'log.yml');
+    this.log = path.join(this.ai, 'log.jsonl');
 
     this.prompts = path.join(this.ai, 'prompts');
     this.architecturePrompt = 'architect.md';
     this.plannerPrompt = 'planner.md';
     this.skillPrompt = 'skill.md';
+
+    this.evolution = path.join(this.ai, 'evolution');
+    this.evolutionIndex = path.join(this.evolution, 'index.json');
+    this.evolutionTopics = path.join(this.evolution, 'topics');
 
     this.constraints = path.join(root, 'AGENTS.md');
 

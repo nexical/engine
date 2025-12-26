@@ -14,6 +14,7 @@
 
 import fs from 'fs-extra';
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -36,21 +37,21 @@ describe('Full System Integration (Smoke Test)', () => {
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      }
-      if (config.provider === 'planner') {
-        return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
-      }
-      if (config.provider === 'executor') {
-        // Simulate work by writing a file
-        const { execSync } = await import('child_process');
-        execSync('echo "content" > built.txt'); // Writes to cwd (worktree)
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        // @ts-ignore
+        if (options?.params?.user_prompt) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        }
+        // Generic / Executor
         return Promise.resolve(Result.ok('OK'));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+      },
+    );
 
     await orchestrator.start('Build a landing page');
 
@@ -78,11 +79,16 @@ describe('Full System Integration (Smoke Test)', () => {
     }));
     const largePlan = ProjectFixture.createPlanResult(tasks);
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') return Promise.resolve(Result.ok(largeArchitecture));
-      if (config.provider === 'planner') return Promise.resolve(Result.ok(largePlan));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // @ts-ignore
+        if (options?.params?.user_request) return Promise.resolve(Result.ok(largeArchitecture));
+        // @ts-ignore
+        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(largePlan));
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Large prompt');
 

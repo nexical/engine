@@ -23,7 +23,7 @@ const mockGraph = {
 const MockWorkflowGraph = jest.fn().mockReturnValue(mockGraph);
 
 const mockBrain = { getEvolution: jest.fn() };
-const mockEvolution = { recordFailure: jest.fn() };
+const mockEvolution = { recordEvent: jest.fn() };
 mockBrain.getEvolution.mockReturnValue(mockEvolution);
 
 const mockWorkspace = { saveState: jest.fn() };
@@ -172,7 +172,7 @@ describe('Workflow Unit Tests', () => {
       expect.stringContaining('Workflow Failed: Unhandled error in ARCHITECTING'),
     );
     expect(engineState.status).toBe('FAILED');
-    expect(mockEvolution.recordFailure).toHaveBeenCalled();
+    expect(mockEvolution.recordEvent).toHaveBeenCalled();
   });
 
   it('should handle explicit FAIL signal', async () => {
@@ -185,7 +185,7 @@ describe('Workflow Unit Tests', () => {
       expect.stringContaining('Workflow Failed: Explicit Fail'),
     );
     expect(engineState.status).toBe('FAILED');
-    expect(mockEvolution.recordFailure).toHaveBeenCalled();
+    expect(mockEvolution.recordEvent).toHaveBeenCalled();
   });
 
   it('should complete successfully when COMPLETED state signals COMPLETE', async () => {

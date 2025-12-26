@@ -115,7 +115,7 @@ describe('ImageGenDriver', () => {
     expect(mockFileSystem.writeFile).toHaveBeenCalledWith('/test/custom.png', expect.anything());
   });
 
-  it('should throw error if no choices returned', async () => {
+  it('should trigger REPLAN if no choices returned', async () => {
     global.fetch = jest.fn(() => {
       return Promise.resolve({
         ok: true,
@@ -124,12 +124,11 @@ describe('ImageGenDriver', () => {
     }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw a cat' };
-    await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
-      'No image data returned from provider',
-    );
+    const res = await driver.run(skill, { ...mockContext, userPrompt: 'test' });
+    expect(res).toContain('Signal REPLAN triggered');
   });
 
-  it('should handle missing images property in response', async () => {
+  it('should trigger REPLAN if missing images property in response', async () => {
     global.fetch = jest.fn(() => {
       return Promise.resolve({
         ok: true,
@@ -138,9 +137,8 @@ describe('ImageGenDriver', () => {
     }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
-    await expect(driver.run(skill, { ...mockContext, userPrompt: 'test' })).rejects.toThrow(
-      'No image data returned from provider',
-    );
+    const res = await driver.run(skill, { ...mockContext, userPrompt: 'test' });
+    expect(res).toContain('Signal REPLAN triggered');
   });
 
   it('should handle data: image URLs', async () => {
@@ -204,14 +202,45 @@ describe('ImageGenDriver', () => {
     expect(body.image_config.image_size).toBe('1024x1024');
   });
 
-  it('should handle fetch/API errors gracefully', async () => {
+  it('should handle fetch/API errors gracefully by triggering REPLAN', async () => {
     global.fetch = jest.fn(() => {
       return Promise.reject(new Error('Network error'));
     }) as any;
 
     const skill = { name: 'gen', prompt_template: 'Draw' };
-    await expect(driver.run(skill, mockContext)).rejects.toThrow('Network error');
-    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Image generation failed'));
+    const res = await driver.run(skill, mockContext);
+    expect(res).toContain('Signal REPLAN triggered');
+    expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 3 failed'));
+  });
+
+  it('should trigger REPLAN signal if prompt_template is missing', async () => {
+    const invalidSkill = { name: 'gen' }; // missing prompt_template
+    const res = await driver.run(invalidSkill as any, mockContext);
+
+    expect(res).toContain('Signal REPLAN triggered');
+    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/sig_task-id_\d+\.json/),
+      expect.stringContaining('"status": "REPLAN"')
+    );
+  });
+
+  it('should retry 3 times and then trigger REPLAN signal on failure', async () => {
+    global.fetch = jest.fn(() => {
+      return Promise.reject(new Error('Persistent API Error'));
+    }) as any;
+
+    const skill = { name: 'gen', prompt_template: 'Draw' };
+    const res = await driver.run(skill, mockContext);
+
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(res).toContain('Signal REPLAN triggered');
+    expect(mockFileSystem.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/sig_task-id_\d+\.json/),
+      expect.stringContaining('"status": "REPLAN"')
+    );
+    expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 1 failed'));
+    expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 2 failed'));
+    expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 3 failed'));
   });
 
   it('should handle undefined context and missing rootDirectory in systemConfig', async () => {

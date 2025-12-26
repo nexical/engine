@@ -33,7 +33,7 @@ describe('Session', () => {
     mockBrain = {
       getEvolution: jest
         .fn<() => IEvolutionService>()
-        .mockReturnValue({ recordFailure: jest.fn() } as unknown as IEvolutionService),
+        .mockReturnValue({ recordEvent: jest.fn() } as unknown as IEvolutionService),
     } as unknown as jest.Mocked<Brain>;
     mockHost = {
       log: jest.fn(),
