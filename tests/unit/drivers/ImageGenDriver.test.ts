@@ -220,7 +220,7 @@ describe('ImageGenDriver', () => {
     expect(res).toContain('Signal REPLAN triggered');
     expect(mockFileSystem.writeFile).toHaveBeenCalledWith(
       expect.stringMatching(/sig_task-id_\d+\.json/),
-      expect.stringContaining('"status": "REPLAN"')
+      expect.stringContaining('"status": "REPLAN"'),
     );
   });
 
@@ -236,7 +236,7 @@ describe('ImageGenDriver', () => {
     expect(res).toContain('Signal REPLAN triggered');
     expect(mockFileSystem.writeFile).toHaveBeenCalledWith(
       expect.stringMatching(/sig_task-id_\d+\.json/),
-      expect.stringContaining('"status": "REPLAN"')
+      expect.stringContaining('"status": "REPLAN"'),
     );
     expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 1 failed'));
     expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Generation attempt 2 failed'));

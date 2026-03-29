@@ -32,8 +32,8 @@ export class PlannerAgent {
   }
 
   public async plan(architecture: Architecture, userRequest: string): Promise<Plan> {
-    const constraints = this.project.getConstraints();
-    const evolutionLog = this.evolutionService.retrieve(userRequest);
+    const constraints = await this.project.getConstraints();
+    const evolutionLog = await this.evolutionService.retrieve(userRequest);
 
     const availableSkills = this.skillRegistry.getSkills().map((s) => ({
       name: s.name,
@@ -41,7 +41,7 @@ export class PlannerAgent {
     }));
 
     const params = {
-      ...this.project.getConfig(),
+      ...(await this.project.getConfig()),
       user_prompt: userRequest,
       agent_skills: JSON.stringify(availableSkills),
       plan_file: this.project.paths.planCurrent,
@@ -79,7 +79,7 @@ export class PlannerAgent {
 
         this.host.log('info', `Planner requesting clarification: ${question}`);
 
-        this.bus.sendRequest({
+        await this.bus.sendRequest({
           id: uuidv4(),
           correlationId,
           source: 'planner',

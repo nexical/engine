@@ -1,7 +1,7 @@
 import path from 'path';
 
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
-import { Signal, SignalType } from '../workflow/Signal.js';
+import { ISignalJSON, Signal, SignalType } from '../workflow/Signal.js';
 import { FileSystemService } from './FileSystemService.js';
 
 export class SignalService {
@@ -25,11 +25,11 @@ export class SignalService {
    * @returns The highest priority signal found, or null.
    */
   public async getHighestPrioritySignal(signalsDir: string): Promise<Signal | null> {
-    if (!this.fs.isDirectory(signalsDir)) {
+    if (!(await this.fs.isDirectory(signalsDir))) {
       return null;
     }
 
-    const files = this.fs.listFiles(signalsDir).filter((f) => f.endsWith('.json'));
+    const files = (await this.fs.listFiles(signalsDir)).filter((f) => f.endsWith('.json'));
     if (files.length === 0) {
       return null;
     }
@@ -39,9 +39,9 @@ export class SignalService {
     for (const file of files) {
       try {
         const filePath = path.join(signalsDir, file);
-        const content = this.fs.readFile(filePath);
+        const content = await this.fs.readFile(filePath);
 
-        const json = JSON.parse(content);
+        const json = JSON.parse(content) as ISignalJSON;
         const signal = Signal.fromJSON(json);
         signals.push(signal);
       } catch (e) {
@@ -72,24 +72,24 @@ export class SignalService {
     const content = JSON.stringify(json, null, 2);
     // Ensure directory exists
     const dir = path.dirname(filePath);
-    if (!this.fs.exists(dir)) {
+    if (!(await this.fs.exists(dir))) {
       // We assume FileSystemService doesn't have mkdirp, so we might need to rely on the caller or add it.
       // But typically .ai/signals should exist.
       // Let's safe-guard if possible, or assume it exists.
       // FileSystemService usually wraps fs, let's assume valid path.
     }
-    this.fs.writeFile(filePath, content);
+    await this.fs.writeFile(filePath, content);
   }
 
   /**
    * Clears a specific signal file or all signals if no file provided (use with caution).
    */
   public async clearSignals(signalsDir: string): Promise<void> {
-    if (this.fs.isDirectory(signalsDir)) {
-      const files = this.fs.listFiles(signalsDir);
+    if (await this.fs.isDirectory(signalsDir)) {
+      const files = await this.fs.listFiles(signalsDir);
       for (const file of files) {
         if (file.endsWith('.json')) {
-          this.fs.deleteFile(path.join(signalsDir, file));
+          await this.fs.deleteFile(path.join(signalsDir, file));
         }
       }
     }

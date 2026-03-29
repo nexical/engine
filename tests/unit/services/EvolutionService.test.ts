@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { jest } from '@jest/globals';
 
 // Mock Node.js fs module
@@ -33,6 +32,10 @@ jest.unstable_mockModule('readline', () => ({
 // Import dependencies
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IProject } from '../../../src/domain/Project.js';
+import {
+  EvolutionService as EvolutionServiceClass,
+  IEvolutionService,
+} from '../../../src/services/EvolutionService.js';
 import { Signal, SignalType } from '../../../src/workflow/Signal.js';
 
 // Standalone mock variables for IFileSystem
@@ -41,9 +44,8 @@ const mockReadFile = jest.fn<IFileSystem['readFile']>();
 const mockWriteFileAtomic = jest.fn<IFileSystem['writeFileAtomic']>();
 
 describe('EvolutionService', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let EvolutionService: any;
-  let service: any;
+  let EvolutionService: typeof EvolutionServiceClass;
+  let service: IEvolutionService;
   let mockProject: jest.Mocked<IProject>;
   let mockFileSystem: jest.Mocked<IFileSystem>;
 
@@ -56,14 +58,17 @@ describe('EvolutionService', () => {
     mockCreateReadStream.mockClear();
     mockExistsSync.mockClear();
     mockCreateInterface.mockReset();
-    mockCreateInterface.mockReturnValue(mockRl); // Restore implementation
+    mockCreateInterface.mockReturnValue(mockRl as unknown as ReturnType<typeof mockCreateInterface>); // Restore implementation
 
     mockExists.mockReset();
     mockReadFile.mockReset();
     mockWriteFileAtomic.mockReset();
     // Default mock implementation
     mockRl[Symbol.asyncIterator].mockImplementation(async function* () {
-      // yield nothing by default
+      await Promise.resolve();
+      for (const line of []) {
+        yield line;
+      }
     });
 
     mockFileSystem = {
@@ -95,7 +100,7 @@ describe('EvolutionService', () => {
     expect(callArgs[0]).toBe('evolution.jsonl');
 
     // Check if valid JSON
-    const content = JSON.parse(callArgs[1]);
+    const content = JSON.parse(callArgs[1]) as Record<string, unknown>;
     expect(content).toMatchObject({
       state: 'state',
       signal_type: 'FAIL',
@@ -114,6 +119,7 @@ describe('EvolutionService', () => {
 
     mockRl[Symbol.asyncIterator].mockImplementation(async function* () {
       for (const line of lines) {
+        await Promise.resolve();
         yield line;
       }
     });
@@ -129,7 +135,7 @@ describe('EvolutionService', () => {
 
   it('should handle missing log for retrieve', async () => {
     mockExistsSync.mockReturnValue(false); // fs.existsSync
-    mockExists.mockReturnValue(false); // disk.exists (for index)
+    mockExists.mockReturnValue(false as unknown as boolean); // disk.exists (for index)
 
     const summary = await service.retrieve('');
     expect(summary).toBe('No historical failures or wisdom recorded.');
@@ -159,5 +165,97 @@ describe('EvolutionService', () => {
     expect(summary).toContain('## Established Wisdom (Long-Term Memory)');
     expect(summary).toContain('### Topic: git');
     expect(summary).toContain('Git rules.');
+  });
+
+  it('should shift entries when maxEntries is reached in getShortTermMemory', async () => {
+    mockExistsSync.mockReturnValue(true);
+
+    const manyLines = Array.from({ length: 25 }, (_, i) =>
+      JSON.stringify({
+        timestamp: String(i),
+        state: 'S' + i,
+        signal_type: 'T',
+        reason: 'R',
+      }),
+    );
+
+    mockRl[Symbol.asyncIterator].mockImplementation(async function* () {
+      for (const line of manyLines) {
+        await Promise.resolve();
+        yield line;
+      }
+    });
+
+    const summary = await service.retrieve('');
+
+    // It should keep last 20 entries (0-24 -> 5-24)
+    expect(summary).not.toContain('S0');
+    expect(summary).not.toContain('S4');
+    expect(summary).toContain('S5');
+    expect(summary).toContain('S24');
+  });
+
+  it('should handle read stream errors in getShortTermMemory', async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockCreateReadStream.mockImplementation(() => {
+      throw new Error('Stream crash');
+    });
+
+    // Silence console error for clean test report
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const summary = await service.retrieve('');
+    expect(summary).not.toContain('Short-Term Memory');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to read evolution log:', expect.any(Error));
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle index parse error in getLongTermWisdom', async () => {
+    mockExists.mockReturnValue(true as unknown as boolean);
+    mockReadFile.mockReturnValue('invalid-json');
+
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const summary = await service.retrieve('test');
+    expect(summary).not.toContain('Long-Term Memory');
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to retrieve long-term wisdom:', expect.any(Error));
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle empty lines and parse errors in getShortTermMemory', async () => {
+    mockExistsSync.mockReturnValue(true);
+    mockCreateReadStream.mockReturnValue({} as unknown);
+    const lines = [
+      '',
+      '   ',
+      'invalid-json',
+      JSON.stringify({ timestamp: '1', state: 'S1', signal_type: 'T1', reason: 'R1' }),
+    ];
+
+    mockRl[Symbol.asyncIterator].mockImplementation(async function* () {
+      for (const line of lines) {
+        await Promise.resolve();
+        yield line;
+      }
+    });
+
+    const summary = await service.retrieve('');
+    expect(summary).toContain('S1');
+    expect(summary.match(/\[Event/g)).toHaveLength(1);
+  });
+
+  it('should return null if all lines in log are invalid', async () => {
+    mockExistsSync.mockReturnValue(true);
+    const lines = ['bad1', 'bad2'];
+
+    mockRl[Symbol.asyncIterator].mockImplementation(async function* () {
+      for (const line of lines) {
+        await Promise.resolve();
+        yield line;
+      }
+    });
+
+    const summary = await service.retrieve('');
+    expect(summary).toBe('No historical failures or wisdom recorded.');
   });
 });

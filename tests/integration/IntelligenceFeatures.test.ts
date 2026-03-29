@@ -45,10 +45,11 @@ describe('Intelligence Features Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        // @ts-ignore
-        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+
+        if ((options?.params as Record<string, unknown>)?.user_prompt)
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
         return Promise.resolve(Result.ok('OK'));
       },
     );
@@ -83,15 +84,13 @@ describe('Intelligence Features Integration', () => {
           return Promise.resolve(true);
         },
         execute: async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-          const projectName = ((options?.params as any)?.project_name as string) || '';
+          const params = (options?.params as Record<string, unknown>) || {};
+          const projectName = (params.project_name as string) || '';
           if (projectName.includes('PersonaTest')) {
             capturedPrompt = projectName;
           }
-          if ((options?.params as any)?.user_request)
-            return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-          if ((options?.params as any)?.user_prompt)
-            return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+          if (params.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+          if (params.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
           return Promise.resolve(Result.ok('OK'));
         },
       },
@@ -121,16 +120,15 @@ describe('Intelligence Features Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options: IDriverContext | undefined): Promise<Result<string, Error>> => {
+        const params = (options?.params as Record<string, unknown>) || {};
         // Architect Skill Detection
-        if ((options?.params as any)?.user_request) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-          capturedArchitectPrompt = ((options as any)?.params?.evolution_log as string) || '';
+        if (params.user_request) {
+          capturedArchitectPrompt = (params.evolution_log as string) || '';
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
         // Planner Skill Detection
-        if ((options?.params as any)?.user_prompt) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-          expect((options as any)?.params?.project_name).toBe('IntelTest');
+        if (params.user_prompt) {
+          expect(params.project_name).toBe('IntelTest');
           return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
         }
         return Promise.resolve(Result.ok('OK'));
@@ -160,7 +158,7 @@ describe('Intelligence Features Integration', () => {
     const orchestrator2 = await fixture.initOrchestrator();
     const evolution2 = orchestrator2.brain.getEvolution();
     // Force load logic or check summary
-    const summary = evolution2.retrieve('context');
+    const summary = await evolution2.retrieve('context');
 
     expect(summary).toContain('Need more detail');
     expect(summary).toContain('REPLAN');

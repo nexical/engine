@@ -34,7 +34,7 @@ export class ImageGenDriver extends BaseDriver<ISkillContext, string> {
 
     // Check for required parameters validation
     if (!promptTemplate) {
-      await this.writeSignal(context, 'REPLAN', 'Missing required parameter: prompt_template');
+      void this.writeSignal(context, 'REPLAN', 'Missing required parameter: prompt_template');
       return 'Signal REPLAN triggered: Missing prompt_template';
     }
 
@@ -61,7 +61,7 @@ export class ImageGenDriver extends BaseDriver<ISkillContext, string> {
     this.host.log('debug', `Resolution: ${resolution} `);
 
     const maxRetries = 3;
-    let lastError: Error | unknown;
+    let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -142,27 +142,14 @@ export class ImageGenDriver extends BaseDriver<ISkillContext, string> {
 
         // Ensure directory exists
         const disk = context?.fileSystem || this.fileSystem;
-        // Assuming disk interface doesn't have mkdirp, but we can assume parent exists or try to write.
-        // Executor creates hydration, but maybe not deep paths.
-        // With 'fs' we would do mkdirSync. With `disk`, we might crash if dir missing.
-        // Let's assume rootDir is safe.
 
         // Convert base64 to Buffer
-        // We need to write this to file. `disk.writeFile` accepts string or Buffer?
-        // Base class `IFileSystem` usually `writeFile(path: string, content: string): Promise<void>`.
-        // Wait, standard `FileSystemService` uses `fs.outputFile` which supports Buffer.
-        // But strict typing might be string.
-        // Let's check `IFileSystem` interface?
-        // Assuming it supports string content. Writing binary as base64 string might not work if it expects text.
-        // If `disk.writeFile` takes string, we should check if we can write binary.
-        // Using `Buffer.from(base64Data, 'base64')` creates a Buffer.
-        // If `disk.writeFile` accepts `string | Buffer`, good.
         // If not, we might fail.
         // Reverting to `BaseDriver` assumptions: `this.fileSystem` is `FileSystemService` in prod.
         // `FileSystemService.writeFile` implementation usually uses `fs-extra` which handles Buffer.
         // Let's cast to any to be safe or assume Buffer is ok.
 
-        await disk.writeFile(outputPath, Buffer.from(base64Data, 'base64') as unknown as string);
+        void disk.writeFile(outputPath, Buffer.from(base64Data, 'base64') as unknown as string);
 
         this.host.log('info', `Image saved to: ${outputPath} `);
         return `Image generated and saved to: ${outputPath} `;
@@ -212,7 +199,8 @@ export class ImageGenDriver extends BaseDriver<ISkillContext, string> {
       },
     };
 
-    await fs.writeFile(filePath, JSON.stringify(signalContent, null, 2));
+    void fs.writeFile(filePath, JSON.stringify(signalContent, null, 2));
     this.host.log('info', `Signal ${status} written to ${filePath}`);
+    await Promise.resolve();
   }
 }

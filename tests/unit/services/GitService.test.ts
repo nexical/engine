@@ -220,4 +220,41 @@ describe('GitService', () => {
       expect.objectContaining({ cwd: '/path' }),
     );
   });
+
+  describe('SimpleMutex', () => {
+    it('should run tasks sequentially', async () => {
+      const mutex = (service as unknown as { mutex: { run: (fn: () => Promise<void>) => Promise<void> } }).mutex;
+      const order: number[] = [];
+      const t1 = mutex.run(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        order.push(1);
+      });
+      const t2 = mutex.run(async () => {
+        order.push(2);
+        await Promise.resolve();
+      });
+      await Promise.all([t1, t2]);
+      expect(order).toEqual([1, 2]);
+    });
+
+    it('should ignore previous errors in mutex chain', async () => {
+      const mutex = (service as unknown as { mutex: { run: (fn: () => Promise<void>) => Promise<void> } }).mutex;
+      const order: number[] = [];
+      const t1 = mutex.run(async () => {
+        await Promise.resolve();
+        throw new Error('fail');
+      });
+      const t2 = mutex.run(async () => {
+        order.push(2);
+        await Promise.resolve();
+      });
+      try {
+        await t1;
+      } catch {
+        /* ignore */
+      }
+      await t2;
+      expect(order).toEqual([2]);
+    });
+  });
 });

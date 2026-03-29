@@ -46,8 +46,8 @@ describe('Workflow Robustness Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request) {
           return Promise.resolve(Result.fail(new Error('Infinite loop trigger')));
         }
         return Promise.resolve(Result.ok('OK'));
@@ -62,7 +62,7 @@ describe('Workflow Robustness Integration', () => {
 
   test('should retreat to PLANNING from EXECUTING when SignalDetectedError:REPLAN occurs (Scenario 8)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'RetreatTest' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
     const orchestrator = await fixture.initOrchestrator();
 
     let replaned = false;
@@ -70,12 +70,12 @@ describe('Workflow Robustness Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request) {
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
-        // @ts-ignore
-        if (options?.params?.user_prompt) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt) {
           const taskId = replaned ? 't2' : 't1';
           return Promise.resolve(
             Result.ok(
@@ -108,16 +108,17 @@ describe('Workflow Robustness Integration', () => {
 
   test('should interrupt execution when an external signal is detected (Scenario 14)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'InterruptTest' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
     const orchestrator = await fixture.initOrchestrator();
 
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        // @ts-ignore
-        if (options?.params?.user_prompt)
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt)
           return Promise.resolve(
             Result.ok(
               ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'msg', description: 'desc' }]),

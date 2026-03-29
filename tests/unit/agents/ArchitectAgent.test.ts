@@ -200,7 +200,7 @@ describe('ArchitectAgent', () => {
           source: 'planner',
           correlationId: 'corr1',
           payload: {
-            type: SignalType.CLARIFICATION_NEEDED,
+            status: SignalType.CLARIFICATION_NEEDED,
             metadata: {
               questions: ['Q1', 'Q2'],
             },
@@ -227,7 +227,7 @@ describe('ArchitectAgent', () => {
           source: 'planner',
           correlationId: 'corr1',
           payload: {
-            type: SignalType.CLARIFICATION_NEEDED,
+            status: SignalType.CLARIFICATION_NEEDED,
             reason: 'Why?',
           },
         };
@@ -247,7 +247,7 @@ describe('ArchitectAgent', () => {
           id: 'msg1',
           source: 'planner',
           payload: {
-            type: SignalType.CLARIFICATION_NEEDED,
+            status: SignalType.CLARIFICATION_NEEDED,
             reason: 'Q',
           },
         };
@@ -259,13 +259,101 @@ describe('ArchitectAgent', () => {
         expect(mockBus.sendResponse).not.toHaveBeenCalled();
       });
 
+      it('should handle autonomous answer from feedback skill', async () => {
+        const mockFeedbackSkill = {
+          execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(
+            Result.ok(
+              JSON.stringify({
+                action: 'ANSWER',
+                response: 'Autonomous Answer',
+              }),
+            ),
+          ),
+        };
+        mockSkillRegistry.getSkill.mockReturnValue(mockFeedbackSkill as any);
+
+        const msg = {
+          id: 'msg-auto',
+          source: 'executor',
+          correlationId: 'corr-id-auto',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Question 1'] },
+          },
+        };
+
+        await messageHandler(msg as any);
+
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr-id-auto', {
+          answers: { 'Question 1': 'Autonomous Answer' },
+        });
+      });
+
+      it('should handle non-string answer from host.ask', async () => {
+        mockSkillRegistry.getSkill.mockReturnValue(undefined);
+        mockHost.ask.mockResolvedValue(42 as any);
+
+        const msg = {
+          id: 'msg-num',
+          source: 'executor',
+          correlationId: 'corr-id-num',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Numeric?'] },
+          },
+        };
+
+        await messageHandler(msg as any);
+
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr-id-num', {
+          answers: { 'Numeric?': '42' },
+        });
+      });
+
+      it('should handle non-interactive mode failure to answer', async () => {
+        const nonInteractiveAgent = new ArchitectAgent(
+          mockProject,
+          mockWorkspace,
+          mockSkillRegistry,
+          mockDriverRegistry,
+          mockEvolution,
+          mockHost,
+          mockBus,
+          mockPromptEngine,
+        );
+        (nonInteractiveAgent as any).runOracleMode('non_interactive');
+        const niHandler = mockBus.watchInbox.mock.calls[mockBus.watchInbox.mock.calls.length - 1][0] as any;
+
+        mockSkillRegistry.getSkill.mockReturnValue(undefined);
+
+        const msg = {
+          id: 'msg-silent',
+          source: 'executor',
+          correlationId: 'corr-id-silent',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Silent?'] },
+          },
+        };
+
+        await niHandler(msg as any);
+
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr-id-silent', {
+          answers: { 'Silent?': expect.stringContaining('I cannot answer this in non-interactive mode') },
+        });
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'warn',
+          expect.stringContaining('Non-interactive mode: Failed to answer'),
+        );
+      });
+
       it('should handle non-string answers in inbox handler', async () => {
         const msg: IBusMessage = {
           id: 'msg1',
           source: 'planner',
           correlationId: 'corr1',
           payload: {
-            type: SignalType.CLARIFICATION_NEEDED,
+            status: SignalType.CLARIFICATION_NEEDED,
             reason: 'Count?',
           },
         };
@@ -285,7 +373,7 @@ describe('ArchitectAgent', () => {
           id: 'msg1',
           source: 'test',
           payload: {
-            type: 'UNKNOWN_TYPE',
+            status: 'UNKNOWN_TYPE',
           },
         };
 
@@ -299,7 +387,7 @@ describe('ArchitectAgent', () => {
           id: 'msg1',
           source: 'planner',
           payload: {
-            type: SignalType.CLARIFICATION_NEEDED,
+            status: SignalType.CLARIFICATION_NEEDED,
             reason: 'Q',
           },
         };
@@ -309,6 +397,209 @@ describe('ArchitectAgent', () => {
         await messageHandler(msg);
 
         expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to handle inbox message'));
+      });
+
+      it('should return early on invalid payload type', async () => {
+        const msg: IBusMessage = {
+          id: 'msg1',
+          source: 'test',
+          payload: 'not-an-object' as any,
+        };
+
+        await messageHandler(msg);
+
+        // Should just return without logging warn/error for unknown type if payload isn't an object
+        expect(mockHost.log).not.toHaveBeenCalledWith('warn', expect.stringContaining('Unknown message type'));
+        expect(mockHost.log).not.toHaveBeenCalledWith('error', expect.any(String));
+      });
+
+      it('should use feedback skill for autonomous answering', async () => {
+        const msg: IBusMessage = {
+          id: 'msg1',
+          source: 'planner',
+          correlationId: 'corr1',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Q1'] },
+          },
+        };
+
+        const mockFeedbackSkill = {
+          execute: jest
+            .fn<() => Promise<Result<string, Error>>>()
+            .mockResolvedValue(Result.ok(JSON.stringify({ action: 'ANSWER', response: 'Auto-A1' }))),
+          getEnvironmentSpec: jest.fn().mockReturnValue({}),
+        };
+
+        mockSkillRegistry.getSkill.mockImplementation((name) => {
+          if (name === 'feedback') return mockFeedbackSkill as any;
+          if (name === 'architect') return mockSkill as any;
+          return undefined;
+        });
+
+        await messageHandler(msg);
+
+        expect(mockFeedbackSkill.execute).toHaveBeenCalled();
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr1', {
+          answers: { Q1: 'Auto-A1' },
+        });
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'info',
+          expect.stringContaining('Architect answered autonomously: Q1'),
+        );
+      });
+
+      it('should handle feedback skill parse error', async () => {
+        const msg: IBusMessage = {
+          id: 'msg1',
+          source: 'planner',
+          correlationId: 'corr1',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Q1'] },
+          },
+        };
+
+        const mockFeedbackSkill = {
+          execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('invalid-json')),
+          getEnvironmentSpec: jest.fn().mockReturnValue({}),
+        };
+
+        mockSkillRegistry.getSkill.mockImplementation((name) => {
+          if (name === 'feedback') return mockFeedbackSkill as any;
+          return undefined;
+        });
+
+        mockHost.ask.mockResolvedValue('Manual answer');
+
+        await messageHandler(msg);
+
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'error',
+          expect.stringContaining('Failed to parse feedback skill response'),
+        );
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr1', {
+          answers: { Q1: 'Manual answer' },
+        });
+      });
+
+      it('should handle non-interactive mode failure to answer autonomously', async () => {
+        // Redefine agent for non_interactive mode
+        const nonInteractiveAgent = new ArchitectAgent(
+          mockProject,
+          mockWorkspace,
+          mockSkillRegistry,
+          mockDriverRegistry,
+          mockEvolution,
+          mockHost,
+          mockBus,
+          mockPromptEngine,
+        );
+        (nonInteractiveAgent as any).runOracleMode('non_interactive');
+        const niHandler = mockBus.watchInbox.mock.calls[mockBus.watchInbox.mock.calls.length - 1][0] as any;
+
+        const msg: IBusMessage = {
+          id: 'msg1',
+          source: 'planner',
+          correlationId: 'corr1',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Q1'] },
+          },
+        };
+
+        // No autonomous answer
+        mockSkillRegistry.getSkill.mockReturnValue(undefined);
+
+        await niHandler(msg);
+
+        expect(mockBus.sendResponse).toHaveBeenCalledWith('corr1', {
+          answers: { Q1: expect.stringContaining('I cannot answer this in non-interactive mode') },
+        });
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'warn',
+          expect.stringContaining('Non-interactive mode: Failed to answer'),
+        );
+      });
+
+      it('should handle payload as null', async () => {
+        const msg: IBusMessage = {
+          id: 'm1',
+          source: 't',
+          payload: null as any,
+        };
+        await messageHandler(msg);
+        expect(mockHost.log).not.toHaveBeenCalledWith('warn', expect.stringContaining('Unknown message type'));
+      });
+
+      it('should cover String(error) in handleInboxMessage catch block', async () => {
+        const msg: IBusMessage = {
+          id: 'm1',
+          source: 't',
+          payload: { status: SignalType.CLARIFICATION_NEEDED, reason: 'Q' },
+        };
+        // Mock feedback skill retrieval to throw a string
+        mockSkillRegistry.getSkill.mockImplementation(() => {
+          throw 'string throw';
+        });
+        await messageHandler(msg);
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'error',
+          expect.stringContaining('Failed to handle inbox message: string throw'),
+        );
+      });
+
+      it('should cover anonymous handlers in feedback skill context', async () => {
+        const msg: IBusMessage = {
+          id: 'msg1',
+          source: 'planner',
+          correlationId: 'corr1',
+          payload: {
+            status: SignalType.CLARIFICATION_NEEDED,
+            metadata: { questions: ['Q1'] },
+          },
+        };
+
+        let feedbackContext: any;
+        const mockFeedbackSkill = {
+          execute: jest.fn<(ctx: any) => Promise<Result<string, Error>>>().mockImplementation(async (ctx: any) => {
+            feedbackContext = ctx;
+            return Result.ok(JSON.stringify({ action: 'ANSWER', response: 'A1' }));
+          }),
+          getEnvironmentSpec: jest.fn().mockReturnValue({}),
+        };
+
+        mockSkillRegistry.getSkill.mockImplementation((name) => {
+          if (name === 'feedback') return mockFeedbackSkill as any;
+          return undefined;
+        });
+
+        await messageHandler(msg);
+
+        // Call the anonymous handlers to cover them
+        const ans = await feedbackContext.clarificationHandler();
+        const out = await feedbackContext.commandRunner();
+        expect(ans).toBe('');
+        expect(out).toBe('');
+      });
+    });
+
+    describe('design edge cases', () => {
+      it('should handle project config fallbacks', async () => {
+        mockProject.getConfig.mockReturnValue({ max_worktrees: 4 } as any); // Minimal valid config
+        mockSkill.execute.mockResolvedValue(Result.ok('architecture: ok'));
+        mockWorkspace.getArchitecture.mockResolvedValue({} as Architecture);
+
+        await agent.design('req');
+
+        const capturedParams = (mockSkill.execute.mock.calls[0][0] as any).params;
+        expect(capturedParams.project_name).toBe('Nexical Project');
+        expect(capturedParams.environment).toBe('development');
+      });
+
+      it('should handle skill.execute returning fail without error', async () => {
+        mockSkill.execute.mockResolvedValue(Result.fail(undefined as any));
+        await expect(agent.design('req')).rejects.toThrow('Skill execution failed');
       });
     });
   });

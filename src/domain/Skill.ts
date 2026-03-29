@@ -160,7 +160,10 @@ export class Skill {
   ): Promise<Result<string, Error>> {
     const driverConfig = this.config[phase];
     if (!driverConfig || !driverConfig.provider) {
-      if (phase === 'execution') return Result.fail(new Error('Execution driver not configured'));
+      if (phase === 'execution') {
+        context.logger.log('error', `Execution driver not configured inside Skill: ${JSON.stringify(this.config)}`);
+        return Result.fail(new Error('Execution driver not configured'));
+      }
       return Result.ok('Skipped');
     }
 

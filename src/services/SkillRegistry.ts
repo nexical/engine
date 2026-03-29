@@ -29,8 +29,7 @@ export class SkillRegistry implements ISkillRegistry {
   ) {}
 
   async init(): Promise<void> {
-    this.loadYamlSkills();
-    return Promise.resolve();
+    await this.loadYamlSkills();
   }
 
   getSkill(name: string): Skill | undefined {
@@ -41,31 +40,39 @@ export class SkillRegistry implements ISkillRegistry {
     return Array.from(this.skills.values());
   }
 
-  private loadYamlSkills(): void {
+  private async loadYamlSkills(): Promise<void> {
     const searchConfig: { path: string; name: string }[] = [
       { path: path.join(__dirname, '../skills'), name: 'Default' },
       { path: this.project.paths.skills, name: 'User' },
     ];
 
     for (const config of searchConfig) {
-      if (!this.project.fileSystem.isDirectory(config.path)) {
+      if (!(await this.project.fileSystem.isDirectory(config.path))) {
         continue;
       }
 
       this.host.log('debug', `Loading ${config.name} skills from: ${config.path}`);
-      const files = this.project.fileSystem.listFiles(config.path);
+      const files = await this.project.fileSystem.listFiles(config.path);
 
       for (const filename of files) {
         if (filename.endsWith('.skill.yml') || filename.endsWith('.skill.yaml') || filename.endsWith('.yml')) {
           const filePath = path.join(config.path, filename);
           try {
-            const content = this.project.fileSystem.readFile(filePath);
+            const content = await this.project.fileSystem.readFile(filePath);
             const profile = yaml.load(content);
             const parsedConfig = SkillSchema.parse(profile) as ISkillConfig;
 
             const skill = new Skill(parsedConfig);
-            // Verify drivers exist? (Optional optimization)
-            // We can iterate env/drivers and check registry.
+            // Verify drivers exist and validate their config
+            for (const phase of ['analysis', 'execution', 'verification'] as const) {
+              const driverConfig = parsedConfig[phase];
+              if (driverConfig?.provider) {
+                const driver = this.driverRegistry.get(driverConfig.provider);
+                if (driver) {
+                  await driver.validateConfig(driverConfig);
+                }
+              }
+            }
 
             this.skills.set(skill.name, skill);
             this.host.log('debug', `Loaded skill: ${skill.name}`);

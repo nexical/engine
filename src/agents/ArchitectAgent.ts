@@ -13,6 +13,11 @@ import { ShellService } from '../services/ShellService.js';
 import { ISkillRegistry } from '../services/SkillRegistry.js';
 import { ISignalJSON, SignalType } from '../workflow/Signal.js';
 
+interface IFeedbackDecision {
+  action: 'ANSWER' | 'REJECT';
+  response: string;
+}
+
 export class ArchitectAgent {
   private shell: ShellService;
 
@@ -38,7 +43,7 @@ export class ArchitectAgent {
     });
 
     // Keep process alive
-    return new Promise(() => { });
+    return new Promise(() => {});
   }
 
   private async handleInboxMessage(message: IBusMessage, mode: 'interactive' | 'non_interactive'): Promise<void> {
@@ -51,7 +56,7 @@ export class ArchitectAgent {
         return;
       }
 
-      if (signalData.status === SignalType.CLARIFICATION_NEEDED) {
+      if ((signalData.status as SignalType) === SignalType.CLARIFICATION_NEEDED) {
         const questions = (signalData.metadata?.questions as string[]) || [signalData.reason];
 
         this.host.log('info', `Processing clarification request for ${questions.length} questions.`);
@@ -70,8 +75,8 @@ export class ArchitectAgent {
           // 1. Try to answer internally if skill exists
           if (feedbackSkill) {
             // Retrieve Context
-            const wisdom = this.evolution.retrieve(q);
-            const config = JSON.stringify(this.project.getConfig());
+            const wisdom = await this.evolution.retrieve(q);
+            const config = JSON.stringify(await this.project.getConfig());
 
             const context: ISkillContext = {
               taskId: uuidv4(),
@@ -87,21 +92,28 @@ export class ArchitectAgent {
               },
               userPrompt: 'Decide if you can answer this question.',
               promptEngine: this.promptEngine,
-              clarificationHandler: async () => '', // No recursion
-              commandRunner: async () => '',
+              clarificationHandler: async (q) => {
+                this.host.log('warn', `Analyst asked for clarification: ${q}. Returning empty.`);
+                return await Promise.resolve('');
+              },
+              commandRunner: async () => await Promise.resolve(''),
               validators: [],
             };
 
             const result = await feedbackSkill.execute(context);
+
             if (result.isOk()) {
               try {
-                const decision = JSON.parse(result.unwrap());
+                const decision = JSON.parse(result.unwrap()) as IFeedbackDecision;
                 if (decision.action === 'ANSWER') {
                   finalAnswer = decision.response;
                   this.host.log('info', `Architect answered autonomously: ${q}`);
                 }
               } catch (e) {
-                this.host.log('error', `Failed to parse feedback skill response: ${e}`);
+                this.host.log(
+                  'error',
+                  `Failed to parse feedback skill response: ${e instanceof Error ? e.message : String(e)}`,
+                );
               }
             }
           }
@@ -122,7 +134,7 @@ export class ArchitectAgent {
 
         // Send response
         if (correlationId) {
-          this.messageBus.sendResponse(correlationId, {
+          await this.messageBus.sendResponse(correlationId, {
             answers,
           });
           this.host.log('info', `Sent response to ${source} for ${correlationId}`);
@@ -139,9 +151,9 @@ export class ArchitectAgent {
   }
 
   public async design(userRequest: string): Promise<Architecture> {
-    const constraints = this.project.getConstraints();
-    const evolutionLog = this.evolution.retrieve(userRequest);
-    const config = this.project.getConfig();
+    const constraints = await this.project.getConstraints();
+    const evolutionLog = await this.evolution.retrieve(userRequest);
+    const config = await this.project.getConfig();
 
     const params = {
       project_name: config.project_name || 'Nexical Project',

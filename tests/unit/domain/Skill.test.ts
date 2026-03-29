@@ -476,25 +476,74 @@ describe('Skill', () => {
       );
     });
 
-    it('should fail after max retries in execution/verification cycle', async () => {
+    it('should handle non-Error failure in post-execution command', async () => {
       const config: ISkillConfig = {
         name: 'test',
         description: 'desc',
         execution: { provider: 'exe' },
-        verification_strategy: { max_retries: 1 },
+        post_execution_commands: ['fail-cmd'],
+        verification_strategy: { max_retries: 0 },
       };
       const skill = new Skill(config);
       mockDriverRegistry.get.mockReturnValue({
         execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
       });
+
+      mockCommandRunner.mockRejectedValue('string error');
+
+      const result = await skill.execute(context);
+      expect(result.isFail()).toBe(true);
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        'warn',
+        expect.stringContaining('Post-execution command failed: string error'),
+      );
+    });
+
+    it('should handle unknown error in validator failure', async () => {
+      const config: ISkillConfig = {
+        name: 'test',
+        description: 'desc',
+        execution: { provider: 'exe' },
+        verification_strategy: { max_retries: 0 },
+      };
+      const skill = new Skill(config);
+      mockDriverRegistry.get.mockReturnValue({
+        execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
+      });
+      // Mock validator returning a fail without an error (or with null message)
       const mockValidator = jest
         .fn<() => Promise<Result<boolean, Error>>>()
-        .mockResolvedValue(Result.fail(new Error('always fail')));
+        .mockResolvedValue(Result.fail(null as any));
       context.validators.push(mockValidator);
 
       const result = await skill.execute(context);
       expect(result.isFail()).toBe(true);
-      expect(result.error()?.message).toBe('Skill failed after 1 attempts');
+      expect(mockLogger.log).toHaveBeenCalledWith('warn', expect.stringContaining('Validator failed: Unknown error'));
+    });
+
+    it('should handle unknown error in verification driver failure', async () => {
+      const config: ISkillConfig = {
+        name: 'test',
+        description: 'desc',
+        execution: { provider: 'exe' },
+        verification: { provider: 'ver' },
+        verification_strategy: { max_retries: 0 },
+      };
+      const skill = new Skill(config);
+      const mockExeDriver = {
+        execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.ok('ok')),
+      };
+      const mockVerDriver = {
+        execute: jest.fn<() => Promise<Result<string, Error>>>().mockResolvedValue(Result.fail(null as any)),
+      };
+      mockDriverRegistry.get.mockReturnValueOnce(mockExeDriver).mockReturnValueOnce(mockVerDriver);
+
+      const result = await skill.execute(context);
+      expect(result.isFail()).toBe(true);
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        'warn',
+        expect.stringContaining('Verification driver failed: Unknown error'),
+      );
     });
   });
 });

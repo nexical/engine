@@ -1,6 +1,6 @@
 import fs from 'fs';
-import readline from 'readline';
 import path from 'path';
+import readline from 'readline';
 import { z } from 'zod';
 
 import { IFileSystem } from '../domain/IFileSystem.js';
@@ -28,7 +28,7 @@ export class EvolutionService implements IEvolutionService {
   constructor(
     private project: IProject,
     private disk: IFileSystem,
-  ) { }
+  ) {}
 
   public async recordEvent(
     stateName: string,
@@ -71,7 +71,7 @@ export class EvolutionService implements IEvolutionService {
     }
 
     // 2. Long-Term Wisdom (Topic-Based)
-    const wisdom = this.getLongTermWisdom(context);
+    const wisdom = await this.getLongTermWisdom(context);
     if (wisdom) {
       sections.push(`## Established Wisdom (Long-Term Memory)\n${wisdom}`);
     }
@@ -101,7 +101,7 @@ export class EvolutionService implements IEvolutionService {
       for await (const line of rl) {
         if (!line.trim()) continue;
         try {
-          const entry = JSON.parse(line);
+          const entry = JSON.parse(line) as EvolutionEntry;
           entries.push(entry);
           if (entries.length > maxEntries) {
             entries.shift();
@@ -127,13 +127,13 @@ export class EvolutionService implements IEvolutionService {
     }
   }
 
-  private getLongTermWisdom(context: string): string | null {
+  private async getLongTermWisdom(context: string): Promise<string | null> {
     const indexPath = this.project.paths.evolutionIndex;
-    if (!this.disk.exists(indexPath)) return null;
+    if (!(await this.disk.exists(indexPath))) return null;
 
     try {
       // Load Index
-      const indexContent = this.disk.readFile(indexPath);
+      const indexContent = await this.disk.readFile(indexPath);
       const index = JSON.parse(indexContent) as Record<string, string>;
 
       // Extract unique topics based on keyword matching
@@ -149,14 +149,12 @@ export class EvolutionService implements IEvolutionService {
       // Always include 'general' topic if it exists
       foundTopics.add('general');
 
-      if (foundTopics.size === 0) return null;
-
       // Read Topic Files
       const wisdoms: string[] = [];
       for (const topic of foundTopics) {
         const topicPath = path.join(this.project.paths.evolutionTopics, `${topic}.md`);
-        if (this.disk.exists(topicPath)) {
-          const content = this.disk.readFile(topicPath);
+        if (await this.disk.exists(topicPath)) {
+          const content = await this.disk.readFile(topicPath);
           wisdoms.push(`### Topic: ${topic}\n${content}`);
         }
       }

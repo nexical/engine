@@ -73,6 +73,22 @@ describe('Orchestrator', () => {
       expect(orchestrator.workspace).toBe(mockServices.workspace);
       expect(orchestrator.session).toBe(mockServices.session);
     });
+
+    it('should skip brain init if skipBrainInit is true', async () => {
+      const mockBrain = { init: jest.fn() };
+      const mockServices = {
+        project: {},
+        brain: mockBrain,
+        workspace: {},
+        session: {},
+        container: {},
+      } as unknown as IEngineServices;
+      mockCreateServices.mockResolvedValue(mockServices);
+
+      await orchestrator.init(true);
+
+      expect(mockBrain.init).not.toHaveBeenCalled();
+    });
   });
 
   describe('Accessors before init', () => {

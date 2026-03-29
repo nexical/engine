@@ -71,7 +71,18 @@ export class ProjectFixture {
 
   async cleanup(): Promise<void> {
     if (this.tmpDir && (await fs.pathExists(this.tmpDir))) {
-      await fs.remove(this.tmpDir);
+      // Retry cleanup for ENOTEMPTY (sometimes git handles linger)
+      let attempts = 0;
+      while (attempts < 3) {
+        try {
+          await fs.remove(this.tmpDir);
+          break;
+        } catch (e) {
+          attempts++;
+          if (attempts === 3) throw e;
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
     }
     jest.restoreAllMocks();
   }
@@ -104,7 +115,13 @@ export class ProjectFixture {
     validateConfig: jest.Mock<(config: DriverConfig) => Promise<boolean>>;
     execute: jest.Mock<(config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>>;
   } {
-    const mockDriver = {
+    const mockDriver: {
+      name: string;
+      description: string;
+      isSupported: () => Promise<boolean>;
+      validateConfig: jest.Mock<(config: DriverConfig) => Promise<boolean>>;
+      execute: jest.Mock<(config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>>;
+    } = {
       name,
       description: `Mock driver for ${name}`,
       isSupported: async (): Promise<boolean> => {
@@ -114,6 +131,9 @@ export class ProjectFixture {
       execute: jest
         .fn<(config: DriverConfig, options?: IDriverContext) => Promise<Result<string, Error>>>()
         .mockImplementation(async (config, options) => {
+          if (!(await mockDriver.validateConfig(config))) {
+            return Result.fail(new Error(`Invalid config for ${mockDriver.name} driver`));
+          }
           if (executeImpl) return executeImpl(config, options);
           return Result.ok('OK');
         }),

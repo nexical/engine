@@ -1,6 +1,6 @@
 import yaml from 'js-yaml';
 
-import { Signal } from '../workflow/Signal.js';
+import { ISignalJSON, Signal } from '../workflow/Signal.js';
 
 export type OrchestratorStatus =
   | 'IDLE'
@@ -100,7 +100,7 @@ export class EngineState {
     }
 
     if (data.last_signal) {
-      state.last_signal = data.last_signal as Signal;
+      state.last_signal = Signal.fromJSON(data.last_signal as ISignalJSON);
     }
 
     state.user_prompt = (data.user_prompt as string) || '';

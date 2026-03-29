@@ -101,7 +101,7 @@ export class Executor {
           this.git.worktreeAdd(worktreePath, branchName, baseBranch);
 
           // 1.5 Submodule Initialization
-          if (this.project.getConfig().git?.submodules) {
+          if ((await this.project.getConfig()).git?.submodules) {
             this.host.log('debug', `Updating submodules for task ${task.id}`);
             this.git.submoduleUpdate(worktreePath);
           }
@@ -150,7 +150,7 @@ export class Executor {
             driverRegistry: this.driverRegistry,
             workspaceRoot: worktreePath,
             params: {
-              ...this.project.getConfig(),
+              ...(await this.project.getConfig()),
               task_id: task.id,
               task_description: task.description,
             },
@@ -165,7 +165,7 @@ export class Executor {
 
             clarificationHandler: async (question: string) => {
               const corrId = uuidv4();
-              this.bus.sendRequest({
+              await this.bus.sendRequest({
                 id: uuidv4(),
                 correlationId: corrId,
                 source: `task-${task.id}`,
@@ -226,7 +226,15 @@ export class Executor {
       for (const res of results) {
         this.host.log('info', `Merging ${res.branch} into ${currentBranch}`);
         try {
+          const beforeMerge = this.git.runCommand(['log', '--oneline']);
+          this.host.log('debug', `Log before merge on ${currentBranch}:\n${beforeMerge}`);
+          const branchLog = this.git.runCommand(['log', '--oneline', res.branch]);
+          this.host.log('debug', `Log on branch ${res.branch}:\n${branchLog}`);
+
           this.git.merge(res.branch);
+
+          const afterMerge = this.git.runCommand(['log', '--oneline']);
+          this.host.log('debug', `Log after merge on ${currentBranch}:\n${afterMerge}`);
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : String(e);
           this.host.log('error', `Merge failed for task ${res.taskId} from branch ${res.branch}: ${errMsg}`);
@@ -235,7 +243,7 @@ export class Executor {
           try {
             this.git.runCommand(['merge', '--abort']);
             this.host.log('info', 'Merge aborted successfully.');
-          } catch (abortErr) {
+          } catch {
             this.host.log('warn', 'Failed to abort merge (maybe no merge was in progress).');
           }
 

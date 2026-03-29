@@ -30,8 +30,9 @@ export interface IProject {
   readonly rootDirectory: string;
   readonly fileSystem: IFileSystem;
   readonly paths: ProjectPaths;
-  getConstraints(): string;
-  getConfig(): ProjectProfile;
+  init(): Promise<void>;
+  getConstraints(): Promise<string>;
+  getConfig(): Promise<ProjectProfile>;
 }
 
 export class Project implements IProject {
@@ -44,29 +45,32 @@ export class Project implements IProject {
     this.rootDirectory = rootDirectory;
     this.fileSystem = fileSystem;
     this.paths = new ProjectPaths(rootDirectory);
-    this.ensureStructure();
   }
 
-  public getConstraints(): string {
-    if (this.fileSystem.exists(this.paths.constraints)) {
-      return this.fileSystem.readFile(this.paths.constraints);
+  public async init(): Promise<void> {
+    await this.ensureStructure();
+  }
+
+  public async getConstraints(): Promise<string> {
+    if (await this.fileSystem.exists(this.paths.constraints)) {
+      return await this.fileSystem.readFile(this.paths.constraints);
     }
     return 'No global constraints defined.';
   }
 
-  public getConfig(): ProjectProfile {
+  public async getConfig(): Promise<ProjectProfile> {
     if (!this.profile) {
-      this.profile = this.loadProfile(this.paths.config);
+      this.profile = await this.loadProfile(this.paths.config);
     }
     return this.profile;
   }
 
-  private loadProfile(path: string): ProjectProfile {
-    if (!this.fileSystem.exists(path)) {
+  private async loadProfile(path: string): Promise<ProjectProfile> {
+    if (!(await this.fileSystem.exists(path))) {
       return ProjectConfigurationSchema.parse({});
     }
     try {
-      const content = this.fileSystem.readFile(path);
+      const content = await this.fileSystem.readFile(path);
       const raw = yaml.load(content);
       return ProjectConfigurationSchema.parse(raw);
     } catch (e) {
@@ -76,21 +80,21 @@ export class Project implements IProject {
     }
   }
 
-  private ensureStructure(): void {
-    this.fileSystem.ensureDir(this.paths.ai);
-    this.fileSystem.ensureDir(this.paths.prompts);
-    this.fileSystem.ensureDir(this.paths.architecture);
-    this.fileSystem.ensureDir(this.paths.plan);
-    this.fileSystem.ensureDir(this.paths.evolution);
-    this.fileSystem.ensureDir(this.paths.evolutionTopics);
-    this.fileSystem.ensureDir(this.paths.personas);
-    this.fileSystem.ensureDir(this.paths.drivers);
-    this.fileSystem.ensureDir(this.paths.skills);
-    this.fileSystem.ensureDir(this.paths.signals);
-    this.fileSystem.ensureDir(this.paths.comms);
-    this.fileSystem.ensureDir(this.paths.inbox);
-    this.fileSystem.ensureDir(this.paths.outbox);
-    this.fileSystem.ensureDir(this.paths.archive);
+  private async ensureStructure(): Promise<void> {
+    await this.fileSystem.ensureDir(this.paths.ai);
+    await this.fileSystem.ensureDir(this.paths.prompts);
+    await this.fileSystem.ensureDir(this.paths.architecture);
+    await this.fileSystem.ensureDir(this.paths.plan);
+    await this.fileSystem.ensureDir(this.paths.evolution);
+    await this.fileSystem.ensureDir(this.paths.evolutionTopics);
+    await this.fileSystem.ensureDir(this.paths.personas);
+    await this.fileSystem.ensureDir(this.paths.drivers);
+    await this.fileSystem.ensureDir(this.paths.skills);
+    await this.fileSystem.ensureDir(this.paths.signals);
+    await this.fileSystem.ensureDir(this.paths.comms);
+    await this.fileSystem.ensureDir(this.paths.inbox);
+    await this.fileSystem.ensureDir(this.paths.outbox);
+    await this.fileSystem.ensureDir(this.paths.archive);
   }
 }
 

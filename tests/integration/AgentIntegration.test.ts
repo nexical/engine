@@ -46,12 +46,9 @@ describe('Agent Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        if (config.provider === 'architect') {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-          capturedArchitectPrompt = (options as any)?.userPrompt || '';
-          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult(['Component A', 'Component B'])));
-        }
-        return Promise.resolve(Result.ok('OK'));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+        capturedArchitectPrompt = (options as any)?.userPrompt || '';
+        return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult(['Component A', 'Component B'])));
       },
     );
 

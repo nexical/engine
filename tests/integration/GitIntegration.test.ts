@@ -13,7 +13,10 @@
  */
 
 import { execSync } from 'child_process';
+import fs from 'fs-extra';
+import path from 'path';
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -46,29 +49,42 @@ describe('Git Integration', () => {
     );
 
     await fixture.writeConfig({ project_name: 'GitTest' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
 
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (config.provider === 'planner') {
-        return Promise.resolve(
-          Result.ok(
-            ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'exec', description: 'desc' }]),
-          ),
-        );
-      }
-      if (config.provider === 'executor') {
-        return Promise.resolve(Result.ok('Executed'));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        const pTemplate = config.prompt_template as string;
+        if (pTemplate?.includes('Software Architect'))
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        if (pTemplate?.includes('expert AI Planner')) {
+          return Promise.resolve(
+            Result.ok(
+              ProjectFixture.createPlanResult([{ id: 't1', skill: 'executor', message: 'exec', description: 'desc' }]),
+            ),
+          );
+        }
+        // If it's the executor, the prompt template might be undefined or different, but we know it's executor if it's not the other two, or checking the task id
+        const workspaceDir = options?.workspaceRoot as string;
+        if (workspaceDir && (options?.params as Record<string, unknown>)?.task_id === 't1') {
+          fs.writeFileSync(path.join(workspaceDir, 'integration_test_file.txt'), 'done');
+          return Promise.resolve(Result.ok('Executed'));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Git integration test');
+    if (orchestrator.session.state.status === 'FAILED') {
+      // eslint-disable-next-line no-console
+      console.error('Workflow Failed with Error:', orchestrator.session.state.error);
+    }
+    expect(orchestrator.session.state.status).toBe('COMPLETED');
 
     // Verify commit was made via exec (simplest integration check)
-    const log = execSync('git log -n 5 --oneline', { cwd: fixture.tmpDir }).toString();
+    const log = execSync('git log -n 5 --oneline', execOptions).toString();
     expect(log).toMatch(/Task complete: t1/);
   });
 });

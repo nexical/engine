@@ -124,4 +124,22 @@ describe('SkillRegistry', () => {
       expect(registry.getSkill('non-existent')).toBeUndefined();
     });
   });
+
+  describe('getSkills', () => {
+    it('should return all loaded skills', async () => {
+      const registry = new SkillRegistry(
+        mockProject as unknown as IProject,
+        mockDriverRegistry as unknown as DriverRegistry,
+        mockHost as unknown as IRuntimeHost,
+      );
+      mockProject.fileSystem.isDirectory.mockReturnValue(true);
+      mockProject.fileSystem.listFiles.mockReturnValue(['s1.skill.yml']);
+      mockProject.fileSystem.readFile.mockReturnValue('name: s1\ndescription: d1');
+      await registry.init();
+
+      const skills = registry.getSkills();
+      expect(skills.length).toBeGreaterThan(0);
+      expect(skills[0].name).toBe('s1');
+    });
+  });
 });

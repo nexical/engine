@@ -38,11 +38,11 @@ export class DriverRegistry extends Registry<IDriver> implements IDriverRegistry
   }
 
   async load(dir: string): Promise<void> {
-    if (!this.fileSystem.isDirectory(dir)) {
+    if (!(await this.fileSystem.isDirectory(dir))) {
       return;
     }
 
-    const files = this.findDriversRecursive(dir);
+    const files = await this.findDriversRecursive(dir);
 
     for (const file of files) {
       if (file.endsWith('.d.ts') || file.endsWith('.map')) {
@@ -50,7 +50,8 @@ export class DriverRegistry extends Registry<IDriver> implements IDriverRegistry
       }
 
       try {
-        const module = (await import(file)) as Record<string, unknown>;
+        const importPath = file.startsWith('/') ? `file://${file}` : file;
+        const module = (await import(importPath)) as Record<string, unknown>;
         let loaded = false;
         for (const key in module) {
           const ExportedClass = module[key];
@@ -98,17 +99,17 @@ export class DriverRegistry extends Registry<IDriver> implements IDriverRegistry
     }
   }
 
-  private findDriversRecursive(dir: string): string[] {
+  private async findDriversRecursive(dir: string): Promise<string[]> {
     const result: string[] = [];
-    if (!this.fileSystem.isDirectory(dir)) return result;
+    if (!(await this.fileSystem.isDirectory(dir))) return result;
 
-    const items = this.fileSystem.listFiles(dir);
+    const items = await this.fileSystem.listFiles(dir);
     for (const item of items) {
       // IFileSystem.listFiles returns filenames, we need to join them
       const fullPath = path.join(dir, item);
 
-      if (this.fileSystem.isDirectory(fullPath)) {
-        result.push(...this.findDriversRecursive(fullPath));
+      if (await this.fileSystem.isDirectory(fullPath)) {
+        result.push(...(await this.findDriversRecursive(fullPath)));
       } else if (fullPath.endsWith('.ts') || fullPath.endsWith('.js')) {
         result.push(fullPath);
       }

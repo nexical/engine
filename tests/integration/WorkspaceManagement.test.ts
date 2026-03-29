@@ -41,7 +41,7 @@ describe('Workspace Management Integration', () => {
     await fs.writeFile(project.paths.architectureCurrent, 'V1 Architecture');
 
     // Archive it
-    workspace.archiveArtifacts();
+    await workspace.archiveArtifacts();
 
     // Verify current file is gone and archive has it
     expect(fs.existsSync(project.paths.architectureCurrent)).toBe(false);

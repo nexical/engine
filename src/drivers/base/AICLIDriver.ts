@@ -62,7 +62,7 @@ export abstract class AICLIDriver<TContext extends ISkillContext = ISkillContext
         try {
           // Attempt to parse if it's a JSON string
           // This allows YAML definition to pass a map
-          allowedSignals = JSON.parse(params.allowed_signals);
+          allowedSignals = JSON.parse(params.allowed_signals) as Record<string, string>;
         } catch {
           // Fallback to single item or simple string - but user asked for map.
           // Let's assume if it's a single key?
@@ -85,7 +85,10 @@ export abstract class AICLIDriver<TContext extends ISkillContext = ISkillContext
       .join('\n');
 
     if (fs) {
-      const projectFooterPath = path.join(context.workspaceRoot || this.systemConfig.rootDirectory as string, '.ai/templates/cli_footer.md');
+      const projectFooterPath = path.join(
+        context.workspaceRoot || (this.systemConfig.rootDirectory as string),
+        '.ai/templates/cli_footer.md',
+      );
       try {
         footer = await fs.readFile(projectFooterPath);
       } catch (e) {

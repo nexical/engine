@@ -33,20 +33,24 @@ describe('Full System Integration (Smoke Test)', () => {
 
   test('should execute full workflow from prompt to success', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'SmokeTest' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
 
     const orchestrator = await fixture.initOrchestrator();
 
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) {
+        if ((options?.params as Record<string, unknown>)?.user_request) {
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
-        // @ts-ignore
-        if (options?.params?.user_prompt) {
-          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        if ((options?.params as Record<string, unknown>)?.user_prompt) {
+          return Promise.resolve(
+            Result.ok(
+              ProjectFixture.createPlanResult([
+                { id: 'task1', skill: 'executor', message: 'exec', description: 'desc' },
+              ]),
+            ),
+          );
         }
         // Generic / Executor
         return Promise.resolve(Result.ok('OK'));
@@ -61,7 +65,7 @@ describe('Full System Integration (Smoke Test)', () => {
 
   test('should handle large payloads correctly (Scenario 16)', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'LargePayloadTest' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
 
     const orchestrator = await fixture.initOrchestrator();
 
@@ -82,10 +86,9 @@ describe('Full System Integration (Smoke Test)', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(largeArchitecture));
-        // @ts-ignore
-        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(largePlan));
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(largeArchitecture));
+        if ((options?.params as Record<string, unknown>)?.user_prompt) return Promise.resolve(Result.ok(largePlan));
         return Promise.resolve(Result.ok('OK'));
       },
     );
@@ -100,5 +103,5 @@ describe('Full System Integration (Smoke Test)', () => {
     expect(fs.existsSync(stateFile)).toBe(true);
     const stateContent = fs.readFileSync(stateFile, 'utf8');
     expect(stateContent.length).toBeGreaterThan(1000);
-  });
+  }, 30000); // 30s timeout for large payload (lots of git worktrees)
 });

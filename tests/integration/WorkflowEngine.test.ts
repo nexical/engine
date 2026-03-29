@@ -12,6 +12,7 @@
  * - Error handling propagation to FAILED state.
  */
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -32,11 +33,20 @@ describe('Workflow Engine Integration', () => {
     await fixture.writeConfig({ project_name: 'WorkflowTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-      if (config.provider === 'planner') return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        // Use options.params to distinguish if config.provider is generic
+        const params = (options?.params as Record<string, unknown>) || {};
+        if (config.provider === 'architect' || params.user_request?.toString().toLowerCase().includes('architect')) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        if (config.provider === 'planner' || params.architecture) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Run workflow');
 
@@ -51,12 +61,16 @@ describe('Workflow Engine Integration', () => {
     await fixture.writeConfig({ project_name: 'FailTest' });
     const orchestrator = await fixture.initOrchestrator();
 
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      if (config.provider === 'architect') {
-        return Promise.resolve(Result.fail(new Error('Architectural meltdown')));
-      }
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        const params = (options?.params as Record<string, unknown>) || {};
+        if (config.provider === 'architect' || params.user_request?.toString().toLowerCase().includes('build')) {
+          return Promise.resolve(Result.fail(new Error('Architectural meltdown')));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     await orchestrator.start('Build something');
 

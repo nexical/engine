@@ -12,6 +12,7 @@
  * - Fallback behavior for resilience.
  */
 
+import { IDriverContext } from '../../src/domain/Driver.js';
 import { Result } from '../../src/domain/Result.js';
 import { DriverConfig } from '../../src/domain/SkillConfig.js';
 import { ProjectFixture } from './utils/ProjectFixture.js';
@@ -40,12 +41,20 @@ describe('Driver Management Integration', () => {
     await fixture.initOrchestrator();
 
     let defaultDriverCalled = false;
-    fixture.registerMockDriver('gemini', async (config: DriverConfig): Promise<Result<string, Error>> => {
-      defaultDriverCalled = true;
-      if (config.provider === 'architect') return Promise.resolve(Result.ok('{}'));
-      if (config.provider === 'planner') return Promise.resolve(Result.ok('[]'));
-      return Promise.resolve(Result.ok('OK'));
-    });
+    fixture.registerMockDriver(
+      'gemini',
+      async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
+        defaultDriverCalled = true;
+        const params = (options?.params as Record<string, unknown>) || {};
+        if (config.provider === 'architect' || params.user_request?.toString().toLowerCase().includes('driver')) {
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        }
+        if (config.provider === 'planner' || params.architecture) {
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        }
+        return Promise.resolve(Result.ok('OK'));
+      },
+    );
 
     const orchestrator = fixture.orchestrator;
 

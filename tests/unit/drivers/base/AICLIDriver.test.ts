@@ -31,7 +31,9 @@ describe('AICLIDriver', () => {
     };
     mockFileSystem = {
       readFile: jest.fn(),
+      exists: jest.fn(),
     };
+
     mockConfig = {
       rootDirectory: '/test',
     };
@@ -67,8 +69,8 @@ describe('AICLIDriver', () => {
     mockContext.params = {
       allowed_signals: {
         DONE: 'Finished.',
-        BROKEN: 'It burst.'
-      }
+        BROKEN: 'It burst.',
+      },
     };
     await driver.run({ prompt_template: 'Hello' } as any, mockContext);
 
@@ -90,7 +92,10 @@ describe('AICLIDriver', () => {
   });
 
   it('should fallback to default footer if file read fails', async () => {
-    mockFileSystem.readFile.mockRejectedValue(new Error('File not found'));
+    mockFileSystem.exists.mockReturnValue(false); // prompt file missing
+    mockFileSystem.readFile.mockRejectedValue(new Error('no footer'));
+    mockPromptEngine.renderString.mockReturnValue('rendered');
+
     await driver.run({ prompt_template: 'Hello' } as any, mockContext);
 
     expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Could not load cli_footer.md'));
@@ -100,5 +105,99 @@ describe('AICLIDriver', () => {
     expect(promptTemplate).toContain('# SYSTEM INSTRUCTION: MANDATORY');
     expect(promptTemplate).toContain('You have the following signals available to you:');
     expect(promptTemplate).toContain('"status": "SIGNAL_NAME"');
+    expect(promptTemplate).toContain('JSON Content Structure:');
+  });
+
+  it('should parse allowed_signals from JSON string', async () => {
+    mockContext.params = {
+      allowed_signals: JSON.stringify({ CUSTOM: 'Custom signal' }),
+    };
+    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+
+    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
+    expect(args.allowed_signals).toContain('- "CUSTOM": Custom signal');
+  });
+
+  it('should fallback and log warning if allowed_signals JSON is invalid', async () => {
+    mockContext.params = {
+      allowed_signals: '{ invalid json',
+    };
+    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+
+    expect(mockHost.log).toHaveBeenCalledWith(
+      'warn',
+      expect.stringContaining('allowed_signals param is not a valid JSON map'),
+    );
+    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
+    expect(args.allowed_signals).toContain('- "COMPLETE": Task completed successfully.');
+  });
+
+  it('should handle missing prompt_template and context props', async () => {
+    // missing prompt_template, missing taskId, missing userPrompt, missing workspaceRoot
+    mockFileSystem.readFile.mockRejectedValue(new Error('no footer'));
+    const emptyContext = {
+      promptEngine: mockPromptEngine,
+      fileSystem: mockFileSystem,
+      params: {},
+    } as any;
+
+    await driver.run({ name: 'test' } as any, emptyContext);
+
+    const calls = mockPromptEngine.renderString.mock.calls;
+    // renderString(promptTemplate, formatArgs)
+    const formatArgs = calls[0][1] as any;
+
+    expect(formatArgs.user_request).toBe('');
+    expect(formatArgs.task_id).toBe('unknown');
+    // Check renderString calls
+    const renderStringCalls = (mockPromptEngine.renderString as jest.Mock).mock.calls;
+    expect(renderStringCalls.some((call) => (call[0] as string).includes('# SYSTEM INSTRUCTION: MANDATORY'))).toBe(
+      true,
+    );
+  });
+
+  it('should use systemConfig root if workspaceRoot is missing', async () => {
+    mockFileSystem.readFile.mockRejectedValue(new Error('no footer'));
+
+    // context without workspaceRoot
+    const minimalContext = {
+      promptEngine: mockPromptEngine,
+      fileSystem: mockFileSystem,
+      taskId: 'test-task',
+      params: {},
+    };
+
+    await driver.run({ name: 'test' } as any, minimalContext as any);
+
+    const calls = (mockPromptEngine.renderString as jest.Mock).mock.calls;
+    const formatArgs = calls[0][1] as any;
+    expect(formatArgs.signal_file_path).toContain('/test/.ai/signals'); // from mockConfig.rootDirectory
+  });
+
+  it('should handle allowed_signals not being string or object', async () => {
+    mockContext.params = {
+      allowed_signals: 123, // number
+    };
+    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+
+    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
+    expect(args.allowed_signals).toContain('- "COMPLETE": Task completed successfully.');
+  });
+
+  it('should throw if PromptEngine is missing', async () => {
+    (mockContext as any).promptEngine = undefined;
+    await expect(driver.run({ prompt_template: 'Hello' } as any, mockContext)).rejects.toThrow(
+      'PromptEngine is required',
+    );
+  });
+
+  it('should test parseSchema', () => {
+    const result = (driver as any).parseSchema({ name: 'test', prompt_template: 'tmpl' });
+    expect(result.success).toBe(true);
+  });
+
+  it('should test isSupported default', async () => {
+    const supported = await driver.isSupported();
+    expect(supported).toBe(false);
   });
 });

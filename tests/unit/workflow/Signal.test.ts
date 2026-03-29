@@ -44,8 +44,9 @@ describe('Signal', () => {
     const signal = new Signal(SignalType.FAIL, 'error', { detail: 'high' });
     const json = signal.toJSON();
     expect(json).toEqual({
-      type: SignalType.FAIL,
+      status: SignalType.FAIL,
       reason: 'error',
+      artifacts: [],
       metadata: { detail: 'high' },
     });
 

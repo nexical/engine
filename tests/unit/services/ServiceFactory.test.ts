@@ -12,6 +12,7 @@ import { IWorkspace } from '../../../src/domain/Workspace.js';
 const mockProject = {
   paths: { prompts: '/prompts' },
   rootDirectory: '/root',
+  init: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 } as unknown as jest.Mocked<IProject>;
 const mockWorkspace = {} as Record<string, unknown>;
 const mockBrain = {
@@ -49,6 +50,7 @@ const MockPromptEngine = jest.fn().mockReturnValue(mockPromptEngine);
 const MockSkillRegistry = jest.fn().mockReturnValue(mockSkillRegistry);
 const MockEvolutionService = jest.fn().mockReturnValue(mockEvolutionService);
 const MockFileSystemBus = jest.fn().mockReturnValue(mockFileSystemBus);
+const MockSignalService = jest.fn().mockImplementation(() => ({}));
 const MockDIContainer = jest.fn().mockReturnValue(mockContainer);
 const MockArchitectAgent = jest.fn<() => ArchitectAgent>();
 const MockPlannerAgent = jest.fn<() => PlannerAgent>();
@@ -69,6 +71,7 @@ jest.unstable_mockModule('../../../src/services/EvolutionService.js', () => ({
   EvolutionService: MockEvolutionService,
 }));
 jest.unstable_mockModule('../../../src/services/FileSystemBus.js', () => ({ FileSystemBus: MockFileSystemBus }));
+jest.unstable_mockModule('../../../src/services/SignalService.js', () => ({ SignalService: MockSignalService }));
 
 jest.unstable_mockModule('../../../src/services/DIContainer.js', () => ({ DIContainer: MockDIContainer }));
 jest.unstable_mockModule('../../../src/agents/ArchitectAgent.js', () => ({ ArchitectAgent: MockArchitectAgent }));
@@ -119,6 +122,8 @@ describe('ServiceFactory', () => {
           return mockEvolutionService;
         case 'fileSystemBus':
           return mockFileSystemBus;
+        case 'signalService':
+          return {};
         case 'gitService':
           return {};
         case 'architect': {
@@ -155,6 +160,7 @@ describe('ServiceFactory', () => {
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('promptEngine', expect.any(Function));
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('skillRegistry', expect.any(Function));
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('evolutionService', expect.any(Function));
+    expect(mockContainer.registerFactory).toHaveBeenCalledWith('signalService', expect.any(Function));
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('brain', expect.any(Function));
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('session', expect.any(Function));
     expect(mockContainer.registerFactory).toHaveBeenCalledWith('fileSystemBus', expect.any(Function));
@@ -282,6 +288,10 @@ describe('ServiceFactory', () => {
     factories['evolutionService']?.();
     expect(MockEvolutionService).toHaveBeenCalledWith(mockProject, mockFileSystem);
 
+    // Test SignalService Factory
+    factories['signalService']?.();
+    expect(MockSignalService).toHaveBeenCalledWith(mockFileSystem);
+
     // Test Executor Factory (via Brain registration)
     // We need to capture the callback passed to brain.registerAgent('executor', cb)
     const registerCalls = mockBrain.registerAgent.mock.calls;
@@ -299,6 +309,7 @@ describe('ServiceFactory', () => {
         expect.anything(), // gitService (mocked as {})
         mockFileSystemBus,
         mockPromptEngine,
+        expect.anything(), // signalService
       );
     }
 

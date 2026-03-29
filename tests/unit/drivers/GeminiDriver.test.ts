@@ -46,6 +46,17 @@ describe('GeminiDriver', () => {
     expect(supported).toBe(true);
   });
 
+  it('should return false if gemini --version fails', async () => {
+    mockShell.execute.mockImplementation(async (cmd: string, args: string[]) => {
+      if (args.includes('--version')) {
+        throw new Error('version failed');
+      }
+      return { code: 0, stdout: '/bin/gemini', stderr: '' };
+    });
+    const supported = await driver.isSupported();
+    expect(supported).toBe(false);
+  });
+
   it('should execute skill', async () => {
     const context = {
       promptEngine: {
@@ -60,7 +71,7 @@ describe('GeminiDriver', () => {
     await driver.run({ name: 'test', prompt_template: 'Hello' }, context);
     expect(mockShell.execute).toHaveBeenCalledWith(
       'gemini',
-      expect.arrayContaining(['prompt', 'Hello', '--yolo']),
+      expect.arrayContaining(['prompt', 'Hello\n', '--yolo']),
       expect.anything(),
     );
   });
@@ -90,11 +101,7 @@ describe('GeminiDriver', () => {
     );
 
     expect(result).toBe('response');
-    expect(mockShell.execute).toHaveBeenCalledWith(
-      'gemini',
-      expect.anything(),
-      expect.anything(),
-    );
+    expect(mockShell.execute).toHaveBeenCalledWith('gemini', expect.anything(), expect.anything());
   });
 
   it('should include extra arguments if provided in skill', async () => {

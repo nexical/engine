@@ -8,22 +8,22 @@ import { SystemError } from '../errors/SystemError.js';
 export class FileSystemService implements IFileSystem {
   constructor(private host: IRuntimeHost) {}
 
-  readFile(filePath: string): string {
+  async readFile(filePath: string): Promise<string> {
     try {
-      return fs.readFileSync(filePath, 'utf-8');
+      return await fs.readFile(filePath, 'utf-8');
     } catch (error) {
       this.host.log('debug', `Reading file: ${String(filePath)}. Error: ${String(error)}`);
       throw SystemError.io(`Failed to read file ${filePath}`, filePath);
     }
   }
 
-  writeFile(filePath: string, content: string | Buffer): void {
+  async writeFile(filePath: string, content: string | Buffer): Promise<void> {
     try {
-      this.ensureDir(path.dirname(filePath));
+      await this.ensureDir(path.dirname(filePath));
       if (typeof content === 'string') {
-        fs.writeFileSync(filePath, content, 'utf-8');
+        await fs.writeFile(filePath, content, 'utf-8');
       } else {
-        fs.writeFileSync(filePath, content);
+        await fs.writeFile(filePath, content);
       }
     } catch (error) {
       this.host.log('debug', `Writing file: ${String(filePath)}. Error: ${String(error)}`);
@@ -31,79 +31,78 @@ export class FileSystemService implements IFileSystem {
     }
   }
 
-  appendFile(filePath: string, content: string): void {
+  async appendFile(filePath: string, content: string): Promise<void> {
     try {
-      fs.ensureDirSync(path.dirname(filePath));
-      fs.appendFileSync(filePath, content, 'utf-8');
+      await fs.ensureDir(path.dirname(filePath));
+      await fs.appendFile(filePath, content, 'utf-8');
     } catch (error) {
       this.host.log('debug', `Appending to file: ${String(filePath)}. Error: ${String(error)}`);
       throw SystemError.io(`Failed to append to file ${filePath}`, filePath);
     }
   }
 
-  move(source: string, destination: string, options?: { overwrite?: boolean }): void {
+  async move(source: string, destination: string, options?: { overwrite?: boolean }): Promise<void> {
     try {
-      fs.ensureDirSync(path.dirname(destination));
-      fs.moveSync(source, destination, options);
+      await fs.ensureDir(path.dirname(destination));
+      await fs.move(source, destination, options);
     } catch (error) {
       this.host.log('error', `Error moving file from ${source} to ${destination}: ${String(error)}`);
       throw SystemError.io(`Failed to move file ${source} to ${destination}`, source);
     }
   }
 
-  copy(source: string, destination: string, options?: { overwrite?: boolean }): void {
+  async copy(source: string, destination: string, options?: { overwrite?: boolean }): Promise<void> {
     try {
-      fs.ensureDirSync(path.dirname(destination));
-      fs.copySync(source, destination, options);
+      await fs.ensureDir(path.dirname(destination));
+      await fs.copy(source, destination, options);
     } catch (error) {
       this.host.log('error', `Error copying file from ${source} to ${destination}: ${String(error)}`);
       throw SystemError.io(`Failed to copy file ${source} to ${destination}`, source);
     }
   }
 
-  ensureDir(dirPath: string): void {
+  async ensureDir(dirPath: string): Promise<void> {
     try {
-      fs.ensureDirSync(dirPath);
+      await fs.ensureDir(dirPath);
     } catch (error) {
       this.host.log('debug', `Ensuring directory: ${String(dirPath)}. Error: ${String(error)}`);
       throw SystemError.io(`Failed to ensure directory ${dirPath}`, dirPath);
     }
   }
 
-  exists(filePath: string): boolean {
-    return fs.existsSync(filePath);
+  async exists(filePath: string): Promise<boolean> {
+    return await fs.pathExists(filePath);
   }
 
-  isDirectory(filePath: string): boolean {
+  async isDirectory(filePath: string): Promise<boolean> {
     try {
-      return fs.statSync(filePath).isDirectory();
+      const stats = await fs.stat(filePath);
+      return stats.isDirectory();
     } catch {
       return false;
     }
   }
 
-  listFiles(dirPath: string): string[] {
+  async listFiles(dirPath: string): Promise<string[]> {
     try {
-      return fs.readdirSync(dirPath);
+      return await fs.readdir(dirPath);
     } catch (error) {
-      // We usually return empty array for listing failure in loose checks, but strict mode should throw?
-      // Keeping safe behavior for now but logging
       this.host.log('debug', `Listing files in directory: ${String(dirPath)}. Error: ${String(error)}`);
       return [];
     }
   }
 
-  writeFileAtomic(filePath: string, content: string): void {
+  async writeFileAtomic(filePath: string, content: string): Promise<void> {
     const tempPath = `${filePath}.tmp.${Math.random().toString(36).substring(7)}`;
     try {
-      this.writeFile(tempPath, content);
-      fs.renameSync(tempPath, filePath);
+      await this.writeFile(tempPath, content);
+      await fs.rename(tempPath, filePath);
     } catch (error) {
       this.host.log('error', `Error writing atomic file ${filePath}: ${String(error)}`);
       // Try to clean up temp file
-      if (this.exists(tempPath)) {
+      if (await this.exists(tempPath)) {
         try {
-          fs.unlinkSync(tempPath);
+          await fs.unlink(tempPath);
         } catch {
           // Ignore
         }
@@ -112,10 +111,10 @@ export class FileSystemService implements IFileSystem {
     }
   }
 
-  deleteFile(filePath: string): void {
+  async deleteFile(filePath: string): Promise<void> {
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
+      if (await fs.pathExists(filePath)) {
+        await fs.unlink(filePath);
       }
     } catch (error) {
       this.host.log('error', `Error deleting file ${filePath}: ${String(error)}`);
@@ -123,32 +122,41 @@ export class FileSystemService implements IFileSystem {
     }
   }
 
-  async acquireLock(filePath: string, retries = 10, delay = 100): Promise<() => void> {
+  public async acquireLock(
+    filePath: string,
+    retries: number = 3,
+    interval: number = 100,
+  ): Promise<() => Promise<void>> {
     const lockPath = `${filePath}.lock`;
-    for (let i = 0; i < retries; i++) {
+    let attempts = 0;
+
+    while (attempts <= retries) {
       try {
-        // exclusive flag 'wx' ensures we fail if file exists
-        fs.closeSync(fs.openSync(lockPath, 'wx'));
-        return () => this.releaseLock(filePath);
+        const handle = await fs.open(lockPath, 'wx');
+        await fs.close(handle);
+        return async () => {
+          await this.releaseLock(filePath);
+        };
       } catch (error) {
         const err = error as { code?: string };
-        if (err.code !== 'EEXIST' || i === retries - 1) {
+        if (err.code !== 'EEXIST' || (retries > 0 && attempts === retries - 1)) {
           if (err.code === 'EEXIST') {
             throw new Error(`Could not acquire lock for ${filePath} after ${retries} attempts.`);
           }
           throw error;
         }
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, interval));
+        attempts++;
       }
     }
-    throw new Error(`Could not acquire lock for ${filePath}`);
+    throw new Error(`Could not acquire lock for ${filePath} after ${retries} attempts.`);
   }
 
-  releaseLock(filePath: string): void {
+  async releaseLock(filePath: string): Promise<void> {
     const lockPath = `${filePath}.lock`;
     try {
-      if (fs.existsSync(lockPath)) {
-        fs.unlinkSync(lockPath);
+      if (await fs.pathExists(lockPath)) {
+        await fs.unlink(lockPath);
       }
     } catch (_e) {
       this.host.log('error', `Error releasing lock for ${filePath}: ${String(_e)}`);

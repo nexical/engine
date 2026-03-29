@@ -30,19 +30,21 @@ describe('Workspace', () => {
     mockDump.mockReset();
 
     mockFileSystem = {
-      exists: jest.fn(),
-      readFile: jest.fn(),
-      writeFile: jest.fn(),
-      appendFile: jest.fn(),
-      move: jest.fn(),
-      copy: jest.fn(),
-      ensureDir: jest.fn(),
-      isDirectory: jest.fn(),
-      listFiles: jest.fn(),
-      writeFileAtomic: jest.fn(),
-      deleteFile: jest.fn(),
-      acquireLock: jest.fn<IFileSystem['acquireLock']>().mockResolvedValue(() => {}),
-      releaseLock: jest.fn(),
+      exists: jest.fn<IFileSystem['exists']>().mockResolvedValue(false),
+      readFile: jest.fn<IFileSystem['readFile']>().mockResolvedValue(''),
+      writeFile: jest.fn<IFileSystem['writeFile']>().mockResolvedValue(undefined),
+      appendFile: jest.fn<IFileSystem['appendFile']>().mockResolvedValue(undefined),
+      move: jest.fn<IFileSystem['move']>().mockResolvedValue(undefined),
+      copy: jest.fn<IFileSystem['copy']>().mockResolvedValue(undefined),
+      ensureDir: jest.fn<IFileSystem['ensureDir']>().mockResolvedValue(undefined),
+      isDirectory: jest.fn<IFileSystem['isDirectory']>().mockResolvedValue(false),
+      listFiles: jest.fn<IFileSystem['listFiles']>().mockResolvedValue([]),
+      writeFileAtomic: jest.fn<IFileSystem['writeFileAtomic']>().mockResolvedValue(undefined),
+      deleteFile: jest.fn<IFileSystem['deleteFile']>().mockResolvedValue(undefined),
+      acquireLock: jest.fn<IFileSystem['acquireLock']>().mockResolvedValue((): Promise<void> => {
+        return Promise.resolve();
+      }),
+      releaseLock: jest.fn<IFileSystem['releaseLock']>().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<IFileSystem>;
 
     mockProject = {
@@ -67,8 +69,8 @@ describe('Workspace', () => {
 
   describe('getArchitecture', () => {
     it('should return cached architecture if available', async () => {
-      mockFileSystem.exists.mockReturnValue(true);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.exists.mockResolvedValue(true);
+      mockFileSystem.readFile.mockResolvedValue('content');
 
       const first = await workspace.getArchitecture('current');
       const second = await workspace.getArchitecture('current');
@@ -78,14 +80,14 @@ describe('Workspace', () => {
     });
 
     it('should read from disk if not cached', async () => {
-      mockFileSystem.exists.mockReturnValue(true);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.exists.mockResolvedValue(true);
+      mockFileSystem.readFile.mockResolvedValue('content');
       const arch = await workspace.getArchitecture('current');
       expect(arch).toBeDefined();
     });
 
     it('should return empty architecture if file not exists', async () => {
-      mockFileSystem.exists.mockReturnValue(false);
+      mockFileSystem.exists.mockResolvedValue(false);
       const arch = await workspace.getArchitecture('current');
       expect(arch).toBeDefined();
     });
@@ -113,8 +115,8 @@ describe('Workspace', () => {
 
   describe('loadPlan', () => {
     it('should load plan from disk', async () => {
-      mockFileSystem.exists.mockReturnValue(true);
-      mockFileSystem.readFile.mockReturnValue('plan content');
+      mockFileSystem.exists.mockResolvedValue(true);
+      mockFileSystem.readFile.mockResolvedValue('plan content');
       mockLoad.mockReturnValue({ plan_name: 'test', tasks: [] });
 
       const plan = await workspace.loadPlan();
@@ -122,8 +124,8 @@ describe('Workspace', () => {
     });
 
     it('should return cached plan if available', async () => {
-      mockFileSystem.exists.mockReturnValue(true);
-      mockFileSystem.readFile.mockReturnValue('plan content');
+      mockFileSystem.exists.mockResolvedValue(true);
+      mockFileSystem.readFile.mockResolvedValue('plan content');
       mockLoad.mockReturnValue({ plan_name: 'test', tasks: [] });
 
       const first = await workspace.loadPlan();
@@ -134,7 +136,7 @@ describe('Workspace', () => {
     });
 
     it('should return new plan if file does not exist', async () => {
-      mockFileSystem.exists.mockReturnValue(false);
+      mockFileSystem.exists.mockResolvedValue(false);
       const plan = await workspace.loadPlan();
       expect(plan).toBeInstanceOf(Plan);
       expect(plan.plan_name).toBe('New Plan');
@@ -142,24 +144,24 @@ describe('Workspace', () => {
   });
 
   describe('archiveArtifacts', () => {
-    it('should copy artifacts to archive if they exist', () => {
-      mockFileSystem.exists.mockReturnValue(true);
-      workspace.archiveArtifacts();
+    it('should copy artifacts to archive if they exist', async () => {
+      mockFileSystem.exists.mockResolvedValue(true);
+      await workspace.archiveArtifacts();
       expect(mockFileSystem.copy).toHaveBeenCalledTimes(2);
     });
 
-    it('should skip copying if artifacts do not exist', () => {
-      mockFileSystem.exists.mockReturnValue(false);
-      workspace.archiveArtifacts();
+    it('should skip copying if artifacts do not exist', async () => {
+      mockFileSystem.exists.mockResolvedValue(false);
+      await workspace.archiveArtifacts();
       expect(mockFileSystem.copy).not.toHaveBeenCalled();
     });
   });
 
   describe('detectSignal', () => {
     it('should detect valid signal', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['test.signal.yml']);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['test.signal.yml']);
+      mockFileSystem.readFile.mockResolvedValue('content');
       mockLoad.mockReturnValue({ type: 'FAIL', reason: 'user request' });
 
       const signal = await workspace.detectSignal();
@@ -168,10 +170,10 @@ describe('Workspace', () => {
     });
 
     it('should detect valid signal with .yaml extension', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['test.signal.yaml']);
-      mockFileSystem.readFile.mockReturnValue('content');
-      mockLoad.mockReturnValue({ type: 'NEXT', reason: 'ok' });
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['test.signal.yaml']);
+      mockFileSystem.readFile.mockResolvedValue('content');
+      mockLoad.mockReturnValue({ type: 'STATUS_NEXT', reason: 'ok' });
 
       const signal = await workspace.detectSignal();
       expect(signal).toBeDefined();
@@ -179,9 +181,9 @@ describe('Workspace', () => {
     });
 
     it('should skip files with other extensions', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['not-a-signal.txt', 'test.signal.yml']);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['not-a-signal.txt', 'test.signal.yml']);
+      mockFileSystem.readFile.mockResolvedValue('content');
       mockLoad.mockReturnValue({ type: 'NEXT', reason: 'ok' });
 
       const signal = await workspace.detectSignal();
@@ -190,22 +192,22 @@ describe('Workspace', () => {
     });
 
     it('should return null if no signals', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue([]);
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue([]);
       const signal = await workspace.detectSignal();
       expect(signal).toBeNull();
     });
 
     it('should return null if signals dir is not a directory', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(false);
+      mockFileSystem.isDirectory.mockResolvedValue(false);
       const signal = await workspace.detectSignal();
       expect(signal).toBeNull();
     });
 
     it('should warn and skip invalid signal file', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['invalid.signal.yml']);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['invalid.signal.yml']);
+      mockFileSystem.readFile.mockResolvedValue('content');
       mockLoad.mockReturnValue({}); // Missing type and reason
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -218,9 +220,9 @@ describe('Workspace', () => {
     });
 
     it('should handle parse error in signal file', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['bad.signal.yml']);
-      mockFileSystem.readFile.mockReturnValue('content');
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['bad.signal.yml']);
+      mockFileSystem.readFile.mockResolvedValue('content');
       mockLoad.mockImplementation(() => {
         throw new Error('Parse error');
       });
@@ -240,8 +242,8 @@ describe('Workspace', () => {
 
   describe('clearSignals', () => {
     it('should delete all files in signals directory', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(true);
-      mockFileSystem.listFiles.mockReturnValue(['s1.yml', 's2.yml']);
+      mockFileSystem.isDirectory.mockResolvedValue(true);
+      mockFileSystem.listFiles.mockResolvedValue(['s1.yml', 's2.yml']);
 
       await workspace.clearSignals();
 
@@ -249,7 +251,7 @@ describe('Workspace', () => {
     });
 
     it('should do nothing if signals dir is missing', async () => {
-      mockFileSystem.isDirectory.mockReturnValue(false);
+      mockFileSystem.isDirectory.mockResolvedValue(false);
       await workspace.clearSignals();
       expect(mockFileSystem.deleteFile).not.toHaveBeenCalled();
     });
@@ -264,14 +266,14 @@ describe('Workspace', () => {
     });
 
     it('should load state if exists', async () => {
-      mockFileSystem.exists.mockReturnValue(true);
+      mockFileSystem.exists.mockResolvedValue(true);
       mockLoad.mockReturnValue({ session_id: 'id', status: 'ready', tasks: [] });
       const state = await workspace.loadState();
       expect(state).toBeInstanceOf(EngineState);
     });
 
     it('should return undefined if state does not exist', async () => {
-      mockFileSystem.exists.mockReturnValue(false);
+      mockFileSystem.exists.mockResolvedValue(false);
       const state = await workspace.loadState();
       expect(state).toBeUndefined();
     });
@@ -279,9 +281,7 @@ describe('Workspace', () => {
 
   describe('async write error handling', () => {
     it('should log error if write fails', async () => {
-      mockFileSystem.writeFileAtomic.mockImplementation(() => {
-        throw new Error('Write failed');
-      });
+      mockFileSystem.writeFileAtomic.mockRejectedValue(new Error('Write failed'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       await workspace.saveState(new EngineState('id'));

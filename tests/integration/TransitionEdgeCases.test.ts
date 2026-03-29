@@ -36,7 +36,7 @@ describe('Workflow Transition Edge Cases', () => {
 
   test('should transition from PLANNING back to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCase' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
@@ -44,12 +44,12 @@ describe('Workflow Transition Edge Cases', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request) {
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
-        // @ts-ignore
-        if (options?.params?.user_prompt) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt) {
           return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
         }
         return Promise.resolve(Result.ok('OK'));
@@ -80,7 +80,7 @@ describe('Workflow Transition Edge Cases', () => {
 
   test('should transition from EXECUTING to ARCHITECTING on REARCHITECT signal', async (): Promise<void> => {
     await fixture.writeConfig({ project_name: 'EdgeCaseExec' });
-    await fixture.writeSkill('executor', { name: 'executor', provider: 'gemini' });
+    await fixture.writeSkill('executor', { name: 'executor', execution: { provider: 'gemini' } });
     const orchestrator = await fixture.initOrchestrator();
 
     let rearchitected = false;
@@ -88,12 +88,12 @@ describe('Workflow Transition Edge Cases', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request) {
           return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
         }
-        // @ts-ignore
-        if (options?.params?.user_prompt) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt) {
           return Promise.resolve(Result.ok(ProjectFixture.createPlanResult()));
         }
         // Executor logic

@@ -25,12 +25,12 @@ export class AnalystAgent {
     const logPath = this.project.paths.log;
 
     // 1. Check if there is anything to analyze
-    if (!this.project.fileSystem.exists(logPath)) {
+    if (!(await this.project.fileSystem.exists(logPath))) {
       this.host.log('info', 'Analyst: No evolution log found to analyze.');
       return;
     }
 
-    const logContent = this.project.fileSystem.readFile(logPath);
+    const logContent = await this.project.fileSystem.readFile(logPath);
     if (!logContent || logContent.trim().length === 0) {
       this.host.log('info', 'Analyst: Evolution log is empty.');
       return;
@@ -66,7 +66,7 @@ export class AnalystAgent {
       // Analyst doesn't need clarification or complex command running usually, but we provide basics
       clarificationHandler: async (q) => {
         this.host.log('warn', `Analyst asked for clarification: ${q}. Returning empty.`);
-        return '';
+        return await Promise.resolve('');
       },
       commandRunner: async (cmd, args) => {
         const result = await this.shell.execute(cmd, args || []);
@@ -84,7 +84,7 @@ export class AnalystAgent {
         this.host.log('info', `Analyst completed: ${result.unwrap()}`);
 
         // 5. Reset Log (Only on success)
-        this.project.fileSystem.deleteFile(logPath);
+        await this.project.fileSystem.deleteFile(logPath);
         this.host.log('info', 'Analyst: Evolution log reset.');
       }
     } catch (e) {

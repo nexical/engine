@@ -13,7 +13,7 @@ export interface IWorkspace {
   saveArchitecture(doc: Architecture): Promise<void>;
   loadPlan(): Promise<Plan>;
   savePlan(doc: Plan): Promise<void>;
-  archiveArtifacts(): void;
+  archiveArtifacts(): Promise<void>;
   detectSignal(path?: string): Promise<Signal | null>;
   clearSignals(): Promise<void>;
   saveState(state: EngineState): Promise<void>;
@@ -34,9 +34,9 @@ export class Workspace implements IWorkspace {
     const promise = (async (): Promise<void> => {
       const release = await this.disk.acquireLock(filePath);
       try {
-        this.disk.writeFileAtomic(filePath, content);
+        await this.disk.writeFileAtomic(filePath, content);
       } finally {
-        release();
+        await release();
       }
     })();
 
@@ -62,8 +62,8 @@ export class Workspace implements IWorkspace {
     }
 
     const pathString = this.project.paths.architectureCurrent;
-    if (this.disk.exists(pathString)) {
-      const content = this.disk.readFile(pathString);
+    if (await this.disk.exists(pathString)) {
+      const content = await this.disk.readFile(pathString);
       const doc = Architecture.fromMarkdown(content);
       this.cache.set('architecture', doc);
       return doc;
@@ -83,8 +83,8 @@ export class Workspace implements IWorkspace {
     }
 
     const pathString = this.project.paths.planCurrent;
-    if (this.disk.exists(pathString)) {
-      const content = this.disk.readFile(pathString);
+    if (await this.disk.exists(pathString)) {
+      const content = await this.disk.readFile(pathString);
       const plan = Plan.fromYaml(content);
       this.cache.set('plan', plan);
       return plan;
@@ -97,24 +97,24 @@ export class Workspace implements IWorkspace {
     await this.scheduleWrite(this.project.paths.planCurrent, doc.toYaml());
   }
 
-  public archiveArtifacts(): void {
+  public async archiveArtifacts(): Promise<void> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const archiveDir = this.project.paths.archive;
 
     // Archive architecture
     const archCurrent = this.project.paths.architectureCurrent;
-    if (this.disk.exists(archCurrent)) {
+    if (await this.disk.exists(archCurrent)) {
       const archArchive = nodePath.join(archiveDir, `${timestamp}.architecture.md`);
-      this.disk.copy(archCurrent, archArchive);
-      this.disk.deleteFile(archCurrent);
+      await this.disk.copy(archCurrent, archArchive);
+      await this.disk.deleteFile(archCurrent);
     }
 
     // Archive plan
     const planCurrent = this.project.paths.planCurrent;
-    if (this.disk.exists(planCurrent)) {
+    if (await this.disk.exists(planCurrent)) {
       const planArchive = nodePath.join(archiveDir, `${timestamp}.plan.yml`);
-      this.disk.copy(planCurrent, planArchive);
-      this.disk.deleteFile(planCurrent);
+      await this.disk.copy(planCurrent, planArchive);
+      await this.disk.deleteFile(planCurrent);
     }
   }
 
@@ -125,12 +125,12 @@ export class Workspace implements IWorkspace {
    */
   public async detectSignal(path?: string): Promise<Signal | null> {
     const signalsDir = path || this.project.paths.signals;
-    if (!this.disk.isDirectory(signalsDir)) return null;
+    if (!(await this.disk.isDirectory(signalsDir))) return null;
 
-    const files = this.disk.listFiles(signalsDir);
+    const files = await this.disk.listFiles(signalsDir);
     for (const file of files) {
       if (file.endsWith('.signal.yml') || file.endsWith('.signal.yaml')) {
-        const content = this.disk.readFile(`${signalsDir}/${file}`);
+        const content = await this.disk.readFile(`${signalsDir}/${file}`);
         try {
           const data = yaml.load(content) as { type: string; reason: string; metadata?: Record<string, unknown> };
           // Validate minimal signal structure
@@ -154,13 +154,12 @@ export class Workspace implements IWorkspace {
    */
   public async clearSignals(): Promise<void> {
     const signalsDir = this.project.paths.signals;
-    if (this.disk.isDirectory(signalsDir)) {
-      const files = this.disk.listFiles(signalsDir);
+    if (await this.disk.isDirectory(signalsDir)) {
+      const files = await this.disk.listFiles(signalsDir);
       for (const file of files) {
-        this.disk.deleteFile(`${signalsDir}/${file}`);
+        await this.disk.deleteFile(`${signalsDir}/${file}`);
       }
     }
-    await Promise.resolve();
   }
 
   public async saveState(state: EngineState): Promise<void> {
@@ -168,10 +167,10 @@ export class Workspace implements IWorkspace {
   }
 
   public async loadState(): Promise<EngineState | undefined> {
-    if (this.disk.exists(this.project.paths.state)) {
-      const content = this.disk.readFile(this.project.paths.state);
-      return await Promise.resolve(EngineState.fromYaml(content));
+    if (await this.disk.exists(this.project.paths.state)) {
+      const content = await this.disk.readFile(this.project.paths.state);
+      return EngineState.fromYaml(content);
     }
-    return await Promise.resolve(undefined);
+    return undefined;
   }
 }

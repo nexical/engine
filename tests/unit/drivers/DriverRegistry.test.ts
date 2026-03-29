@@ -219,11 +219,11 @@ describe('DriverRegistry', () => {
       expect(registryNoConfig.getDefault()?.name).toBe('gemini');
     });
 
-    it('should handle recursive find with non-dir file', () => {
+    it('should handle recursive find with non-dir file', async () => {
       // Hit line 91
-      const result = (registry as unknown as { findDriversRecursive: (p: string) => unknown[] }).findDriversRecursive(
-        path.join(tempDir, 'ValidDriver.js'),
-      );
+      const result = await (
+        registry as unknown as { findDriversRecursive: (p: string) => Promise<unknown[]> }
+      ).findDriversRecursive(path.join(tempDir, 'ValidDriver.js'));
       expect(result).toEqual([]);
 
       // Also hit line 21 (FileSystemService default)

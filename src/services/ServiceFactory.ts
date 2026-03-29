@@ -185,6 +185,8 @@ export class ServiceFactory {
 
     // Resolve and Initialize what needs initialization
     const project = container.resolve<IProject>('project');
+    await project.init();
+
     const brain = container.resolve<Brain>('brain');
 
     // Note: Brain initialization is now the responsibility of the Orchestrator
@@ -192,12 +194,12 @@ export class ServiceFactory {
     const workspace = container.resolve<IWorkspace>('workspace');
     const session = container.resolve<Session>('session');
 
-    return {
+    return await Promise.resolve({
       project,
       brain,
       workspace,
       session,
       container,
-    };
+    });
   }
 }

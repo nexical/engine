@@ -43,10 +43,12 @@ describe('Session Resumption Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        // @ts-ignore
-        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt)
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
         return Promise.resolve(Result.ok('OK'));
       },
     );
@@ -70,10 +72,12 @@ describe('Session Resumption Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        // @ts-ignore
-        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt)
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
         return Promise.resolve(Result.ok('OK'));
       },
     );
@@ -100,10 +104,11 @@ describe('Session Resumption Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       async (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_request) return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
-        // @ts-ignore
-        if (options?.params?.user_prompt) {
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_request)
+          return Promise.resolve(Result.ok(ProjectFixture.createArchitectResult()));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt) {
           // Force state save before crashing
           await orchestrator1.workspace.saveState(orchestrator1.session.state);
           return Promise.resolve(Result.fail(new Error('Stop here'))); // Simulate crash
@@ -135,8 +140,9 @@ describe('Session Resumption Integration', () => {
     fixture.registerMockDriver(
       'gemini',
       (config: DriverConfig, options?: IDriverContext): Promise<Result<string, Error>> => {
-        // @ts-ignore
-        if (options?.params?.user_prompt) return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
+        // @ts-expect-error: Accessing internal properties for testing
+        if ((options?.params as Record<string, unknown>)?.user_prompt)
+          return Promise.resolve(Result.ok(ProjectFixture.createPlanResult([])));
         return Promise.resolve(Result.ok('OK'));
       },
     );

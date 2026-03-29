@@ -207,7 +207,6 @@ describe('PlannerAgent', () => {
       await capturedContext!.commandRunner('ls');
       expect(mockShellExecute).toHaveBeenCalledWith('ls', []);
     });
-
     it('should handle non-Error exceptions during plan parsing', async () => {
       const mockArch = new Architecture('');
       mockSkill.execute.mockResolvedValue(Result.ok('plan_name: ok\ntasks: []'));
@@ -220,6 +219,59 @@ describe('PlannerAgent', () => {
       expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to parse plan YAML'));
 
       planSpy.mockRestore();
+    });
+
+    it('should handle skill execution fail without error object', async () => {
+      const mockArch = new Architecture('');
+      mockSkill.execute.mockResolvedValue(Result.fail(undefined as any));
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('Skill execution failed');
+    });
+
+    it('should cover String(e) fallback in YAML parsing error', async () => {
+      const mockArch = new Architecture('');
+      mockSkill.execute.mockResolvedValue(Result.ok('plan_name: ok'));
+      jest.spyOn(Plan, 'fromYaml').mockImplementation(() => {
+        throw 'string parse error';
+      });
+
+      await expect(agent.plan(mockArch, 'req')).rejects.toThrow('string parse error');
+      expect(mockHost.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to parse plan YAML: string parse error'),
+      );
+      (Plan.fromYaml as jest.Mock).mockRestore();
+    });
+
+    it('should handle clarificationHandler with missing data/answers', async () => {
+      let capturedContext: ISkillContext | undefined;
+      mockSkill.execute.mockImplementation(async (context: ISkillContext) => {
+        capturedContext = context;
+        return Result.ok('plan_name: ok\ntasks: []');
+      });
+      const mockArch = new Architecture('');
+      mockWorkspace.loadPlan.mockResolvedValue(new Plan('ok'));
+
+      await agent.plan(mockArch, 'req');
+
+      // Case 1: payload is null
+      mockBus.waitForResponse.mockResolvedValue({ id: '1', source: 'a', payload: null });
+      const ans1 = await capturedContext!.clarificationHandler('Q?');
+      expect(ans1).toBe('');
+
+      const ans2 = await capturedContext!.clarificationHandler('Q?');
+      expect(ans2).toBe('');
+    });
+
+    it('should cover skill map callback in plan params', async () => {
+      const mockArch = new Architecture('');
+      mockSkill.execute.mockResolvedValue(Result.ok('plan_name: ok\ntasks: []'));
+      mockSkillRegistry.getSkills.mockReturnValue([{ name: 's1', description: 'd1' }] as any);
+      mockWorkspace.loadPlan.mockResolvedValue(new Plan('ok'));
+
+      await agent.plan(mockArch, 'req');
+
+      const capturedParams = (mockSkill.execute.mock.calls[0][0] as any).params;
+      expect(capturedParams.agent_skills).toBe(JSON.stringify([{ name: 's1', description: 'd1' }]));
     });
   });
 });

@@ -60,15 +60,15 @@ export class FileSystemBus {
         this.messageQueue = this.messageQueue.then(async () => {
           try {
             // Check if file still exists (it might be processed by another event if duplications occure, safe guard)
-            if (!this.project.fileSystem.exists(filePath)) return;
+            if (!(await this.project.fileSystem.exists(filePath))) return;
 
-            const content = this.project.fileSystem.readFile(filePath);
+            const content = await this.project.fileSystem.readFile(filePath);
             const message = JSON.parse(content) as IBusMessage;
 
             await handler(message);
 
             // Processed, delete the request file
-            this.project.fileSystem.deleteFile(filePath);
+            await this.project.fileSystem.deleteFile(filePath);
           } catch (error) {
             // eslint-disable-next-line no-console
             console.error(`Error processing inbox message ${filePath}:`, error);
@@ -102,7 +102,7 @@ export class FileSystemBus {
    * Sends a request to the Inbox (Planner/Task -> Architect).
    * Uses unique filename to prevent collisions.
    */
-  public sendRequest(message: IBusMessage): void {
+  public async sendRequest(message: IBusMessage): Promise<void> {
     // Unique filename: req_SOURCE_CORRELATIONID_TIMESTAMP_RANDOM.json
     const safeSource = message.source.replace(/[^a-zA-Z0-9_-]/g, '');
     const safeId = (message.correlationId || message.id).replace(/[^a-zA-Z0-9_-]/g, '');
@@ -113,13 +113,13 @@ export class FileSystemBus {
     const filePath = path.join(this.inboxPath, fileName);
 
     message.timestamp = timestamp;
-    this.project.fileSystem.writeFile(filePath, JSON.stringify(message, null, 2));
+    await this.project.fileSystem.writeFile(filePath, JSON.stringify(message, null, 2));
   }
 
   /**
    * Writes a response to the Outbox (Architect -> Planner/Task).
    */
-  public sendResponse(correlationId: string, payload: Record<string, unknown>): void {
+  public async sendResponse(correlationId: string, payload: Record<string, unknown>): Promise<void> {
     const id = uuidv4();
     const message: IBusMessage = {
       id,
@@ -134,7 +134,7 @@ export class FileSystemBus {
     const fileName = `res_architect_${correlationId}.json`;
     const filePath = path.join(this.outboxPath, fileName);
 
-    this.project.fileSystem.writeFile(filePath, JSON.stringify(message, null, 2));
+    await this.project.fileSystem.writeFile(filePath, JSON.stringify(message, null, 2));
   }
 
   private ensureOutboxWatcher(): void {
@@ -154,7 +154,6 @@ export class FileSystemBus {
 
       this.outboxWatcher.on('add', (filePath) => {
         try {
-          const fileName = path.basename(filePath);
           // Emit event with filename or content
           // We emit the filename so listeners can check if it matches their correlationId
           this.responseEmitter.emit('file-added', filePath);
@@ -183,59 +182,46 @@ export class FileSystemBus {
     const expectedFileName = `res_architect_${correlationId}.json`;
     const expectedFilePath = path.join(this.outboxPath, expectedFileName);
 
-    // 1. Check if file already exists (race condition: arrival before we wait)
-    if (this.project.fileSystem.exists(expectedFilePath)) {
-      return this.readAndCleanupResponse(expectedFilePath);
-    }
-
     // 2. Wait for event
     return new Promise((resolve, reject) => {
-      let timeoutTimer: NodeJS.Timeout;
-
-      const onFileAdded = (filePath: string) => {
-        if (path.basename(filePath) === expectedFileName) {
-          cleanup();
-          try {
-            const msg = this.readAndCleanupResponse(filePath);
-            resolve(msg);
-          } catch (e) {
-            reject(e);
-          }
-        }
-      };
-
-      const cleanup = () => {
-        this.responseEmitter.off('file-added', onFileAdded);
-        if (timeoutTimer) clearTimeout(timeoutTimer);
-      };
-
-      // Set timeout
-      timeoutTimer = setTimeout(() => {
+      const timeoutTimer: NodeJS.Timeout = setTimeout(() => {
         cleanup();
         reject(new Error(`Timeout waiting for response to correlationId: ${correlationId}`));
       }, timeoutMs);
 
+      const onFileAdded = (filePath: string): void => {
+        if (path.basename(filePath) === expectedFileName) {
+          cleanup();
+          this.readAndCleanupResponse(filePath).then(resolve).catch(reject);
+        }
+      };
+
+      const cleanup = (): void => {
+        this.responseEmitter.off('file-added', onFileAdded);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
+      };
+
       // Listen
       this.responseEmitter.on('file-added', onFileAdded);
 
-      // Double check file existence after setting listener to close small race gap
-      if (this.project.fileSystem.exists(expectedFilePath)) {
-        cleanup();
-        try {
-          const msg = this.readAndCleanupResponse(expectedFilePath);
-          resolve(msg);
-        } catch (e) {
-          reject(e);
-        }
-      }
+      // Check if file already exists (race condition: arrival before we wait)
+      this.project.fileSystem
+        .exists(expectedFilePath)
+        .then((exists) => {
+          if (exists) {
+            cleanup();
+            this.readAndCleanupResponse(expectedFilePath).then(resolve).catch(reject);
+          }
+        })
+        .catch(reject);
     });
   }
 
-  private readAndCleanupResponse(filePath: string): IBusMessage {
-    const content = this.project.fileSystem.readFile(filePath);
+  private async readAndCleanupResponse(filePath: string): Promise<IBusMessage> {
+    const content = await this.project.fileSystem.readFile(filePath);
     const message = JSON.parse(content) as IBusMessage;
     // Cleanup response
-    this.project.fileSystem.deleteFile(filePath);
+    await this.project.fileSystem.deleteFile(filePath);
     return message;
   }
 }
