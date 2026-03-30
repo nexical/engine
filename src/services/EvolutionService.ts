@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { IFileSystem } from '../domain/IFileSystem.js';
 import { IProject } from '../domain/Project.js';
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { Signal } from '../workflow/Signal.js';
 
 export const EvolutionEntrySchema = z.object({
@@ -28,6 +29,7 @@ export class EvolutionService implements IEvolutionService {
   constructor(
     private project: IProject,
     private disk: IFileSystem,
+    private host?: IRuntimeHost,
   ) {}
 
   public async recordEvent(
@@ -121,8 +123,9 @@ export class EvolutionService implements IEvolutionService {
         })
         .join('\n\n');
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to read evolution log:', e);
+      if (this.host) {
+        this.host.log('error', `Failed to read evolution log: ${(e as Error).message}`);
+      }
       return null;
     }
   }
@@ -161,8 +164,9 @@ export class EvolutionService implements IEvolutionService {
 
       return wisdoms.join('\n\n');
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to retrieve long-term wisdom:', error);
+      if (this.host) {
+        this.host.log('error', `Failed to retrieve long-term wisdom: ${(error as Error).message}`);
+      }
       return null;
     }
   }

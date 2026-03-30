@@ -40,13 +40,18 @@ export class ServiceFactory {
 
     // 2. Register Project
     container.registerFactory('project', () => {
-      return new Project(container.resolve<string>('rootDirectory'), container.resolve<IFileSystem>('fileSystem'));
+      return new Project(
+        container.resolve<string>('rootDirectory'),
+        container.resolve<IFileSystem>('fileSystem'),
+        container.resolve<IRuntimeHost>('host'),
+      );
     });
 
     // 3. Register Workspace
     container.registerFactory('workspace', () => {
       const project = container.resolve<IProject>('project');
-      return new Workspace(project);
+      const host = container.resolve<IRuntimeHost>('host');
+      return new Workspace(project, host);
     });
 
     // 4. Register Sub-Services
@@ -81,7 +86,8 @@ export class ServiceFactory {
     container.registerFactory('evolutionService', () => {
       const project = container.resolve<IProject>('project');
       const fs = container.resolve<IFileSystem>('fileSystem');
-      return new EvolutionService(project as Project, fs as FileSystemService);
+      const host = container.resolve<IRuntimeHost>('host');
+      return new EvolutionService(project as Project, fs as FileSystemService, host);
     });
 
     container.registerFactory('gitService', () => {
@@ -93,12 +99,14 @@ export class ServiceFactory {
     container.registerFactory('fileSystemBus', () => {
       const project = container.resolve<IProject>('project');
       const fs = container.resolve<IFileSystem>('fileSystem');
-      return new FileSystemBus(project, fs);
+      const host = container.resolve<IRuntimeHost>('host');
+      return new FileSystemBus(project, fs, host);
     });
 
     container.registerFactory('signalService', () => {
       const fs = container.resolve<IFileSystem>('fileSystem');
-      return new SignalService(fs as FileSystemService);
+      const host = container.resolve<IRuntimeHost>('host');
+      return new SignalService(fs as FileSystemService, host);
     });
 
     // 5. Register Brain

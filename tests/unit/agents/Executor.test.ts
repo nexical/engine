@@ -1,10 +1,24 @@
-/* eslint-disable */
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 import { jest } from '@jest/globals';
+
+import type { Executor } from '../../../src/agents/Executor.js';
+import { Plan } from '../../../src/domain/Plan.js';
+import { IProject, ProjectProfile } from '../../../src/domain/Project.js';
+import { Result } from '../../../src/domain/Result.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import { ISkillContext } from '../../../src/domain/SkillConfig.js';
+import { EngineState } from '../../../src/domain/State.js';
+import { Task } from '../../../src/domain/Task.js';
+import { IWorkspace } from '../../../src/domain/Workspace.js';
+import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
+import { FileSystemBus } from '../../../src/services/FileSystemBus.js';
+import { GitService } from '../../../src/services/GitService.js';
+import { IPromptEngine } from '../../../src/services/PromptEngine.js';
+import { SignalService } from '../../../src/services/SignalService.js';
+import { ISkillRegistry } from '../../../src/services/SkillRegistry.js';
+import { Signal } from '../../../src/workflow/Signal.js';
 
 const mockExecSync = jest.fn<(command: string, options?: { cwd?: string }) => string>();
 const mockEnsureDirSync = jest.fn();
-const mockShellExecute = jest.fn<(...args: any[]) => Promise<any>>();
 const mockCopySync = jest.fn();
 
 jest.unstable_mockModule('child_process', () => ({
@@ -20,25 +34,8 @@ jest.unstable_mockModule('fs-extra', () => ({
   },
 }));
 
-import type { Executor } from '../../../src/agents/Executor.js';
-import { Plan } from '../../../src/domain/Plan.js';
-import { IProject } from '../../../src/domain/Project.js';
-import { Result } from '../../../src/domain/Result.js';
-import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
-import { ISkillContext } from '../../../src/domain/SkillConfig.js';
-import { EngineState } from '../../../src/domain/State.js';
-import { Task } from '../../../src/domain/Task.js';
-import { IWorkspace } from '../../../src/domain/Workspace.js';
-import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
-import { FileSystemBus } from '../../../src/services/FileSystemBus.js';
-import { GitService } from '../../../src/services/GitService.js';
-import { IPromptEngine } from '../../../src/services/PromptEngine.js';
-import { SignalService } from '../../../src/services/SignalService.js';
-import { ISkillRegistry } from '../../../src/services/SkillRegistry.js';
-import { Signal } from '../../../src/workflow/Signal.js';
-
 // Dynamic import for Executor class to ensure mock works
-let ExecutorClass: any;
+let ExecutorClass: typeof Executor;
 
 describe('Executor', () => {
   let agent: Executor;
@@ -52,7 +49,7 @@ describe('Executor', () => {
   let mockPromptEngine: jest.Mocked<IPromptEngine>;
   let mockSignalService: jest.Mocked<SignalService>;
   let mockSkill: {
-    execute: jest.Mock<(...args: any[]) => Promise<Result<string, Error>>>;
+    execute: jest.Mock<(context: ISkillContext) => Promise<Result<string, Error>>>;
     getEnvironmentSpec: jest.Mock;
   };
   let state: EngineState;
@@ -60,7 +57,7 @@ describe('Executor', () => {
   beforeEach(async () => {
     // Import module dynamically
     const module = await import('../../../src/agents/Executor.js');
-    ExecutorClass = module.Executor;
+    ExecutorClass = module.Executor as unknown as typeof Executor;
 
     jest.clearAllMocks();
     mockExecSync.mockReset();
@@ -73,10 +70,12 @@ describe('Executor', () => {
       getConstraints: jest.fn().mockReturnValue('constraints'),
       rootDirectory: '/tmp',
       fileSystem: {
-        writeFile: jest.fn(),
-        exists: jest.fn(),
-        readFile: jest.fn(),
-        deleteFile: jest.fn(),
+        writeFile: jest
+          .fn<(filePath: string, content: string | Buffer) => Promise<void>>()
+          .mockResolvedValue(undefined),
+        exists: jest.fn<(filePath: string) => Promise<boolean>>().mockResolvedValue(true),
+        readFile: jest.fn<(filePath: string) => Promise<string>>().mockResolvedValue(''),
+        deleteFile: jest.fn<(filePath: string) => Promise<void>>().mockResolvedValue(undefined),
       },
     } as unknown as jest.Mocked<IProject>;
 
@@ -261,7 +260,7 @@ describe('Executor', () => {
     it('should throw if Git is missing', async () => {
       const plan = new Plan('plan', [new Task('1', 'task', 'desc', 'skill')]);
       mockWorkspace.loadPlan.mockResolvedValue(plan);
-      (agent as any).git = undefined;
+      (agent as unknown as { git: GitService | undefined }).git = undefined;
 
       await expect(agent.execute(state)).rejects.toThrow('Git is required');
     });
@@ -277,7 +276,10 @@ describe('Executor', () => {
     it('should update submodules if configured', async () => {
       const plan = new Plan('plan', [new Task('1', 'task', 'desc', 'skill')]);
       mockWorkspace.loadPlan.mockResolvedValue(plan);
-      mockProject.getConfig.mockReturnValue({ max_worktrees: 4, git: { submodules: true } } as any);
+      mockProject.getConfig.mockResolvedValue({
+        max_worktrees: 4,
+        git: { submodules: true },
+      } as ProjectProfile);
 
       await agent.execute(state);
       expect(mockGit.submoduleUpdate).toHaveBeenCalled();
@@ -306,7 +308,7 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       // Force stash push success then pop fail
-      mockGit.runCommand.mockImplementation((args: any) => {
+      mockGit.runCommand.mockImplementation((args: string[]) => {
         if (args[0] === 'stash' && args[1] === 'push') return 'Saved working directory';
         if (args[0] === 'stash' && args[1] === 'pop') throw new Error('pop fail');
         return '';
@@ -374,9 +376,9 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       let capturedContext: ISkillContext | undefined;
-      mockSkill.execute.mockImplementation(async (ctx: any) => {
+      mockSkill.execute.mockImplementation((ctx: ISkillContext) => {
         capturedContext = ctx;
-        return Result.ok('ok');
+        return Promise.resolve(Result.ok('ok'));
       });
 
       await agent.execute(state);
@@ -410,7 +412,7 @@ describe('Executor', () => {
       mockGit.merge.mockImplementation(() => {
         throw new Error('merge error');
       });
-      mockGit.runCommand.mockImplementation((args: any) => {
+      mockGit.runCommand.mockImplementation((args: string[]) => {
         if (args[0] === 'merge' && args[1] === '--abort') throw new Error('abort fail');
         return '';
       });
@@ -424,13 +426,6 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       // We need to trigger the catch block of the analyst agent inside the finally block
-      // AnalystAgent is instantiated inside Executor.execute
-      // But it's hard to mock it unless we mock the constructor or its methods.
-      // Since it's imported normally, let's just make it throw.
-      // Wait, AnalystAgent is imported at the top of Executor.ts.
-      // We can't easily mock it now because it's already bound.
-      // BUT, we can mock the FileSystem to make it throw during analyst.analyze()
-
       (mockProject.fileSystem.exists as jest.Mock).mockImplementation(() => {
         throw new Error('FileSystem crash');
       });
@@ -441,7 +436,7 @@ describe('Executor', () => {
 
     it('should cover String(e) fallback in constructor', () => {
       mockGit.cleanStaleWorktrees.mockImplementation(() => {
-        throw 'string constructor error';
+        throw new Error('string constructor error');
       });
       new ExecutorClass(
         mockProject,
@@ -456,7 +451,7 @@ describe('Executor', () => {
       );
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('Failed to clean stale worktrees: string constructor error'),
+        expect.stringContaining('Failed to clean stale worktrees: Error: string constructor error'),
       );
     });
 
@@ -464,11 +459,11 @@ describe('Executor', () => {
       const plan = new Plan('fail plan', [new Task('1', 't', 'm', 's')]);
       mockWorkspace.loadPlan.mockResolvedValue(plan);
       mockSkill.execute.mockImplementation(() => {
-        throw 'task throw';
+        throw new Error('task throw');
       });
 
       await agent.execute(state).catch(() => {});
-      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Task 1 failed: task throw'));
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Task 1 failed: Error: task throw'));
     });
 
     it('should cover String(e) fallback in merge failure', async () => {
@@ -476,13 +471,13 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
       mockSkill.execute.mockResolvedValue(Result.ok('ok'));
       mockGit.merge.mockImplementation(() => {
-        throw 'merge throw';
+        throw new Error('merge throw');
       });
 
       await expect(agent.execute(state)).rejects.toThrow('Manual resolution required');
       expect(mockHost.log).toHaveBeenCalledWith(
         'error',
-        expect.stringContaining('Merge failed for task 1 from branch task/1: merge throw'),
+        expect.stringContaining('Merge failed for task 1 from branch task/1: Error: merge throw'),
       );
     });
 
@@ -491,15 +486,15 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
       mockSkill.execute.mockResolvedValue(Result.ok('ok'));
 
-      mockGit.runCommand.mockImplementation((args: any) => {
-        if (args[0] === 'stash' && args[1] === 'push') throw 'stash throw';
+      mockGit.runCommand.mockImplementation((args: string[]) => {
+        if (args[0] === 'stash' && args[1] === 'push') throw new Error('stash throw');
         return '';
       });
 
       await agent.execute(state);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('Failed to stash changes: stash throw'),
+        expect.stringContaining('Failed to stash changes: Error: stash throw'),
       );
     });
 
@@ -508,13 +503,13 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
       mockSkill.execute.mockResolvedValue(Result.ok('ok'));
       mockGit.worktreeRemove.mockImplementation(() => {
-        throw 'rm throw';
+        throw new Error('rm throw');
       });
 
       await agent.execute(state);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('Failed to cleanup worktree /tmp/.worktrees/1: rm throw'),
+        expect.stringContaining('Failed to cleanup worktree /tmp/.worktrees/1: Error: rm throw'),
       );
     });
 
@@ -523,13 +518,13 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
       mockSkill.execute.mockResolvedValue(Result.ok('ok'));
       mockGit.worktreePrune.mockImplementation(() => {
-        throw 'prune throw';
+        throw new Error('prune throw');
       });
 
       await agent.execute(state);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('Failed to prune worktrees: prune throw'),
+        expect.stringContaining('Failed to prune worktrees: Error: prune throw'),
       );
     });
 
@@ -539,9 +534,9 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       let capturedContext: ISkillContext | undefined;
-      mockSkill.execute.mockImplementation(async (ctx: any) => {
+      mockSkill.execute.mockImplementation((ctx: ISkillContext) => {
         capturedContext = ctx;
-        return Result.ok('ok');
+        return Promise.resolve(Result.ok('ok'));
       });
 
       state.user_prompt = 'global prompt';
@@ -555,9 +550,9 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       let capturedContext: ISkillContext | undefined;
-      mockSkill.execute.mockImplementation(async (ctx: any) => {
+      mockSkill.execute.mockImplementation((ctx: ISkillContext) => {
         capturedContext = ctx;
-        return Result.ok('ok');
+        return Promise.resolve(Result.ok('ok'));
       });
 
       await agent.execute(state);
@@ -587,12 +582,12 @@ describe('Executor', () => {
       const plan = new Plan('plan', [new Task('1', 't', 'm', 'skill')]);
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
-      mockSkill.execute.mockResolvedValue(Result.fail(undefined as any));
+      mockSkill.execute.mockResolvedValue(Result.fail(undefined as unknown as Error));
 
       await agent.execute(state).catch(() => {});
       expect(mockHost.log).toHaveBeenCalledWith(
         'error',
-        expect.stringContaining('Task 1 failed: Skill execution failed'),
+        expect.stringContaining('Task 1 failed: Error: Skill execution failed'),
       );
     });
 
@@ -601,9 +596,9 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       let capturedContext: ISkillContext | undefined;
-      mockSkill.execute.mockImplementation(async (ctx: any) => {
+      mockSkill.execute.mockImplementation((ctx: ISkillContext) => {
         capturedContext = ctx;
-        return Result.ok('ok');
+        return Promise.resolve(Result.ok('ok'));
       });
 
       await agent.execute(state);
@@ -618,16 +613,16 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       // Force stash push success then pop fail with string
-      mockGit.runCommand.mockImplementation((args: any) => {
+      mockGit.runCommand.mockImplementation((args: string[]) => {
         if (args[0] === 'stash' && args[1] === 'push') return 'Saved working directory';
-        if (args[0] === 'stash' && args[1] === 'pop') throw 'pop string fail';
+        if (args[0] === 'stash' && args[1] === 'pop') throw new Error('pop string fail');
         return '';
       });
 
       await agent.execute(state);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('Stash pop failed (conflict?): pop string fail'),
+        expect.stringContaining('Stash pop failed (conflict?): Error: pop string fail'),
       );
     });
 
@@ -636,14 +631,30 @@ describe('Executor', () => {
       mockWorkspace.loadPlan.mockResolvedValue(plan);
 
       (mockProject.fileSystem.exists as jest.Mock).mockImplementation(() => {
-        throw 'analyst string crash';
+        throw new Error('analyst string crash');
       });
 
       await agent.execute(state);
       expect(mockHost.log).toHaveBeenCalledWith(
         'warn',
-        expect.stringContaining('AnalystAgent failed to run: analyst string crash'),
+        expect.stringContaining('AnalystAgent failed to run: Error: analyst string crash'),
       );
+    });
+
+    it('should handle commandRunner with args and success', async () => {
+      const plan = new Plan('plan', [new Task('1', 't', 'm', 'skill')]);
+      mockWorkspace.loadPlan.mockResolvedValue(plan);
+      let capturedContext: ISkillContext | undefined;
+      mockSkill.execute.mockImplementation((ctx: ISkillContext) => {
+        capturedContext = ctx;
+        return Promise.resolve(Result.ok('ok'));
+      });
+
+      await agent.execute(state);
+      mockExecSync.mockReturnValue('output');
+      const out = await capturedContext?.commandRunner('ls', ['-la']);
+      expect(mockExecSync).toHaveBeenCalledWith('ls -la', expect.any(Object));
+      expect(out).toBe('output');
     });
   });
 });

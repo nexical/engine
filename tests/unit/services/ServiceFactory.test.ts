@@ -185,7 +185,7 @@ describe('ServiceFactory', () => {
 
     // Test Project Factory
     factories['project']?.();
-    expect(MockProject).toHaveBeenCalledWith('/root', mockFileSystem);
+    expect(MockProject).toHaveBeenCalledWith('/root', mockFileSystem, mockHost);
 
     // Test DriverRegistry Factory
     factories['driverRegistry']?.();
@@ -205,7 +205,7 @@ describe('ServiceFactory', () => {
 
     // Test FileSystemBus Factory
     factories['fileSystemBus']?.();
-    expect(MockFileSystemBus).toHaveBeenCalledWith(mockProject, mockFileSystem);
+    expect(MockFileSystemBus).toHaveBeenCalledWith(mockProject, mockFileSystem, mockHost);
 
     // Test Brain Factory
     factories['brain']?.();
@@ -274,7 +274,7 @@ describe('ServiceFactory', () => {
 
     // Test Workspace Factory
     factories['workspace']?.();
-    expect(MockWorkspace).toHaveBeenCalledWith(mockProject);
+    expect(MockWorkspace).toHaveBeenCalledWith(mockProject, mockHost);
 
     // Test Session Factory
     factories['session']?.();
@@ -286,11 +286,11 @@ describe('ServiceFactory', () => {
 
     // Test EvolutionService Factory
     factories['evolutionService']?.();
-    expect(MockEvolutionService).toHaveBeenCalledWith(mockProject, mockFileSystem);
+    expect(MockEvolutionService).toHaveBeenCalledWith(mockProject, mockFileSystem, mockHost);
 
     // Test SignalService Factory
     factories['signalService']?.();
-    expect(MockSignalService).toHaveBeenCalledWith(mockFileSystem);
+    expect(MockSignalService).toHaveBeenCalledWith(mockFileSystem, mockHost);
 
     // Test Executor Factory (via Brain registration)
     // We need to capture the callback passed to brain.registerAgent('executor', cb)

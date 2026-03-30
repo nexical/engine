@@ -1,7 +1,12 @@
 import { jest } from '@jest/globals';
+
+import { IFileSystem } from '../../../src/domain/IFileSystem.js';
+import { IProject } from '../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+
 // Define mocks first
-const mockLoad = jest.fn();
-const mockDump = jest.fn();
+const mockLoad = jest.fn<() => unknown>();
+const mockDump = jest.fn<(_o: unknown) => string>();
 
 jest.unstable_mockModule('js-yaml', () => ({
   load: mockLoad,
@@ -16,13 +21,13 @@ const { Plan } = await import('../../../src/domain/Plan.js');
 const { EngineState } = await import('../../../src/domain/State.js');
 const { SignalType } = await import('../../../src/workflow/Signal.js');
 
-import { IFileSystem } from '../../../src/domain/IFileSystem.js';
-import { IProject } from '../../../src/domain/Project.js';
+type IWorkspaceInstance = InstanceType<typeof Workspace>;
 
 describe('Workspace', () => {
-  let workspace: InstanceType<typeof Workspace>;
+  let workspace: IWorkspaceInstance;
   let mockProject: jest.Mocked<IProject>;
   let mockFileSystem: jest.Mocked<IFileSystem>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(() => {
     // Reset mocks
@@ -47,6 +52,17 @@ describe('Workspace', () => {
       releaseLock: jest.fn<IFileSystem['releaseLock']>().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<IFileSystem>;
 
+    mockHost = {
+      log: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
     mockProject = {
       fileSystem: mockFileSystem,
       paths: {
@@ -56,11 +72,12 @@ describe('Workspace', () => {
         signals: 'signals_dir',
         state: 'state.yml',
       },
-      getConfig: jest.fn(),
-      getConstraints: jest.fn(),
+      getConfig: jest.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
+      getConstraints: jest.fn<() => Promise<string>>().mockResolvedValue(''),
+      rootDirectory: '/root',
     } as unknown as jest.Mocked<IProject>;
 
-    workspace = new Workspace(mockProject);
+    workspace = new Workspace(mockProject, mockHost);
   });
 
   it('should be defined', () => {
@@ -210,13 +227,10 @@ describe('Workspace', () => {
       mockFileSystem.readFile.mockResolvedValue('content');
       mockLoad.mockReturnValue({}); // Missing type and reason
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
       const signal = await workspace.detectSignal();
 
       expect(signal).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid signal file content'));
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Invalid signal file content'));
     });
 
     it('should handle parse error in signal file', async () => {
@@ -227,16 +241,10 @@ describe('Workspace', () => {
         throw new Error('Parse error');
       });
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       const signal = await workspace.detectSignal();
 
       expect(signal).toBeNull();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to parse signal file'),
-        expect.anything(),
-      );
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to parse signal file'));
     });
   });
 
@@ -282,15 +290,13 @@ describe('Workspace', () => {
   describe('async write error handling', () => {
     it('should log error if write fails', async () => {
       mockFileSystem.writeFileAtomic.mockRejectedValue(new Error('Write failed'));
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       await workspace.saveState(new EngineState('id'));
 
       // Wait for async promise (scheduleWrite)
       await workspace.flush();
 
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Async write failed'), expect.anything());
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Async write failed'));
     });
   });
 });

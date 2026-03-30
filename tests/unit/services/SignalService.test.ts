@@ -1,23 +1,34 @@
 import { jest } from '@jest/globals';
 
+import { IFileSystem } from '../../../src/domain/IFileSystem.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { FileSystemService } from '../../../src/services/FileSystemService.js';
 import { SignalService } from '../../../src/services/SignalService.js';
 import { ISignalJSON, Signal, SignalType } from '../../../src/workflow/Signal.js';
 
 describe('SignalService', () => {
   let mockFs: jest.Mocked<FileSystemService>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let service: SignalService;
 
   beforeEach(() => {
     mockFs = {
-      isDirectory: jest.fn(),
-      listFiles: jest.fn(),
-      readFile: jest.fn(),
-      exists: jest.fn(),
-      writeFile: jest.fn(),
-      deleteFile: jest.fn(),
+      isDirectory: jest.fn<IFileSystem['isDirectory']>(),
+      listFiles: jest.fn<IFileSystem['listFiles']>(),
+      readFile: jest.fn<IFileSystem['readFile']>(),
+      exists: jest.fn<IFileSystem['exists']>(),
+      writeFile: jest.fn<IFileSystem['writeFile']>(),
+      deleteFile: jest.fn<IFileSystem['deleteFile']>(),
     } as unknown as jest.Mocked<FileSystemService>;
-    service = new SignalService(mockFs);
+
+    mockHost = {
+      log: jest.fn(),
+      emit: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
+    service = new SignalService(mockFs, mockHost);
     jest.clearAllMocks();
   });
 
@@ -25,22 +36,22 @@ describe('SignalService', () => {
     const signalsDir = '/tmp/signals';
 
     it('should return null if directory does not exist', async () => {
-      mockFs.isDirectory.mockReturnValue(false);
+      mockFs.isDirectory.mockResolvedValue(false);
       const result = await service.getHighestPrioritySignal(signalsDir);
       expect(result).toBeNull();
     });
 
     it('should return null if no JSON files exist', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['ignore.txt']);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['ignore.txt']);
       const result = await service.getHighestPrioritySignal(signalsDir);
       expect(result).toBeNull();
     });
 
     it('should parse and return the single signal', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['sig1.json']);
-      mockFs.readFile.mockReturnValue(JSON.stringify({ status: 'COMPLETE', reason: 'done' }));
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['sig1.json']);
+      mockFs.readFile.mockResolvedValue(JSON.stringify({ status: 'COMPLETE', reason: 'done' }));
 
       const result = await service.getHighestPrioritySignal(signalsDir);
       expect(result).not.toBeNull();
@@ -48,17 +59,17 @@ describe('SignalService', () => {
     });
 
     it('should prioritize REARCHITECT over COMPLETE', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['sig_complete.json', 'sig_rearchitect.json']);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['sig_complete.json', 'sig_rearchitect.json']);
 
       mockFs.readFile.mockImplementation((filePath: string) => {
         if (filePath.endsWith('sig_complete.json')) {
-          return JSON.stringify({ status: 'COMPLETE', reason: 'done' });
+          return Promise.resolve(JSON.stringify({ status: 'COMPLETE', reason: 'done' }));
         }
         if (filePath.endsWith('sig_rearchitect.json')) {
-          return JSON.stringify({ status: 'REARCHITECT', reason: 'major change' });
+          return Promise.resolve(JSON.stringify({ status: 'REARCHITECT', reason: 'major change' }));
         }
-        return '';
+        return Promise.resolve('');
       });
 
       const result = await service.getHighestPrioritySignal(signalsDir);
@@ -66,54 +77,50 @@ describe('SignalService', () => {
     });
 
     it('should log warning and continue on parse error', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['bad.json', 'good.json']);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['bad.json', 'good.json']);
       mockFs.readFile.mockImplementation((filePath: string) => {
-        if (filePath.endsWith('bad.json')) return 'invalid json';
-        return JSON.stringify({ status: 'COMPLETE' });
+        if (filePath.endsWith('bad.json')) return Promise.resolve('invalid json');
+        return Promise.resolve(JSON.stringify({ status: 'COMPLETE' }));
       });
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const result = await service.getHighestPrioritySignal(signalsDir);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockHost.log).toHaveBeenCalledWith(
+        'warn',
         expect.stringContaining('Failed to parse signal file bad.json'),
-        expect.any(Error),
       );
       expect(result?.type).toBe(SignalType.COMPLETE);
-      consoleSpy.mockRestore();
     });
 
     it('should return null if all JSON files are invalid', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['bad1.json', 'bad2.json']);
-      mockFs.readFile.mockImplementation(() => 'invalid json');
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['bad1.json', 'bad2.json']);
+      mockFs.readFile.mockImplementation(() => Promise.resolve('invalid json'));
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const result = await service.getHighestPrioritySignal(signalsDir);
 
       expect(result).toBeNull();
-      consoleSpy.mockRestore();
     });
   });
 
   describe('ensureNoInterrupt', () => {
     it('should throw SignalDetectedError if signal found', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['sig.json']);
-      mockFs.readFile.mockReturnValue(
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['sig.json']);
+      mockFs.readFile.mockResolvedValue(
         JSON.stringify({ status: SignalType.FAIL, reason: 'error', metadata: {} } as ISignalJSON),
       );
       await expect(service.ensureNoInterrupt('/tmp/signals', 'task-1')).rejects.toThrow();
     });
 
     it('should resolve if no signal found', async () => {
-      mockFs.isDirectory.mockReturnValue(false);
+      mockFs.isDirectory.mockResolvedValue(false);
       await expect(service.ensureNoInterrupt('/tmp/signals')).resolves.toBeUndefined();
     });
 
     it('should not catch FS errors in ensureNoInterrupt (they propagate)', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
+      mockFs.isDirectory.mockResolvedValue(true);
       mockFs.listFiles.mockImplementation(() => {
         throw new Error('critical fs error');
       });
@@ -125,7 +132,7 @@ describe('SignalService', () => {
   describe('miscellaneous', () => {
     it('should write signal to file', async () => {
       const signal = new Signal(SignalType.COMPLETE, 'done');
-      mockFs.exists.mockReturnValue(false);
+      mockFs.exists.mockResolvedValue(false);
 
       await service.writeSignal('/tmp/sig.json', signal);
 
@@ -133,8 +140,8 @@ describe('SignalService', () => {
     });
 
     it('should clear signals correctly', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['s1.json', 'not-sig.txt']);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['s1.json', 'not-sig.txt']);
 
       await service.clearSignals('/tmp/sigs');
 
@@ -143,11 +150,11 @@ describe('SignalService', () => {
     });
 
     it('should handle unknown signal types in priority sorting', async () => {
-      mockFs.isDirectory.mockReturnValue(true);
-      mockFs.listFiles.mockReturnValue(['sig1.json', 'sig2.json']);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['sig1.json', 'sig2.json']);
       mockFs.readFile.mockImplementation((filePath: string) => {
-        if (filePath.endsWith('sig1.json')) return JSON.stringify({ status: 'UNKNOWN' });
-        return JSON.stringify({ status: 'REARCHITECT' });
+        if (filePath.endsWith('sig1.json')) return Promise.resolve(JSON.stringify({ status: 'UNKNOWN' }));
+        return Promise.resolve(JSON.stringify({ status: 'REARCHITECT' }));
       });
 
       const result = await service.getHighestPrioritySignal('/tmp');
@@ -155,10 +162,33 @@ describe('SignalService', () => {
     });
 
     it('should cover directory check in writeSignal', async () => {
-      mockFs.exists.mockReturnValue(false); // directory does not exist
+      mockFs.exists.mockResolvedValue(false); // directory does not exist
       const signal = new Signal(SignalType.COMPLETE, 'done');
       await service.writeSignal('/tmp/newdir/sig.json', signal);
       expect(mockFs.writeFile).toHaveBeenCalled();
+    });
+
+    it('should return early if directory does not exist in clearSignals', async () => {
+      mockFs.isDirectory.mockResolvedValue(false);
+      await service.clearSignals('/tmp/sigs');
+      expect(mockFs.listFiles).not.toHaveBeenCalled();
+    });
+
+    it('should use default unknown taskId in ensureNoInterrupt', async () => {
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['sig.json']);
+      mockFs.readFile.mockResolvedValue(JSON.stringify({ status: 'FAIL' }));
+      await expect(service.ensureNoInterrupt('/tmp/sigs')).rejects.toThrow();
+    });
+
+    it('should not log if host is missing during parse error', async () => {
+      const s = new SignalService(mockFs);
+      mockFs.isDirectory.mockResolvedValue(true);
+      mockFs.listFiles.mockResolvedValue(['bad.json']);
+      mockFs.readFile.mockResolvedValue('invalid json');
+      const result = await s.getHighestPrioritySignal('/tmp');
+      expect(result).toBeNull();
+      expect(mockHost.log).not.toHaveBeenCalled();
     });
   });
 });

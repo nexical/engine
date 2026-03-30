@@ -32,6 +32,7 @@ jest.unstable_mockModule('readline', () => ({
 // Import dependencies
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IProject } from '../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import {
   EvolutionService as EvolutionServiceClass,
   IEvolutionService,
@@ -48,6 +49,7 @@ describe('EvolutionService', () => {
   let service: IEvolutionService;
   let mockProject: jest.Mocked<IProject>;
   let mockFileSystem: jest.Mocked<IFileSystem>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
 
   beforeEach(async () => {
     // Re-import module for every test to apply mocks
@@ -57,8 +59,14 @@ describe('EvolutionService', () => {
     mockAppendFile.mockClear();
     mockCreateReadStream.mockClear();
     mockExistsSync.mockClear();
-    mockCreateInterface.mockReset();
     mockCreateInterface.mockReturnValue(mockRl as unknown as ReturnType<typeof mockCreateInterface>); // Restore implementation
+
+    mockHost = {
+      log: jest.fn(),
+      emit: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
 
     mockExists.mockReset();
     mockReadFile.mockReset();
@@ -86,7 +94,7 @@ describe('EvolutionService', () => {
       fileSystem: mockFileSystem,
     } as unknown as jest.Mocked<IProject>;
 
-    service = new EvolutionService(mockProject, mockFileSystem);
+    service = new EvolutionService(mockProject, mockFileSystem, mockHost);
   });
 
   it('should record event as JSON line', async () => {
@@ -135,7 +143,7 @@ describe('EvolutionService', () => {
 
   it('should handle missing log for retrieve', async () => {
     mockExistsSync.mockReturnValue(false); // fs.existsSync
-    mockExists.mockReturnValue(false as unknown as boolean); // disk.exists (for index)
+    mockExists.mockResolvedValue(false); // disk.exists (for index)
 
     const summary = await service.retrieve('');
     expect(summary).toBe('No historical failures or wisdom recorded.');
@@ -147,16 +155,16 @@ describe('EvolutionService', () => {
     // Mock Index/Topics via IFileSystem (disk)
     mockExists.mockImplementation((path: string) => {
       // Allow index file check
-      if (path.includes('evolution/index.json')) return true;
+      if (path.includes('evolution/index.json')) return Promise.resolve(true);
       // Allow topic file check
-      if (path.includes('evolution/topics/git.md')) return true;
-      return false;
+      if (path.includes('evolution/topics/git.md')) return Promise.resolve(true);
+      return Promise.resolve(false);
     });
 
     mockReadFile.mockImplementation((path: string) => {
-      if (path.includes('evolution/index.json')) return JSON.stringify({ commit: 'git', push: 'git' });
-      if (path.includes('evolution/topics/git.md')) return 'Git rules.';
-      return '';
+      if (path.includes('evolution/index.json')) return Promise.resolve(JSON.stringify({ commit: 'git', push: 'git' }));
+      if (path.includes('evolution/topics/git.md')) return Promise.resolve('Git rules.');
+      return Promise.resolve('');
     });
 
     const summary = await service.retrieve('I cannot commit changes');
@@ -201,25 +209,18 @@ describe('EvolutionService', () => {
       throw new Error('Stream crash');
     });
 
-    // Silence console error for clean test report
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
     const summary = await service.retrieve('');
     expect(summary).not.toContain('Short-Term Memory');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to read evolution log:', expect.any(Error));
-    consoleSpy.mockRestore();
+    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to read evolution log:'));
   });
 
   it('should handle index parse error in getLongTermWisdom', async () => {
-    mockExists.mockReturnValue(true as unknown as boolean);
-    mockReadFile.mockReturnValue('invalid-json');
-
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockExists.mockResolvedValue(true);
+    mockReadFile.mockResolvedValue('invalid-json');
 
     const summary = await service.retrieve('test');
     expect(summary).not.toContain('Long-Term Memory');
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to retrieve long-term wisdom:', expect.any(Error));
-    consoleSpy.mockRestore();
+    expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to retrieve long-term wisdom:'));
   });
 
   it('should handle empty lines and parse errors in getShortTermMemory', async () => {

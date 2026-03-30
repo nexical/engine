@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { IFileSystem } from '../domain/IFileSystem.js';
 import { IProject } from '../domain/Project.js';
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
 
 export interface IBusMessage {
   id: string;
@@ -26,6 +27,7 @@ export class FileSystemBus {
   constructor(
     private project: IProject,
     private fileSystem: IFileSystem,
+    private host?: IRuntimeHost,
   ) {
     this.inboxPath = this.project.paths.inbox || path.join(this.project.rootDirectory, '.ai/comms/inbox');
     this.outboxPath = this.project.paths.outbox || path.join(this.project.rootDirectory, '.ai/comms/outbox');
@@ -70,19 +72,22 @@ export class FileSystemBus {
             // Processed, delete the request file
             await this.project.fileSystem.deleteFile(filePath);
           } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error(`Error processing inbox message ${filePath}:`, error);
+            if (this.host) {
+              this.host.log('error', `Error processing inbox message ${filePath}: ${(error as Error).message}`);
+            }
           }
         });
       });
 
       this.inboxWatcher.on('error', (error) => {
-        // eslint-disable-next-line no-console
-        console.error('Inbox watcher error:', error);
+        if (this.host) {
+          this.host.log('error', `Inbox watcher error: ${error.message}`);
+        }
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to initialize inbox watcher:', error);
+      if (this.host) {
+        this.host.log('error', `Failed to initialize inbox watcher: ${(error as Error).message}`);
+      }
     }
   }
 
@@ -158,18 +163,21 @@ export class FileSystemBus {
           // We emit the filename so listeners can check if it matches their correlationId
           this.responseEmitter.emit('file-added', filePath);
         } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error('Error in outbox watcher add event:', error);
+          if (this.host) {
+            this.host.log('error', `Error in outbox watcher add event: ${(error as Error).message}`);
+          }
         }
       });
 
       this.outboxWatcher.on('error', (error) => {
-        // eslint-disable-next-line no-console
-        console.error('Outbox watcher error:', error);
+        if (this.host) {
+          this.host.log('error', `Outbox watcher error: ${error.message}`);
+        }
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to initialize outbox watcher:', error);
+      if (this.host) {
+        this.host.log('error', `Failed to initialize outbox watcher: ${(error as Error).message}`);
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 # Integration Testing Guide
 
-This directory contains integration tests for the `@astrical/engine`. Unlike unit tests which isolate individual classes, these tests verify the interaction between multiple components (Agents, Services, Workflow, Drivers) in a controlled environment.
+This directory contains integration tests for the `@nexical/engine`. Unlike unit tests which isolate individual classes, these tests verify the interaction between multiple components (Agents, Services, Workflow, Drivers) in a controlled environment.
 
 ## Philosophy
 

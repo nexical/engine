@@ -2,11 +2,10 @@ import { Plan } from '../domain/Plan.js';
 import { Result } from '../domain/Result.js';
 import { ISkillContext } from '../domain/SkillConfig.js';
 
-// eslint-disable-next-line @typescript-eslint/require-await
-export const PlanGraphValidator = async (context: ISkillContext): Promise<Result<boolean, Error>> => {
+export const PlanGraphValidator = (context: ISkillContext): Promise<Result<boolean, Error>> => {
   const yamlContent = context['executionResult'] as string;
   if (!yamlContent) {
-    return Result.fail(new Error('No execution result found in context for validation'));
+    return Promise.resolve(Result.fail(new Error('No execution result found in context for validation')));
   }
 
   try {
@@ -16,9 +15,9 @@ export const PlanGraphValidator = async (context: ISkillContext): Promise<Result
     validateDependenciesExist(plan);
     validateAcyclic(plan);
 
-    return Result.ok(true);
+    return Promise.resolve(Result.ok(true));
   } catch (e) {
-    return Result.fail(e instanceof Error ? e : new Error(String(e)));
+    return Promise.resolve(Result.fail(e instanceof Error ? e : new Error(String(e))));
   }
 };
 

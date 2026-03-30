@@ -1,4 +1,4 @@
-# @astrical/engine
+# @nexical/engine
 
 ![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)
 ![Version](https://img.shields.io/badge/version-0.1.0-green.svg)
@@ -34,7 +34,7 @@
 
 ## I. Overview
 
-**@astrical/engine** is a TypeScript-based runtime that enables sophisticated multi-agent AI workflows. Unlike simple chat bots, this engine is designed for **stateful, multi-turn, and goal-oriented** operations. It provides the backbone for building AI systems that can plan, architect, and execute complex coding and content generation tasks.
+**@nexical/engine** is a TypeScript-based runtime that enables sophisticated multi-agent AI workflows. Unlike simple chat bots, this engine is designed for **stateful, multi-turn, and goal-oriented** operations. It provides the backbone for building AI systems that can plan, architect, and execute complex coding and content generation tasks.
 
 ### Key Features
 
@@ -55,7 +55,7 @@
 ### Installation
 
 ```bash
-npm install @astrical/engine
+npm install @nexical/engine
 ```
 
 ### Quick Start
@@ -63,7 +63,7 @@ npm install @astrical/engine
 The correct way to use the engine is via the `Orchestrator`. You must implement a `RuntimeHost` to bridge the engine to your environment (CLI or Web).
 
 ```typescript
-import { Orchestrator, IRuntimeHost } from '@astrical/engine';
+import { Orchestrator, IRuntimeHost } from '@nexical/engine';
 
 // 1. Implement Host
 const myHost: IRuntimeHost = {
@@ -426,7 +426,7 @@ We welcome contributions! Please refer to **[CODE.md](./CODE.md)** for strict co
 For developers extending the engine, we recommend a **Fixture-based approach**.
 
 ```typescript
-import { ProjectFixture } from '@astrical/engine/test-utils';
+import { ProjectFixture } from '@nexical/engine/test-utils';
 
 const fixture = new ProjectFixture();
 await fixture.setup(); // Creates temp dir with git init

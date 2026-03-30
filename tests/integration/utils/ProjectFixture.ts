@@ -34,7 +34,7 @@ export class ProjectFixture {
   }
 
   async setup(): Promise<void> {
-    this.tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'astrical-fixture-'));
+    this.tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nexical-fixture-'));
     await fs.ensureDir(path.join(this.tmpDir, '.ai/prompts'));
     await fs.ensureDir(path.join(this.tmpDir, '.ai/skills'));
     await fs.ensureDir(path.join(this.tmpDir, '.ai/personas'));

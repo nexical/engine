@@ -3,6 +3,7 @@ import path from 'path';
 import { z } from 'zod';
 
 import { IFileSystem } from './IFileSystem.js';
+import { IRuntimeHost } from './RuntimeHost.js';
 
 export const AgentConfigSchema = z
   .object({
@@ -41,7 +42,11 @@ export class Project implements IProject {
   public readonly fileSystem: IFileSystem;
   private profile: ProjectProfile | null = null;
 
-  constructor(rootDirectory: string, fileSystem: IFileSystem) {
+  constructor(
+    rootDirectory: string,
+    fileSystem: IFileSystem,
+    private host?: IRuntimeHost,
+  ) {
     this.rootDirectory = rootDirectory;
     this.fileSystem = fileSystem;
     this.paths = new ProjectPaths(rootDirectory);
@@ -74,8 +79,9 @@ export class Project implements IProject {
       const raw = yaml.load(content);
       return ProjectConfigurationSchema.parse(raw);
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(`Failed to load project profile from ${path}:`, e);
+      if (this.host) {
+        this.host.log('error', `Failed to load project profile from ${path}: ${(e as Error).message}`);
+      }
       throw e;
     }
   }

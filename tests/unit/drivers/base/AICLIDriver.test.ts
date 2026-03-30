@@ -1,45 +1,60 @@
-/* eslint-disable */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { jest } from '@jest/globals';
-import { AICLIDriver } from '../../../../src/drivers/base/AICLIDriver.js';
+
+import { ISkill } from '../../../../src/domain/Driver.js';
+import { IFileSystem } from '../../../../src/domain/IFileSystem.js';
+import { IRuntimeHost } from '../../../../src/domain/RuntimeHost.js';
 import { ISkillContext } from '../../../../src/domain/SkillConfig.js';
-import path from 'path';
+import { AICLIDriver } from '../../../../src/drivers/base/AICLIDriver.js';
+import { IPromptEngine } from '../../../../src/services/PromptEngine.js';
 
 class TestAICLIDriver extends AICLIDriver {
-  name = 'test-ai-cli';
-  description = 'Test driver';
+  public override name = 'test-ai-cli';
+  public override description = 'Test driver';
 
-  protected getExecutable(skill: any): string {
+  protected override getExecutable(_skill: ISkill): string {
     return 'echo';
   }
-  protected getArguments(skill: any): string[] {
+  protected override getArguments(_skill: ISkill): string[] {
     return ['arg'];
   }
 }
 
 describe('AICLIDriver', () => {
   let driver: TestAICLIDriver;
-  let mockHost: any;
-  let mockFileSystem: any;
-  let mockConfig: any;
+  let mockHost: jest.Mocked<IRuntimeHost>;
+  let mockFileSystem: jest.Mocked<IFileSystem>;
+  let mockConfig: Record<string, unknown>;
   let mockContext: ISkillContext;
-  let mockPromptEngine: any;
+  let mockPromptEngine: jest.Mocked<IPromptEngine>;
 
   beforeEach(() => {
     mockHost = {
       log: jest.fn(),
-    };
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
     mockFileSystem = {
-      readFile: jest.fn(),
-      exists: jest.fn(),
-    };
+      readFile: jest.fn<IFileSystem['readFile']>().mockResolvedValue(''),
+      exists: jest.fn<IFileSystem['exists']>().mockResolvedValue(false),
+      isDirectory: jest.fn<IFileSystem['isDirectory']>().mockResolvedValue(false),
+      deleteFile: jest.fn<IFileSystem['deleteFile']>().mockResolvedValue(undefined),
+      writeFile: jest.fn<IFileSystem['writeFile']>().mockResolvedValue(undefined),
+      listFiles: jest.fn<IFileSystem['listFiles']>().mockResolvedValue([]),
+    } as unknown as jest.Mocked<IFileSystem>;
 
     mockConfig = {
       rootDirectory: '/test',
     };
     mockPromptEngine = {
-      renderString: jest.fn((tmpl: string) => tmpl),
-    };
+      render: jest.fn<IPromptEngine['render']>().mockImplementation((name: string) => name),
+      renderString: jest.fn<IPromptEngine['renderString']>().mockImplementation((tmpl: string) => tmpl),
+    } as unknown as jest.Mocked<IPromptEngine>;
+
     mockContext = {
       taskId: 'task-123',
       userPrompt: 'do something',
@@ -50,19 +65,22 @@ describe('AICLIDriver', () => {
 
     driver = new TestAICLIDriver(mockHost, mockConfig, mockFileSystem);
     // Mock executeShell to avoid actual execution
-    (driver as any).executeShell = jest.fn<() => Promise<string>>().mockResolvedValue('success');
+    (driver as unknown as { executeShell: jest.Mock<() => Promise<string>> }).executeShell = jest
+      .fn<() => Promise<string>>()
+      .mockResolvedValue('success');
   });
 
   it('should use default allowed signals if not provided', async () => {
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
     // Check formatArgs passed to renderString
     const calls = mockPromptEngine.renderString.mock.calls;
-    const args = calls[0][1] as Record<string, string>;
+    const args = calls[0][1];
+    const allowedSignals = args.allowed_signals as string;
 
-    expect(args.allowed_signals).toBeDefined();
-    expect(args.allowed_signals).toContain('- "COMPLETE": Task completed successfully.');
-    expect(args.allowed_signals).toContain('- "REARCHITECT": Fundamental architectural flaws detected');
+    expect(allowedSignals).toBeDefined();
+    expect(allowedSignals).toContain('- "COMPLETE": Task completed successfully.');
+    expect(allowedSignals).toContain('- "REARCHITECT": Fundamental architectural flaws detected');
   });
 
   it('should use provided allowed signals map', async () => {
@@ -72,17 +90,19 @@ describe('AICLIDriver', () => {
         BROKEN: 'It burst.',
       },
     };
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
     const calls = mockPromptEngine.renderString.mock.calls;
-    const args = calls[0][1] as Record<string, string>;
-    expect(args.allowed_signals).toContain('- "DONE": Finished.');
-    expect(args.allowed_signals).toContain('- "BROKEN": It burst.');
+    const args = calls[0][1];
+    const allowedSignals = args.allowed_signals as string;
+
+    expect(allowedSignals).toContain('- "DONE": Finished.');
+    expect(allowedSignals).toContain('- "BROKEN": It burst.');
   });
 
   it('should attempt to read template from file system', async () => {
     mockFileSystem.readFile.mockResolvedValue('TEMPLATE CONTENT {{ allowed_signals }}');
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
     expect(mockFileSystem.readFile).toHaveBeenCalledWith(expect.stringContaining('.ai/templates/cli_footer.md'));
 
@@ -92,11 +112,10 @@ describe('AICLIDriver', () => {
   });
 
   it('should fallback to default footer if file read fails', async () => {
-    mockFileSystem.exists.mockReturnValue(false); // prompt file missing
+    mockFileSystem.exists.mockResolvedValue(false); // prompt file missing
     mockFileSystem.readFile.mockRejectedValue(new Error('no footer'));
-    mockPromptEngine.renderString.mockReturnValue('rendered');
 
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
     expect(mockHost.log).toHaveBeenCalledWith('warn', expect.stringContaining('Could not load cli_footer.md'));
 
@@ -112,24 +131,26 @@ describe('AICLIDriver', () => {
     mockContext.params = {
       allowed_signals: JSON.stringify({ CUSTOM: 'Custom signal' }),
     };
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
-    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
-    expect(args.allowed_signals).toContain('- "CUSTOM": Custom signal');
+    const args = mockPromptEngine.renderString.mock.calls[0][1];
+    const allowedSignals = args.allowed_signals as string;
+    expect(allowedSignals).toContain('- "CUSTOM": Custom signal');
   });
 
   it('should fallback and log warning if allowed_signals JSON is invalid', async () => {
     mockContext.params = {
       allowed_signals: '{ invalid json',
     };
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
     expect(mockHost.log).toHaveBeenCalledWith(
       'warn',
       expect.stringContaining('allowed_signals param is not a valid JSON map'),
     );
-    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
-    expect(args.allowed_signals).toContain('- "COMPLETE": Task completed successfully.');
+    const args = mockPromptEngine.renderString.mock.calls[0][1];
+    const allowedSignals = args.allowed_signals as string;
+    expect(allowedSignals).toContain('- "COMPLETE": Task completed successfully.');
   });
 
   it('should handle missing prompt_template and context props', async () => {
@@ -138,22 +159,22 @@ describe('AICLIDriver', () => {
     const emptyContext = {
       promptEngine: mockPromptEngine,
       fileSystem: mockFileSystem,
-      params: {},
-    } as any;
+      params: {
+        allowed_signals: {},
+      },
+    } as unknown as ISkillContext;
 
-    await driver.run({ name: 'test' } as any, emptyContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: '' } as ISkill, emptyContext);
 
     const calls = mockPromptEngine.renderString.mock.calls;
     // renderString(promptTemplate, formatArgs)
-    const formatArgs = calls[0][1] as any;
+    const formatArgs = calls[0][1];
 
     expect(formatArgs.user_request).toBe('');
     expect(formatArgs.task_id).toBe('unknown');
     // Check renderString calls
-    const renderStringCalls = (mockPromptEngine.renderString as jest.Mock).mock.calls;
-    expect(renderStringCalls.some((call) => (call[0] as string).includes('# SYSTEM INSTRUCTION: MANDATORY'))).toBe(
-      true,
-    );
+    const renderStringCalls = mockPromptEngine.renderString.mock.calls;
+    expect(renderStringCalls.some((call) => call[0].includes('# SYSTEM INSTRUCTION: MANDATORY'))).toBe(true);
   });
 
   it('should use systemConfig root if workspaceRoot is missing', async () => {
@@ -164,35 +185,43 @@ describe('AICLIDriver', () => {
       promptEngine: mockPromptEngine,
       fileSystem: mockFileSystem,
       taskId: 'test-task',
-      params: {},
-    };
+      params: {
+        allowed_signals: {},
+      },
+    } as unknown as ISkillContext;
 
-    await driver.run({ name: 'test' } as any, minimalContext as any);
+    await driver.run({ name: 'test', description: 'test', prompt_template: '' } as ISkill, minimalContext);
 
-    const calls = (mockPromptEngine.renderString as jest.Mock).mock.calls;
-    const formatArgs = calls[0][1] as any;
-    expect(formatArgs.signal_file_path).toContain('/test/.ai/signals'); // from mockConfig.rootDirectory
+    const calls = mockPromptEngine.renderString.mock.calls;
+    const formatArgs = calls[0][1];
+    expect(formatArgs.signal_file_path as string).toContain('/test/.ai/signals'); // from mockConfig.rootDirectory
   });
 
   it('should handle allowed_signals not being string or object', async () => {
+    const invalidSignals = 123 as unknown as Record<string, string>;
     mockContext.params = {
-      allowed_signals: 123, // number
+      allowed_signals: invalidSignals,
     };
-    await driver.run({ prompt_template: 'Hello' } as any, mockContext);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, mockContext);
 
-    const args = mockPromptEngine.renderString.mock.calls[0][1] as Record<string, string>;
-    expect(args.allowed_signals).toContain('- "COMPLETE": Task completed successfully.');
+    const args = mockPromptEngine.renderString.mock.calls[0][1];
+    const allowedSignals = args.allowed_signals as string;
+    expect(allowedSignals).toContain('- "COMPLETE": Task completed successfully.');
   });
 
   it('should throw if PromptEngine is missing', async () => {
-    (mockContext as any).promptEngine = undefined;
-    await expect(driver.run({ prompt_template: 'Hello' } as any, mockContext)).rejects.toThrow(
-      'PromptEngine is required',
-    );
+    const contextNoEngine = { ...mockContext, promptEngine: undefined as unknown as IPromptEngine };
+    await expect(
+      driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, contextNoEngine),
+    ).rejects.toThrow('PromptEngine is required');
   });
 
   it('should test parseSchema', () => {
-    const result = (driver as any).parseSchema({ name: 'test', prompt_template: 'tmpl' });
+    const result = (driver as unknown as { parseSchema: (s: unknown) => { success: boolean } }).parseSchema({
+      name: 'test',
+      description: 'test',
+      prompt_template: 'tmpl',
+    });
     expect(result.success).toBe(true);
   });
 

@@ -96,7 +96,7 @@ export class Skill {
 
     // 3. Execution
     let executionAttempts = 0;
-    const maxRetries = this.config.verification_strategy?.max_retries || 3;
+    const maxRetries = this.config.verification_strategy?.max_retries ?? 3;
 
     while (executionAttempts <= maxRetries) {
       executionAttempts++;

@@ -1,6 +1,6 @@
 # Unit Testing Guidelines
 
-This directory contains unit tests for the `@astrical/engine` project.
+This directory contains unit tests for the `@nexical/engine` project.
 
 ## Structure matches Source
 The file structure here mirrors the `src` directory. For every source file `src/path/to/file.ts`, there should be a corresponding test file `tests/unit/path/to/file.test.ts`.

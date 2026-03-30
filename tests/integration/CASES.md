@@ -1,6 +1,6 @@
 # Integration & E2E Test Cases
 
-This document outlines the hyper-comprehensive testing suite for the `@astrical/engine`. It covers happy paths, complex agent orchestrations, failure recovery, and esoteric edge cases.
+This document outlines the hyper-comprehensive testing suite for the `@nexical/engine`. It covers happy paths, complex agent orchestrations, failure recovery, and esoteric edge cases.
 
 ---
 

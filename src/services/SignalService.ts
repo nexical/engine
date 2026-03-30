@@ -1,5 +1,6 @@
 import path from 'path';
 
+import { IRuntimeHost } from '../domain/RuntimeHost.js';
 import { SignalDetectedError } from '../errors/SignalDetectedError.js';
 import { ISignalJSON, Signal, SignalType } from '../workflow/Signal.js';
 import { FileSystemService } from './FileSystemService.js';
@@ -17,7 +18,10 @@ export class SignalService {
     [SignalType.WAIT]: 1,
   };
 
-  constructor(private fs: FileSystemService) {}
+  constructor(
+    private fs: FileSystemService,
+    private host?: IRuntimeHost,
+  ) {}
 
   /**
    * Scans the signals directory for the highest priority signal.
@@ -45,8 +49,9 @@ export class SignalService {
         const signal = Signal.fromJSON(json);
         signals.push(signal);
       } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn(`Failed to parse signal file ${file}:`, e);
+        if (this.host) {
+          this.host.log('warn', `Failed to parse signal file ${file}: ${(e as Error).message}`);
+        }
       }
     }
 

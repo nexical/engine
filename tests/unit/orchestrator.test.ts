@@ -1,5 +1,14 @@
 import { jest } from '@jest/globals';
 
+import type { Brain } from '../../src/agents/Brain.js';
+import { IProject } from '../../src/domain/Project.js';
+import { IRuntimeHost } from '../../src/domain/RuntimeHost.js';
+import { Session } from '../../src/domain/Session.js';
+import { IWorkspace } from '../../src/domain/Workspace.js';
+import type { Orchestrator } from '../../src/orchestrator.js';
+import { DIContainer } from '../../src/services/DIContainer.js';
+import type { IEngineServices } from '../../src/services/ServiceFactory.js';
+
 // 1. Setup the mock module
 jest.unstable_mockModule('../../src/services/ServiceFactory.js', () => ({
   ServiceFactory: {
@@ -8,29 +17,28 @@ jest.unstable_mockModule('../../src/services/ServiceFactory.js', () => ({
 }));
 
 // 2. Import the mocked module and other dependencies
-const { ServiceFactory } = await import('../../src/services/ServiceFactory.js');
-const mockCreateServices = ServiceFactory.createServices as jest.Mock<typeof ServiceFactory.createServices>;
+const ServiceFactoryMod = (await import('../../src/services/ServiceFactory.js')) as unknown as {
+  ServiceFactory: {
+    createServices: jest.Mock<(root: string, host: IRuntimeHost) => Promise<IEngineServices>>;
+  };
+};
+const mockCreateServices = ServiceFactoryMod.ServiceFactory.createServices;
 
-import type { Brain } from '../../src/agents/Brain.js';
-import type { Orchestrator } from '../../src/orchestrator.js';
-const { Orchestrator: OrchestratorValue } = await import('../../src/orchestrator.js');
-
-import { IProject } from '../../src/domain/Project.js';
-import { IRuntimeHost } from '../../src/domain/RuntimeHost.js';
-import { IWorkspace } from '../../src/domain/Workspace.js';
-import { IEngineServices } from '../../src/services/ServiceFactory.js';
+const { Orchestrator: OrchestratorValue } = (await import('../../src/orchestrator.js')) as {
+  Orchestrator: typeof Orchestrator;
+};
 
 describe('Orchestrator', () => {
   let mockHost: jest.Mocked<IRuntimeHost>;
-  let orchestrator: InstanceType<typeof Orchestrator>;
+  let orchestrator: InstanceType<typeof OrchestratorValue>;
   const rootDir = '/test/root';
 
   beforeEach(() => {
     mockHost = {
-      emit: jest.fn(),
-      log: jest.fn(),
-      status: jest.fn(),
-      ask: jest.fn(),
+      emit: jest.fn<IRuntimeHost['emit']>(),
+      log: jest.fn<IRuntimeHost['log']>(),
+      status: jest.fn<IRuntimeHost['status']>(),
+      ask: jest.fn<IRuntimeHost['ask']>(),
     } as unknown as jest.Mocked<IRuntimeHost>;
 
     orchestrator = new OrchestratorValue(rootDir, mockHost);
@@ -48,11 +56,11 @@ describe('Orchestrator', () => {
   describe('init', () => {
     it('should initialize services via ServiceFactory', async () => {
       const mockServices = {
-        project: {},
-        brain: { init: jest.fn() },
-        workspace: {},
-        session: {},
-        container: {},
+        project: {} as unknown as IProject,
+        brain: { init: jest.fn() } as unknown as Brain,
+        workspace: {} as unknown as IWorkspace,
+        session: {} as unknown as Session,
+        container: {} as unknown as DIContainer,
       } as unknown as IEngineServices;
       mockCreateServices.mockResolvedValue(mockServices);
 
@@ -61,9 +69,9 @@ describe('Orchestrator', () => {
       expect(mockCreateServices).toHaveBeenCalledWith(
         rootDir,
         expect.objectContaining({
-          emit: expect.anything() as unknown,
-          log: expect.anything() as unknown,
-          status: expect.anything() as unknown,
+          emit: expect.any(Function) as unknown,
+          log: expect.any(Function) as unknown,
+          status: expect.any(Function) as unknown,
         }),
       );
 
@@ -77,11 +85,11 @@ describe('Orchestrator', () => {
     it('should skip brain init if skipBrainInit is true', async () => {
       const mockBrain = { init: jest.fn() };
       const mockServices = {
-        project: {},
-        brain: mockBrain,
-        workspace: {},
-        session: {},
-        container: {},
+        project: {} as unknown as IProject,
+        brain: mockBrain as unknown as Brain,
+        workspace: {} as unknown as IWorkspace,
+        session: {} as unknown as Session,
+        container: {} as unknown as DIContainer,
       } as unknown as IEngineServices;
       mockCreateServices.mockResolvedValue(mockServices);
 
@@ -107,7 +115,7 @@ describe('Orchestrator', () => {
   });
 
   describe('start/execute', () => {
-    let mockSession: { start: jest.Mock };
+    let mockSession: { start: jest.Mock<(prompt: string, interactive: boolean) => Promise<void>> };
 
     beforeEach(async () => {
       mockSession = { start: jest.fn() };
@@ -122,8 +130,8 @@ describe('Orchestrator', () => {
         } as unknown as jest.Mocked<IProject>,
         brain: { init: jest.fn() } as unknown as jest.Mocked<Brain>,
         workspace: {} as unknown as jest.Mocked<IWorkspace>,
-        session: mockSession,
-        container: {},
+        session: mockSession as unknown as Session,
+        container: {} as unknown as DIContainer,
       } as unknown as IEngineServices;
       mockCreateServices.mockResolvedValue(mockServices);
       await orchestrator.init();
@@ -139,6 +147,7 @@ describe('Orchestrator', () => {
       expect(mockSession.start).toHaveBeenCalledWith('test prompt', false);
     });
   });
+
   it('should bubble events from host to orchestrator', () => {
     const spy = jest.fn();
     orchestrator.on('test-event', spy);

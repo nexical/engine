@@ -6,6 +6,7 @@ import { Signal, SignalType } from '../workflow/Signal.js';
 import { Architecture } from './Architecture.js';
 import { Plan } from './Plan.js';
 import { IProject } from './Project.js';
+import { IRuntimeHost } from './RuntimeHost.js';
 import { EngineState } from './State.js';
 
 export interface IWorkspace {
@@ -26,7 +27,10 @@ export class Workspace implements IWorkspace {
   private cache: Map<string, unknown> = new Map();
   private pendingWrites: Set<Promise<void>> = new Set();
 
-  constructor(private project: IProject) {
+  constructor(
+    private project: IProject,
+    private host?: IRuntimeHost,
+  ) {
     this.disk = project.fileSystem as FileSystemService;
   }
 
@@ -44,8 +48,9 @@ export class Workspace implements IWorkspace {
     try {
       await promise;
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(`Async write failed for ${filePath}:`, e);
+      if (this.host) {
+        this.host.log('error', `Async write failed for ${filePath}: ${(e as Error).message}`);
+      }
     } finally {
       this.pendingWrites.delete(promise);
     }
@@ -135,14 +140,16 @@ export class Workspace implements IWorkspace {
           const data = yaml.load(content) as { type: string; reason: string; metadata?: Record<string, unknown> };
           // Validate minimal signal structure
           if (!data || !data.type || !data.reason) {
-            // eslint-disable-next-line no-console
-            console.warn(`Invalid signal file content in ${file}`);
+            if (this.host) {
+              this.host.log('warn', `Invalid signal file content in ${file}`);
+            }
             continue;
           }
           return new Signal(data.type as SignalType, data.reason, data.metadata);
         } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error(`Failed to parse signal file ${file}:`, e);
+          if (this.host) {
+            this.host.log('error', `Failed to parse signal file ${file}: ${(e as Error).message}`);
+          }
         }
       }
     }

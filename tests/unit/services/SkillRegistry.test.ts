@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 
+import { IDriver } from '../../../src/domain/Driver.js';
 import { IProject } from '../../../src/domain/Project.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 import { DriverRegistry } from '../../../src/drivers/DriverRegistry.js';
@@ -9,15 +10,19 @@ describe('SkillRegistry', () => {
   let mockProject: {
     paths: { skills: string };
     fileSystem: {
-      isDirectory: jest.Mock;
-      listFiles: jest.Mock;
-      readFile: jest.Mock;
+      isDirectory: jest.Mock<(p: string) => Promise<boolean>>;
+      listFiles: jest.Mock<(p: string) => Promise<string[]>>;
+      readFile: jest.Mock<(p: string) => Promise<string>>;
     };
+    rootDirectory: string;
+    getConstraints: jest.Mock<() => Promise<string>>;
+    getConfig: jest.Mock<() => Promise<Record<string, unknown>>>;
   };
   let mockHost: {
     log: jest.Mock;
+    ask: jest.Mock;
   };
-  let mockDriverRegistry: DriverRegistry;
+  let mockDriverRegistry: jest.Mocked<DriverRegistry>;
 
   beforeEach(() => {
     mockProject = {
@@ -25,15 +30,21 @@ describe('SkillRegistry', () => {
         skills: '/project/skills',
       },
       fileSystem: {
-        isDirectory: jest.fn(),
-        listFiles: jest.fn(),
-        readFile: jest.fn(),
+        isDirectory: jest.fn<(_p: string) => Promise<boolean>>(),
+        listFiles: jest.fn<(_p: string) => Promise<string[]>>(),
+        readFile: jest.fn<(_p: string) => Promise<string>>(),
       },
+      rootDirectory: '/project',
+      getConstraints: jest.fn<() => Promise<string>>().mockResolvedValue(''),
+      getConfig: jest.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({}),
     };
     mockHost = {
       log: jest.fn(),
+      ask: jest.fn(),
     };
-    mockDriverRegistry = {} as unknown as DriverRegistry;
+    mockDriverRegistry = {
+      get: jest.fn(),
+    } as unknown as jest.Mocked<DriverRegistry>;
   });
 
   describe('init', () => {
@@ -44,14 +55,14 @@ describe('SkillRegistry', () => {
         mockHost as unknown as IRuntimeHost,
       );
 
-      mockProject.fileSystem.isDirectory.mockReturnValue(true);
+      mockProject.fileSystem.isDirectory.mockResolvedValue(true);
       mockProject.fileSystem.listFiles
-        .mockReturnValueOnce(['test1.skill.yml']) // Default path
-        .mockReturnValueOnce(['test2.skill.yaml']); // User path
+        .mockResolvedValueOnce(['test1.skill.yml']) // Default path
+        .mockResolvedValueOnce(['test2.skill.yaml']); // User path
 
       mockProject.fileSystem.readFile
-        .mockReturnValueOnce('name: test1\ndescription: desc1')
-        .mockReturnValueOnce('name: test2\ndescription: desc2');
+        .mockResolvedValueOnce('name: test1\ndescription: desc1')
+        .mockResolvedValueOnce('name: test2\ndescription: desc2');
 
       await registry.init();
 
@@ -67,7 +78,7 @@ describe('SkillRegistry', () => {
         mockDriverRegistry as unknown as DriverRegistry,
         mockHost as unknown as IRuntimeHost,
       );
-      mockProject.fileSystem.isDirectory.mockReturnValue(false);
+      mockProject.fileSystem.isDirectory.mockResolvedValue(false);
 
       await registry.init();
 
@@ -80,9 +91,9 @@ describe('SkillRegistry', () => {
         mockDriverRegistry as unknown as DriverRegistry,
         mockHost as unknown as IRuntimeHost,
       );
-      mockProject.fileSystem.isDirectory.mockReturnValue(true);
-      mockProject.fileSystem.listFiles.mockReturnValue(['invalid.skill.yml']);
-      mockProject.fileSystem.readFile.mockReturnValue('invalid: yaml: :'); // Syntax error
+      mockProject.fileSystem.isDirectory.mockResolvedValue(true);
+      mockProject.fileSystem.listFiles.mockResolvedValue(['invalid.skill.yml']);
+      mockProject.fileSystem.readFile.mockResolvedValue('invalid: yaml: :'); // Syntax error
 
       await registry.init();
 
@@ -99,18 +110,20 @@ describe('SkillRegistry', () => {
         mockDriverRegistry as unknown as DriverRegistry,
         mockHost as unknown as IRuntimeHost,
       );
-      mockProject.fileSystem.isDirectory.mockReturnValue(true);
-      mockProject.fileSystem.listFiles.mockReturnValue(['test.skill.yml', 'README.md', 'other.yml']);
+      mockProject.fileSystem.isDirectory.mockResolvedValue(true);
+      mockProject.fileSystem.listFiles
+        .mockResolvedValueOnce(['test.skill.yml', 'README.md', 'other.yml'])
+        .mockResolvedValueOnce([]); // Second search path is empty
 
       mockProject.fileSystem.readFile
-        .mockReturnValueOnce('name: test\ndescription: desc')
-        .mockReturnValueOnce('name: other\ndescription: desc');
+        .mockResolvedValueOnce('name: test\ndescription: desc')
+        .mockResolvedValueOnce('name: other\ndescription: desc');
 
       await registry.init();
 
       expect(registry.getSkill('test')).toBeDefined();
       expect(registry.getSkill('other')).toBeDefined();
-      expect(mockProject.fileSystem.readFile).toHaveBeenCalledTimes(4);
+      expect(mockProject.fileSystem.readFile).toHaveBeenCalledTimes(2); // README.md is skipped, 2 files from first path
     });
   });
 
@@ -132,14 +145,58 @@ describe('SkillRegistry', () => {
         mockDriverRegistry as unknown as DriverRegistry,
         mockHost as unknown as IRuntimeHost,
       );
-      mockProject.fileSystem.isDirectory.mockReturnValue(true);
-      mockProject.fileSystem.listFiles.mockReturnValue(['s1.skill.yml']);
-      mockProject.fileSystem.readFile.mockReturnValue('name: s1\ndescription: d1');
+      mockProject.fileSystem.isDirectory.mockResolvedValue(true);
+      mockProject.fileSystem.listFiles.mockResolvedValue(['s1.skill.yml']);
+      mockProject.fileSystem.readFile.mockResolvedValue('name: s1\ndescription: d1');
       await registry.init();
 
       const skills = registry.getSkills();
       expect(skills.length).toBeGreaterThan(0);
       expect(skills[0].name).toBe('s1');
+    });
+  });
+
+  describe('loadYamlSkills edge cases', () => {
+    it('should validate driver config if provider is specified', async () => {
+      const registry = new SkillRegistry(
+        mockProject as unknown as IProject,
+        mockDriverRegistry as unknown as DriverRegistry,
+        mockHost as unknown as IRuntimeHost,
+      );
+
+      const mockDriver = {
+        name: 'test-driver',
+        execute: jest.fn(),
+        isSupported: jest.fn(),
+        getEnvironmentSpec: jest.fn(),
+        validateConfig: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      } as unknown as IDriver;
+      mockDriverRegistry.get.mockReturnValue(mockDriver);
+
+      mockProject.fileSystem.isDirectory.mockResolvedValue(true);
+      mockProject.fileSystem.listFiles.mockResolvedValue(['driver.skill.yml']);
+      mockProject.fileSystem.readFile.mockResolvedValue('name: driver-skill\nexecution:\n  provider: test-driver');
+
+      await registry.init();
+
+      expect(mockDriverRegistry.get).toHaveBeenCalledWith('test-driver');
+      expect(mockDriver.validateConfig).toHaveBeenCalled();
+    });
+
+    it('should handle missing directory during load', async () => {
+      const registry = new SkillRegistry(
+        mockProject as unknown as IProject,
+        mockDriverRegistry as unknown as DriverRegistry,
+        mockHost as unknown as IRuntimeHost,
+      );
+      // Simulate default path missing but user path existing
+      mockProject.fileSystem.isDirectory.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      mockProject.fileSystem.listFiles.mockResolvedValue(['user.skill.yml']);
+      mockProject.fileSystem.readFile.mockResolvedValue('name: user-skill');
+
+      await registry.init();
+
+      expect(registry.getSkill('user-skill')).toBeDefined();
     });
   });
 });

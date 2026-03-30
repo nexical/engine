@@ -15,16 +15,17 @@ const MockExecutingState = jest.fn().mockImplementation(() => ({ name: 'EXECUTIN
 const MockCompletedState = jest.fn().mockImplementation(() => ({ name: 'COMPLETED' }));
 
 const mockGraph = {
-  getInitialState: jest.fn().mockReturnValue('ARCHITECTING'),
-  getNextState: jest.fn(),
-  getErrorTarget: jest.fn(),
-  getConfig: jest.fn().mockReturnValue({ maxLoops: 5 }),
+  getInitialState: jest.fn<() => string>().mockReturnValue('ARCHITECTING'),
+  getNextState: jest.fn<(_s: string, _sig: Signal) => string | undefined>(),
+  getErrorTarget: jest.fn<(_s: string) => string | undefined>(),
+  getConfig: jest.fn<() => { maxLoops: number }>().mockReturnValue({ maxLoops: 5 }),
 };
 const MockWorkflowGraph = jest.fn().mockReturnValue(mockGraph);
 
 const mockBrain = { getEvolution: jest.fn() };
 const mockEvolution = { recordEvent: jest.fn() };
-mockBrain.getEvolution.mockReturnValue(mockEvolution);
+
+(mockBrain.getEvolution as jest.Mock).mockReturnValue(mockEvolution);
 
 const mockWorkspace = { saveState: jest.fn() };
 const mockHost = { log: jest.fn(), emit: jest.fn() };
@@ -57,22 +58,22 @@ type WorkflowConstructor = new (
   start(state: EngineState, onStateChange?: () => Promise<void>): Promise<void>;
   registerState(state: State): void;
   currentState?: State;
-  // Access private property for testing if needed, though strictly not allowed
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  states: Map<string, any>;
+  states: Map<string, State>;
 };
 
 let Workflow: WorkflowConstructor;
 try {
-  const mod = await import('../../../src/workflow/Workflow.js');
-  Workflow = mod.Workflow as unknown as WorkflowConstructor;
+  const mod = (await import('../../../src/workflow/Workflow.js')) as { Workflow: WorkflowConstructor };
+  Workflow = mod.Workflow;
 } catch (e) {
-  // eslint-disable-next-line no-console
-  console.error('Error importing Workflow module:', e);
+  // Use a fallback or rethrow
+  throw new Error(`Error importing Workflow module: ${(e as Error).message}`);
 }
 
+type IWorkflow = InstanceType<WorkflowConstructor>;
+
 describe('Workflow Unit Tests', () => {
-  let workflow: InstanceType<typeof Workflow>;
+  let workflow: IWorkflow;
   let engineState: EngineState;
 
   type StateRun = (state: EngineState) => Promise<Signal>;
@@ -100,10 +101,10 @@ describe('Workflow Unit Tests', () => {
     );
 
     // Mock default states behavior to avoid real logic
-    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
-    setupMockState('PLANNING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
-    setupMockState('EXECUTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT) as jest.Mock<StateRun>);
-    setupMockState('COMPLETED', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE) as jest.Mock<StateRun>);
+    setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT));
+    setupMockState('PLANNING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT));
+    setupMockState('EXECUTING', jest.fn<StateRun>().mockResolvedValue(Signal.NEXT));
+    setupMockState('COMPLETED', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE));
   });
 
   it('should resume from existing state', async () => {
@@ -272,7 +273,7 @@ describe('Workflow Unit Tests', () => {
     setupMockState('PLANNING', planningRun);
 
     // Mock graph to return undefined for subsequent states to finish loop if needed
-    mockGraph.getNextState.mockImplementation((state, _signal) => {
+    mockGraph.getNextState.mockImplementation((state: string, _signal: Signal) => {
       if (state === 'ARCHITECTING') return 'PLANNING';
       return undefined;
     });
@@ -318,20 +319,6 @@ describe('Workflow Unit Tests', () => {
 
   it('should fail if implicit COMPLETED state is missing', async () => {
     // We need to unregister COMPLETED state for this test, or ensure it's not found
-    // Since we mock states map in beforeEach, we can just NOT register it here?
-    // But beforeEach registers 'COMPLETED'.
-    // We can clear the map if we had access, but 'workflow.states' is private.
-    // Hack: Rename mocked COMPLETED state in map?
-    // Or simpler: Mock 'COMPLETED' state registration to NOT happen or happen with different name?
-    // We can't easily undo beforeEach.
-    // Instead, we can force get('COMPLETED') to return undefined by mocking the map.get call if we could.
-    // But 'workflow.states' is a real Map.
-
-    // Alternative: Create a new workflow instance for this test without default states?
-    // But 'Workflow' constructor calls 'registerDefaultStates'.
-
-    // Okay, assuming 'COMPLETED' is always there, this branch might be unreachable in normal usage unless 'registerDefaultStates' changes.
-    // But we can check if 'this.states.delete' works?
     workflow.states.delete('COMPLETED');
 
     setupMockState('ARCHITECTING', jest.fn<StateRun>().mockResolvedValue(Signal.COMPLETE));

@@ -2,7 +2,8 @@ import { jest } from '@jest/globals';
 
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { IProject } from '../../../src/domain/Project.js';
-import { FileSystemBus as FileSystemBusType, IBusMessage } from '../../../src/services/FileSystemBus.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
+import type { FileSystemBus as FileSystemBusType, IBusMessage } from '../../../src/services/FileSystemBus.js';
 
 // Mock chokidar
 const mockOn = jest.fn<(...args: unknown[]) => unknown>().mockReturnThis();
@@ -29,6 +30,7 @@ const { FileSystemBus } = await import('../../../src/services/FileSystemBus.js')
 describe('FileSystemBus', () => {
   let mockProject: jest.Mocked<IProject>;
   let mockFileSystem: jest.Mocked<IFileSystem>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   let bus: FileSystemBusType;
 
   beforeEach(() => {
@@ -38,7 +40,20 @@ describe('FileSystemBus', () => {
       readFile: jest.fn<IFileSystem['readFile']>().mockResolvedValue(''),
       writeFile: jest.fn<IFileSystem['writeFile']>().mockResolvedValue(undefined),
       deleteFile: jest.fn<IFileSystem['deleteFile']>().mockResolvedValue(undefined),
+      isDirectory: jest.fn<IFileSystem['isDirectory']>().mockResolvedValue(false),
+      listFiles: jest.fn<IFileSystem['listFiles']>().mockResolvedValue([]),
     } as unknown as jest.Mocked<IFileSystem>;
+
+    mockHost = {
+      log: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+      emit: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
 
     mockProject = {
       rootDirectory: '/root',
@@ -49,7 +64,7 @@ describe('FileSystemBus', () => {
       fileSystem: mockFileSystem,
     } as unknown as jest.Mocked<IProject>;
 
-    bus = new FileSystemBus(mockProject, mockFileSystem);
+    bus = new FileSystemBus(mockProject, mockFileSystem, mockHost);
   });
 
   describe('constructor', () => {
@@ -60,7 +75,7 @@ describe('FileSystemBus', () => {
         fileSystem: mockFileSystem,
       };
 
-      const minimalBus = new FileSystemBus(minimalProject as unknown as IProject, mockFileSystem);
+      const minimalBus = new FileSystemBus(minimalProject as unknown as IProject, mockFileSystem, mockHost);
 
       minimalBus.watchInbox(jest.fn<() => Promise<void>>().mockResolvedValue(undefined));
       expect(mockWatch).toHaveBeenCalledWith('/custom-root/.ai/comms/inbox', expect.any(Object));
@@ -116,7 +131,6 @@ describe('FileSystemBus', () => {
 
     it('should handle handler errors gracefully', async () => {
       const handler = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('handler fail'));
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       bus.watchInbox(handler);
 
       const addHandlerCall = mockOn.mock.calls.find((call) => call[0] === 'add');
@@ -127,8 +141,30 @@ describe('FileSystemBus', () => {
       addHandler('/root/inbox/error.json');
       await flushPromises();
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error processing inbox message'));
+    });
+  });
+
+  describe('watcher errors', () => {
+    it('should handle inbox watcher error emission', () => {
+      bus.watchInbox(() => Promise.resolve());
+
+      const errorHandlerCall = mockOn.mock.calls.find((call) => call[0] === 'error');
+      const errorHandler = errorHandlerCall?.[1] as (err: Error) => void;
+
+      if (!errorHandler) throw new Error('Could not find error handler on inbox watcher');
+
+      errorHandler(new Error('chokidar test error'));
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Inbox watcher error'));
+    });
+
+    it('should handle failed inbox watcher initialization', () => {
+      mockWatch.mockImplementationOnce(() => {
+        throw new Error('init fail');
+      });
+
+      bus.watchInbox(() => Promise.resolve());
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to initialize inbox watcher'));
     });
   });
 
@@ -177,9 +213,6 @@ describe('FileSystemBus', () => {
   });
 
   describe('waitForResponse', () => {
-    // Note: We avoid global fake timers here to ensure async events are processed correctly.
-    // We only use fake timers for specific timeout tests.
-
     it('should resolve if response already exists', async () => {
       mockFileSystem.exists.mockResolvedValue(true);
       mockFileSystem.readFile.mockResolvedValue(JSON.stringify({ id: 'res1', payload: { x: 1 } }));
@@ -279,21 +312,21 @@ describe('FileSystemBus', () => {
 
   describe('outbox watcher and emitters', () => {
     it('should log error when outbox watcher fails to initialize', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockWatch.mockImplementationOnce(() => {
         throw new Error('watch fail');
       });
 
-      const b = new FileSystemBus(mockProject, mockFileSystem);
+      const b = new FileSystemBus(mockProject, mockFileSystem, mockHost);
       (b as unknown as { ensureOutboxWatcher: () => void }).ensureOutboxWatcher();
 
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to initialize outbox watcher:', expect.any(Error));
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Failed to initialize outbox watcher'),
+      );
     });
 
     it('should log error when outbox watcher emits error', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const b = new FileSystemBus(mockProject, mockFileSystem);
+      const b = new FileSystemBus(mockProject, mockFileSystem, mockHost);
       (b as unknown as { ensureOutboxWatcher: () => void }).ensureOutboxWatcher();
 
       const errorCalls = mockOn.mock.calls.filter((call) => call[0] === 'error');
@@ -301,13 +334,11 @@ describe('FileSystemBus', () => {
 
       if (errorListener) {
         errorListener(new Error('emitted outbox error'));
-        expect(consoleSpy).toHaveBeenCalledWith('Outbox watcher error:', expect.any(Error));
+        expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Outbox watcher error'));
       }
-      consoleSpy.mockRestore();
     });
 
     it('should handle errors in outbox watcher add event', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       await bus.sendResponse('c1', {});
 
       const addCalls = mockOn.mock.calls.filter((call) => call[0] === 'add');
@@ -321,9 +352,11 @@ describe('FileSystemBus', () => {
         });
 
         addListener('/some/path.json');
-        expect(consoleSpy).toHaveBeenCalledWith('Error in outbox watcher add event:', expect.any(Error));
+        expect(mockHost.log).toHaveBeenCalledWith(
+          'error',
+          expect.stringContaining('Error in outbox watcher add event'),
+        );
       }
-      consoleSpy.mockRestore();
     });
   });
 
@@ -341,33 +374,28 @@ describe('FileSystemBus', () => {
 
   describe('inbox watcher errors', () => {
     it('should log error if inbox watcher fails to initialize', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockWatch.mockImplementationOnce(() => {
         throw new Error('inbox init fail');
       });
 
-      bus.watchInbox(async () => {});
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to initialize inbox watcher:', expect.any(Error));
-      consoleSpy.mockRestore();
+      bus.watchInbox(() => Promise.resolve());
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to initialize inbox watcher'));
     });
 
     it('should log error if inbox watcher emits error', () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      bus.watchInbox(async () => {});
+      bus.watchInbox(() => Promise.resolve());
 
       const errorListenerCall = mockOn.mock.calls.filter((call) => call[0] === 'error')[0];
       const errorListener = errorListenerCall?.[1] as (e: Error) => void;
 
       if (errorListener) {
         errorListener(new Error('inbox error'));
-        expect(consoleSpy).toHaveBeenCalledWith('Inbox watcher error:', expect.any(Error));
+        expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Inbox watcher error'));
       }
-      consoleSpy.mockRestore();
     });
 
     it('should handle invalid JSON in inbox message', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      bus.watchInbox(async () => {});
+      bus.watchInbox(() => Promise.resolve());
 
       const addListenerCall = mockOn.mock.calls.find((call) => call[0] === 'add');
       const addListener = addListenerCall?.[1] as (p: string) => void;
@@ -378,17 +406,13 @@ describe('FileSystemBus', () => {
       addListener('/root/inbox/bad.json');
       await flushPromises();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Error processing inbox message'),
-        expect.any(Error),
-      );
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Error processing inbox message'));
     });
   });
 
   describe('edge cases', () => {
     it('should stop and close both watchers', async () => {
-      bus.watchInbox(async () => {});
+      bus.watchInbox(() => Promise.resolve());
       (bus as unknown as { ensureOutboxWatcher: () => void }).ensureOutboxWatcher();
       await bus.stop();
       expect(mockClose).toHaveBeenCalledTimes(2);
@@ -405,12 +429,35 @@ describe('FileSystemBus', () => {
         paths: {},
         fileSystem: mockFileSystem,
       };
-      const b = new FileSystemBus(minimalProject as unknown as IProject, mockFileSystem);
+      const b = new FileSystemBus(minimalProject as unknown as IProject, mockFileSystem, mockHost);
       await b.sendResponse('c1', {});
       expect(mockFileSystem.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('/tmp/.ai/comms/outbox'),
         expect.any(String),
       );
+    });
+
+    it('should not log when host is missing and outbox watcher fails', () => {
+      mockWatch.mockImplementationOnce(() => {
+        throw new Error('no-host fail');
+      });
+      const b = new FileSystemBus(mockProject, mockFileSystem);
+      // No host provided, so ensureOutboxWatcher shouldn't throw but also shouldn't log
+      expect(() => (b as unknown as { ensureOutboxWatcher: () => void }).ensureOutboxWatcher()).not.toThrow();
+      expect(mockHost.log).not.toHaveBeenCalled();
+    });
+
+    it('should not log when host is missing and inbox watcher error occurs', () => {
+      const b = new FileSystemBus(mockProject, mockFileSystem);
+      b.watchInbox(() => Promise.resolve());
+
+      const errorListenerCall = mockOn.mock.calls.filter((call) => call[0] === 'error')[0];
+      const errorListener = errorListenerCall?.[1] as (e: Error) => void;
+
+      if (errorListener) {
+        expect(() => errorListener(new Error('inbox error'))).not.toThrow();
+        expect(mockHost.log).not.toHaveBeenCalled();
+      }
     });
   });
 });

@@ -15,8 +15,7 @@ export class Brain {
   private driverRegistry: IDriverRegistry;
   private skillRegistry: ISkillRegistry;
   private evolution: IEvolutionService;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private agentFactories: Map<string, (workspace: IWorkspace) => any> = new Map();
+  private agentFactories: Map<string, (workspace: IWorkspace) => unknown> = new Map();
 
   constructor(
     private project: IProject,

@@ -22,7 +22,7 @@ export class DriverRegistry extends Registry<IDriver> implements IDriverRegistry
     protected config: Record<string, unknown>,
     fileSystem?: IFileSystem,
   ) {
-    super();
+    super(host);
     this.fileSystem = fileSystem || new FileSystemService(host);
   }
 

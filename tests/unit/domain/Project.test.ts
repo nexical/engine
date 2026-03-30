@@ -2,10 +2,12 @@ import { jest } from '@jest/globals';
 
 import { IFileSystem } from '../../../src/domain/IFileSystem.js';
 import { Project } from '../../../src/domain/Project.js';
+import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
 
 describe('Project', () => {
   let project: Project;
   let mockFileSystem: jest.Mocked<IFileSystem>;
+  let mockHost: jest.Mocked<IRuntimeHost>;
   const rootDir = '/test/root';
 
   beforeEach(() => {
@@ -27,7 +29,14 @@ describe('Project', () => {
       releaseLock: jest.fn<IFileSystem['releaseLock']>().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<IFileSystem>;
 
-    project = new Project(rootDir, mockFileSystem);
+    mockHost = {
+      log: jest.fn(),
+      emit: jest.fn(),
+      status: jest.fn(),
+      ask: jest.fn(),
+    } as unknown as jest.Mocked<IRuntimeHost>;
+
+    project = new Project(rootDir, mockFileSystem, mockHost);
   });
 
   it('should be defined', () => {
@@ -80,15 +89,8 @@ describe('Project', () => {
       mockFileSystem.exists.mockResolvedValue(true);
       mockFileSystem.readFile.mockRejectedValue(new Error('Read failed'));
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       await expect(project.getConfig()).rejects.toThrow('Read failed');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to load project profile'),
-        expect.any(Error),
-      );
-
-      consoleSpy.mockRestore();
+      expect(mockHost.log).toHaveBeenCalledWith('error', expect.stringContaining('Failed to load project profile'));
     });
   });
 });

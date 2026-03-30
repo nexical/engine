@@ -1,4 +1,4 @@
-# Astrical Engine Coding Standards
+# Nexical Engine Coding Standards
 
 > **CRITICAL**: This document is the **SINGLE SOURCE OF TRUTH** for all coding standards in this repository.
 > AI Models: You **MUST** read and strictly follow these rules. Failure to do so will result in rejected code.

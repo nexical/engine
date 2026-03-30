@@ -33,8 +33,10 @@ export interface ISkillContext {
 
   // Domain Services
   fileSystem: IFileSystem;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  driverRegistry: any; // Using 'any' for now to avoid circular dependency
+  /**
+   * Registry of available drivers.
+   */
+  driverRegistry: { get(name: string): unknown };
   workspaceRoot: string;
 
   // Execution State

@@ -1,10 +1,7 @@
-/* eslint-disable */
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
 import { jest } from '@jest/globals';
 
 import { IDriverContext, ISkill } from '../../../src/domain/Driver.js';
 import { IRuntimeHost } from '../../../src/domain/RuntimeHost.js';
-import { AISkill } from '../../../src/drivers/base/AICLIDriver.js';
 import { GeminiDriver } from '../../../src/drivers/GeminiDriver.js';
 import { IPromptEngine } from '../../../src/services/PromptEngine.js';
 import { ShellService } from '../../../src/services/ShellService.js';
@@ -23,13 +20,16 @@ describe('GeminiDriver', () => {
       status: jest.fn(),
       ask: jest.fn(),
       emit: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
     } as unknown as jest.Mocked<IRuntimeHost>;
     driver = new GeminiDriver(mockHost, {
       rootDirectory: '/tmp',
     });
     // Access protected shell property via unknown cast
-
-    mockShell = (driver as any).shell;
+    mockShell = (driver as unknown as { shell: jest.Mocked<ShellService> }).shell;
     // Mock execute method
     mockShell.execute = jest
       .fn<() => Promise<{ code: number; stdout: string; stderr: string }>>()
@@ -47,11 +47,22 @@ describe('GeminiDriver', () => {
   });
 
   it('should return false if gemini --version fails', async () => {
-    mockShell.execute.mockImplementation(async (cmd: string, args: string[]) => {
+    mockShell.execute.mockImplementation((_cmd: string, args: string[]) => {
       if (args.includes('--version')) {
-        throw new Error('version failed');
+        return Promise.reject(new Error('version failed'));
       }
-      return { code: 0, stdout: '/bin/gemini', stderr: '' };
+      return Promise.resolve({ code: 0, stdout: '/bin/gemini', stderr: '' });
+    });
+    const supported = await driver.isSupported();
+    expect(supported).toBe(false);
+  });
+
+  it('should return false if gemini binary is missing', async () => {
+    mockShell.execute.mockImplementation((cmd: string) => {
+      if (cmd === 'which') {
+        return Promise.reject(new Error('not found'));
+      }
+      return Promise.resolve({ code: 0, stdout: '', stderr: '' });
     });
     const supported = await driver.isSupported();
     expect(supported).toBe(false);
@@ -60,19 +71,19 @@ describe('GeminiDriver', () => {
   it('should execute skill', async () => {
     const context = {
       promptEngine: {
-        renderString: jest.fn<IPromptEngine['renderString']>().mockImplementation((...args: any[]) => {
-          const [t, c] = args as [string, Record<string, unknown>];
-          const context = c as Record<string, string>;
-          if (t === '{prompt}') return context.prompt || '';
-          return t;
-        }),
+        renderString: jest
+          .fn<IPromptEngine['renderString']>()
+          .mockImplementation((tmpl: string, ctx: Record<string, unknown>) => {
+            if (tmpl === '{prompt}') return (ctx.prompt as string) || '';
+            return tmpl;
+          }),
       },
     } as unknown as IDriverContext;
-    await driver.run({ name: 'test', prompt_template: 'Hello' }, context);
+    await driver.run({ name: 'test', description: 'test', prompt_template: 'Hello' } as ISkill, context);
     expect(mockShell.execute).toHaveBeenCalledWith(
       'gemini',
       expect.arrayContaining(['prompt', 'Hello\n', '--yolo']),
-      expect.anything(),
+      expect.any(Object),
     );
   });
 
@@ -94,19 +105,20 @@ describe('GeminiDriver', () => {
     const result = await driver.run(
       {
         name: 'test',
+        description: 'test',
         prompt_template: 'template',
         model: 'gemini-pro',
-      } as any,
+      } as unknown as ISkill,
       context,
     );
 
     expect(result).toBe('response');
-    expect(mockShell.execute).toHaveBeenCalledWith('gemini', expect.anything(), expect.anything());
+    expect(mockShell.execute).toHaveBeenCalledWith('gemini', expect.any(Array), expect.any(Object));
   });
 
   it('should include extra arguments if provided in skill', async () => {
     await driver.run(
-      { name: 'test', prompt_template: 'Hello', args: ['--extra', 'val'] } as unknown as ISkill,
+      { name: 'test', description: 'test', prompt_template: 'Hello', args: ['--extra', 'val'] } as unknown as ISkill,
       {
         userPrompt: 'User',
         promptEngine: {
@@ -122,7 +134,24 @@ describe('GeminiDriver', () => {
     expect(mockShell.execute).toHaveBeenCalledWith(
       'gemini',
       expect.arrayContaining(['--extra', 'val']),
-      expect.anything(),
+      expect.any(Object),
+    );
+  });
+
+  it('should handle skill without extra arguments', async () => {
+    await driver.run(
+      { name: 'test', description: 'test', prompt_template: 'Hello' } as unknown as ISkill,
+      {
+        userPrompt: 'User',
+        promptEngine: {
+          renderString: jest.fn<IPromptEngine['renderString']>().mockReturnValue('Hello'),
+        },
+      } as unknown as IDriverContext,
+    );
+    expect(mockShell.execute).toHaveBeenCalledWith(
+      'gemini',
+      expect.not.arrayContaining(['--extra']),
+      expect.any(Object),
     );
   });
 });

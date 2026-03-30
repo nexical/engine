@@ -39,7 +39,7 @@ export class Executor {
         this.git.cleanStaleWorktrees();
       } catch (e) {
         // Warning only
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = String(e);
         this.host.log('warn', `Failed to clean stale worktrees: ${msg}`);
       }
     }
@@ -204,7 +204,8 @@ export class Executor {
           return { taskId: task.id, branch: branchName, worktreePath };
         } catch (e) {
           state.tasks.failed.push(task.id);
-          this.host.log('error', `Task ${task.id} failed: ${e instanceof Error ? e.message : String(e)}`);
+          const msg = String(e);
+          this.host.log('error', `Task ${task.id} failed: ${msg}`);
           throw e;
         }
       });
@@ -220,7 +221,7 @@ export class Executor {
         const stashOut = this.git.runCommand(['stash', 'push', '-u', '-m', 'Executor-Auto-Stash']);
         stashed = !stashOut.includes('No local changes to save');
       } catch (e) {
-        this.host.log('warn', `Failed to stash changes: ${e instanceof Error ? e.message : String(e)}`);
+        this.host.log('warn', `Failed to stash changes: ${String(e)}`);
       }
 
       for (const res of results) {
@@ -236,7 +237,7 @@ export class Executor {
           const afterMerge = this.git.runCommand(['log', '--oneline']);
           this.host.log('debug', `Log after merge on ${currentBranch}:\n${afterMerge}`);
         } catch (e) {
-          const errMsg = e instanceof Error ? e.message : String(e);
+          const errMsg = String(e);
           this.host.log('error', `Merge failed for task ${res.taskId} from branch ${res.branch}: ${errMsg}`);
 
           // Attempt to abort the merge to return to a clean state
@@ -259,7 +260,7 @@ export class Executor {
           // Pop conflict is possible if merged content differs from stashed.
           // But since task branch contains the stashed content (copied), it should be fine mostly.
           // If conflict occurs, it's a real conflict.
-          this.host.log('warn', `Stash pop failed (conflict?): ${e instanceof Error ? e.message : String(e)}`);
+          this.host.log('warn', `Stash pop failed (conflict?): ${String(e)}`);
         }
       }
     } finally {
@@ -270,7 +271,7 @@ export class Executor {
           this.git.worktreeRemove(wt.path);
           this.git.deleteBranch(wt.branch, true);
         } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
+          const msg = String(e);
           this.host.log('warn', `Failed to cleanup worktree ${wt.path}: ${msg}`);
         }
       }
@@ -278,7 +279,7 @@ export class Executor {
       try {
         this.git.worktreePrune();
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = String(e);
         this.host.log('warn', `Failed to prune worktrees: ${msg}`);
       }
 
@@ -293,7 +294,7 @@ export class Executor {
         );
         await analyst.analyze();
       } catch (e) {
-        this.host.log('warn', `AnalystAgent failed to run: ${e instanceof Error ? e.message : String(e)}`);
+        this.host.log('warn', `AnalystAgent failed to run: ${String(e)}`);
       }
     }
   }

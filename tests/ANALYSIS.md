@@ -5,7 +5,7 @@
 **Scope:** `src/engine` Deep Analysis
 
 ## 1. Purpose & Structure
-This document serves as the authoritative guide to the internal workings of the Astrical Engine. It maps every interaction, workflow path, and state transition within the application to guide integration and end-to-end testing strategies.
+This document serves as the authoritative guide to the internal workings of the Nexical Engine. It maps every interaction, workflow path, and state transition within the application to guide integration and end-to-end testing strategies.
 
 ### Structure
 1.  **Source File Deep Dive**: Detailed analysis of each source file, including responsibilities, state mutations, and interactions.
@@ -27,7 +27,6 @@ This document serves as the authoritative guide to the internal workings of the 
     *   `PromptEngine`: Renders the `architect` skill prompts.
     *   `RuntimeHost`: Asks the user for approval or clarification.
 *   **Legacy Note**: `runOracleMode` is a blocking call. Integration tests must not call this directly in the main thread or it will hang the test runner.
-*   **Logic Quirk**: Requires specific regex matching in `Architecture.ts` line 30+. If the model output varies (e.g., "Section 1: ..."), parsing fails.
 
 #### `PlannerAgent`
 *   **Responsibility**: Converts `Architecture` into a DAG of executable `Task`s.
@@ -120,7 +119,7 @@ This document serves as the authoritative guide to the internal workings of the 
 1.  **Start**: `Orchestrator.start()`.
 2.  **Architecting**:
     *   Agent runs. Driver returns Markdown.
-    *   `Architecture.fromMarkdown` parses regex sections.
+    *   `Architecture.fromMarkdown` stores the raw markdown string.
     *   `Signal.NEXT` -> **Planning**.
 3.  **Planning**:
     *   Agent runs. Driver returns YAML.
@@ -158,7 +157,7 @@ To ensure coverage and stability, the following constraints MUST be met by `Proj
 ### 4.1 State Seeding (Fixtures)
 *   **Git Init**: Tests involving `Executor` must have `git init` AND `git commit --allow-empty -m "init"` to create a valid HEAD.
 *   **Valid Artifacts**:
-    *   `ValidArchitectureMd`: Must match regex `/## 1\. Solution Overview/`.
+    *   `ValidArchitectureMd`: Can be any valid markdown text depending on generated structure.
     *   `ValidPlanYaml`: Must match Zod schema `tasks: [{id, skill, ...}]`.
 
 ### 4.2 Concurrency & Threads
